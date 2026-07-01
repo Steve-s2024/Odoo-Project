@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_warehouse_form_subwarehouse" model="ir.ui.view">
+        <field name="name">stock.warehouse.form.subwarehouse</field>
+        <field name="model">stock.warehouse</field>
+        <field name="inherit_id" ref="stock.view_warehouse"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_open_subwarehouse_structure"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-sitemap"
+                    string="子仓库"
+                    groups="stock.group_stock_multi_locations">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">子仓库</span>
+                    </div>
+                </button>
+                <button name="action_view_descendant_inventory_totals"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-cubes"
+                    string="下级库存">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">下级库存</span>
+                    </div>
+                </button>
+                <button name="action_view_descendant_inventory_product_totals"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-list"
+                    string="产品汇总">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">产品汇总</span>
+                    </div>
+                </button>
+            </xpath>
+            <xpath expr="//page[@name='warehouse_config']" position="after">
+                <page string="子仓库" name="subwarehouse_structure" groups="stock.group_stock_multi_locations">
+                    <group>
+                        <button name="action_create_subwarehouse" type="object" string="创建子仓库" class="btn-primary"/>
+                        <button name="action_open_subwarehouse_structure" type="object" string="打开层级结构"/>
+                        <button name="action_view_descendant_inventory_totals" type="object" string="计算下级库存"/>
+                        <button name="action_view_descendant_inventory_product_totals" type="object" string="产品汇总列表"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+    <record id="view_warehouse_form_subwarehouse_trim_buttons" model="ir.ui.view">
+        <field name="name">stock.warehouse.form.subwarehouse.trim.buttons</field>
+        <field name="model">stock.warehouse</field>
+        <field name="inherit_id" ref="stock.view_warehouse"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_view_descendant_inventory_product_totals']" position="replace"/>
+            <xpath expr="//page[@name='subwarehouse_structure']//button[@name='action_view_descendant_inventory_product_totals']" position="replace"/>
+        </field>
+    </record>
+</odoo>

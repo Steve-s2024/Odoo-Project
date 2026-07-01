@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_product_attribute_apply_all_form" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.product.attribute.apply.wizard.form</field>
+        <field name="model">stock.subwarehouse.product.attribute.apply.wizard</field>
+        <field name="arch" type="xml">
+            <form string="为所有产品添加属性">
+                <sheet>
+                    <group>
+                        <field name="attribute_name"/>
+                        <field name="value_name"/>
+                        <field name="include_archived_products"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_apply" type="object" string="添加属性" class="btn-primary"/>
+                    <button special="cancel" string="取消"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_add_attribute_to_all_products" model="ir.actions.act_window">
+        <field name="name">为所有产品添加自定义属性</field>
+        <field name="res_model">stock.subwarehouse.product.attribute.apply.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="product.model_product_template"/>
+        <field name="binding_view_types">list,form</field>
+    </record>
+
+    <record id="view_product_attribute_remove_all_form" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.product.attribute.remove.wizard.form</field>
+        <field name="model">stock.subwarehouse.product.attribute.remove.wizard</field>
+        <field name="arch" type="xml">
+            <form string="从所有产品移除自定义属性">
+                <sheet>
+                    <group>
+                        <field name="attribute_id"/>
+                        <field name="include_archived_products"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_remove" type="object" string="移除属性" class="btn-primary"/>
+                    <button special="cancel" string="取消"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_remove_attribute_from_all_products" model="ir.actions.act_window">
+        <field name="name">从所有产品移除自定义属性</field>
+        <field name="res_model">stock.subwarehouse.product.attribute.remove.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="product.model_product_template"/>
+        <field name="binding_view_types">list,form</field>
+    </record>
+
+    <menuitem
+        id="menu_add_attribute_to_all_products"
+        name="为所有产品添加自定义属性"
+        parent="sale.menu_product_attribute_action"
+        action="action_add_attribute_to_all_products"
+        sequence="95"/>
+
+    <menuitem
+        id="menu_remove_attribute_from_all_products"
+        name="从所有产品移除自定义属性"
+        parent="sale.menu_product_attribute_action"
+        action="action_remove_attribute_from_all_products"
+        sequence="96"/>
+
+    <record id="product_template_kanban_add_attribute_button" model="ir.ui.view">
+        <field name="name">product.template.kanban.add.attribute.button</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_kanban_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//kanban" position="inside">
+                <header>
+                    <button
+                        name="%(action_add_attribute_to_all_products)d"
+                        type="action"
+                        string="添加自定义属性"
+                        class="btn-secondary"
+                        display="always"/>
+                    <button
+                        name="%(action_remove_attribute_from_all_products)d"
+                        type="action"
+                        string="移除自定义属性"
+                        class="btn-secondary"
+                        display="always"/>
+                </header>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="product_template_list_add_attribute_button" model="ir.ui.view">
+        <field name="name">product.template.list.add.attribute.button</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="account.product_template_list_view_sellable_inherit"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="inside">
+                <header>
+                    <button
+                        name="%(action_add_attribute_to_all_products)d"
+                        type="action"
+                        string="添加自定义属性"
+                        class="btn-secondary"
+                        display="always"/>
+                    <button
+                        name="%(action_remove_attribute_from_all_products)d"
+                        type="action"
+                        string="移除自定义属性"
+                        class="btn-secondary"
+                        display="always"/>
+                </header>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="product_template_form_custom_attributes_visible" model="ir.ui.view">
+        <field name="name">product.template.form.custom.attributes.visible</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_only_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='general_information']" position="after">
+                <page name="custom_attributes" string="自定义属性">
+                    <field name="x_custom_attribute_value_ids" widget="one2many">
+                        <list string="自定义属性" editable="bottom">
+                            <field name="attribute_id" readonly="1"/>
+                            <field name="value_text" string="值"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

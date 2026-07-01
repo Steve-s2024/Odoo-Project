@@ -1,0 +1,127 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# * stock_subwarehouse_hierarchy
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-26 00:00+0000\n"
+"PO-Revision-Date: 2026-06-26 00:00+0000\n"
+"Language: zh_CN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Stock Subwarehouse Hierarchy"
+msgstr "库存子仓库层级"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Track warehouses and subwarehouses using the stock location tree."
+msgstr "使用库存库位树跟踪仓库和子仓库。"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Subwarehouse"
+msgstr "子仓库"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Subwarehouses"
+msgstr "子仓库"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Subwarehouse Code"
+msgstr "子仓库编码"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Responsible"
+msgstr "负责人"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Structure Notes"
+msgstr "结构备注"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Child Locations"
+msgstr "子库位"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Warehouse Structure"
+msgstr "仓库结构"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Create Subwarehouse"
+msgstr "创建子仓库"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Open Structure"
+msgstr "打开层级结构"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Parent Location"
+msgstr "父库位"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Descendant Inventory Totals"
+msgstr "下级库存汇总"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Descendant Product Totals"
+msgstr "下级产品汇总"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Inventory In/Out History"
+msgstr "库存出入历史"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Internal Transfer"
+msgstr "内部调拨"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Load / Remove Product"
+msgstr "装入/移除产品"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Manufacture Product"
+msgstr "制造产品"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Import Manufacturing Sheet"
+msgstr "导入制造单"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Add Custom Attribute"
+msgstr "添加自定义属性"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Remove Custom Attribute"
+msgstr "移除自定义属性"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Custom Attributes"
+msgstr "自定义属性"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Value"
+msgstr "值"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Products"
+msgstr "产品"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Product Import Template (current custom attributes)"
+msgstr "产品导入模板（当前自定义属性）"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Manufacturing Import Template (current product attributes)"
+msgstr "制造单导入模板（当前产品属性）"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "The subwarehouse code must be unique per company."
+msgstr "每家公司内的子仓库编码必须唯一。"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Marks this location as a managed subwarehouse node."
+msgstr "将此库位标记为受管理的子仓库节点。"

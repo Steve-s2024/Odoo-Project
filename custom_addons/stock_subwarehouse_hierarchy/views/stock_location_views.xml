@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_location_search_subwarehouse" model="ir.ui.view">
+        <field name="name">stock.location.search.subwarehouse</field>
+        <field name="model">stock.location</field>
+        <field name="inherit_id" ref="stock.view_location_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='warehouse']" position="after">
+                <filter string="父库位" name="group_by_parent_location" domain="[]" context="{'group_by': 'location_id'}"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_location_form_subwarehouse_actions" model="ir.ui.view">
+        <field name="name">stock.location.form.subwarehouse.actions</field>
+        <field name="model">stock.location</field>
+        <field name="inherit_id" ref="stock.view_location_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='%(stock.location_open_putaway)d']" position="replace"/>
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_descendant_inventory_totals"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-cubes"
+                    string="下级库存">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">下级库存</span>
+                    </div>
+                </button>
+                <button name="action_view_inventory_in_out"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-exchange"
+                    string="库存出入记录">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">库存出入</span>
+                    </div>
+                </button>
+                <button name="action_view_descendant_inventory_product_totals"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-list"
+                    string="产品汇总">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">产品汇总</span>
+                    </div>
+                </button>
+                <button name="action_create_internal_transfer"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-random"
+                    string="内部调拨">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">内部调拨</span>
+                    </div>
+                </button>
+                <button name="action_load_remove_inventory"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-plus-square"
+                    string="装入/移除产品">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">装入/移除产品</span>
+                    </div>
+                </button>
+                <button name="action_manufacture_product"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-wrench"
+                    string="制造产品">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">制造产品</span>
+                    </div>
+                </button>
+                <button name="action_import_manufacturing_sheet"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-upload"
+                    string="导入制造单">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">导入制造</span>
+                    </div>
+                </button>
+                <button name="action_view_manufacturing_history"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-history"
+                    string="制造历史">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">制造历史</span>
+                    </div>
+                </button>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_location_hierarchy_subwarehouse" model="ir.ui.view">
+        <field name="name">stock.location.hierarchy.subwarehouse</field>
+        <field name="model">stock.location</field>
+        <field name="arch" type="xml">
+            <hierarchy parent_field="location_id" child_field="child_ids" icon="fa-sitemap" draggable="1">
+                <field name="name"/>
+                <field name="complete_name"/>
+                <field name="usage"/>
+                <field name="is_empty"/>
+                <field name="company_id"/>
+                <templates>
+                    <t t-name="hierarchy-box">
+                        <div class="o_hierarchy_node_header d-flex justify-content-center align-items-center">
+                            <field name="name"/>
+                        </div>
+                        <div class="o_hierarchy_node_body d-flex flex-column px-2 py-1">
+                            <div>
+                                <field name="usage"/>
+                            </div>
+                            <div class="text-muted small">
+                                <field name="complete_name"/>
+                            </div>
+                            <div class="text-muted small">
+                                <field name="company_id"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </hierarchy>
+        </field>
+    </record>
+
+    <record id="action_subwarehouse_structure" model="ir.actions.act_window">
+        <field name="name">子仓库</field>
+        <field name="res_model">stock.location</field>
+        <field name="view_mode">hierarchy,list,form</field>
+        <field name="view_id" ref="view_location_hierarchy_subwarehouse"/>
+        <field name="search_view_id" ref="stock.view_location_search"/>
+        <field name="domain">[('usage', 'in', ('view', 'internal'))]</field>
+        <field name="context">{'default_usage': 'view'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">创建子仓库库位</p>
+            <p>子仓库是标记为仓库级节点的库存库位。可使用子库位表示区域、通道、货架和货位。</p>
+        </field>
+    </record>
+
+    <record id="stock.stock_picking_type_action" model="ir.actions.act_window">
+        <field name="name">子仓库</field>
+        <field name="res_model">stock.location</field>
+        <field name="view_mode">hierarchy,list,form</field>
+        <field name="view_id" ref="view_location_hierarchy_subwarehouse"/>
+        <field name="search_view_id" ref="stock.view_location_search"/>
+        <field name="domain">[('usage', 'in', ('view', 'internal'))]</field>
+        <field name="context">{'default_usage': 'view'}</field>
+        <field name="path">inventory</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">创建子仓库库位</p>
+            <p>子仓库按其上级仓库或库位分组。</p>
+        </field>
+    </record>
+
+    <menuitem id="stock.stock_picking_type_menu"
+        name="子仓库"
+        action="stock.stock_picking_type_action"
+        parent="stock.menu_stock_root"
+        sequence="0"/>
+
+    <record id="stock.stock_picking_type_menu" model="ir.ui.menu">
+        <field name="group_ids" eval="[(5, 0, 0)]"/>
+    </record>
+
+    <menuitem id="menu_subwarehouse_structure"
+        name="子仓库"
+        parent="stock.menu_warehouse_config"
+        action="action_subwarehouse_structure"
+        sequence="2"
+        groups="stock.group_stock_multi_locations"/>
+    <record id="view_location_form_subwarehouse_trim_buttons" model="ir.ui.view">
+        <field name="name">stock.location.form.subwarehouse.trim.buttons</field>
+        <field name="model">stock.location</field>
+        <field name="inherit_id" ref="stock.view_location_form"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_view_descendant_inventory_product_totals']" position="replace"/>
+            <xpath expr="//button[@name='action_load_remove_inventory']" position="replace"/>
+        </field>
+    </record>
+</odoo>

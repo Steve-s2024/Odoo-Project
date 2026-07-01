@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_order_form_inherit_source_inventory" model="ir.ui.view">
+        <field name="name">sale.order.form.source.inventory</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='order_line']//form//div[@name='ordered_qty']" position="after">
+                <field name="is_storable" invisible="1"/>
+                <field name="x_eligible_source_location_ids" invisible="1"/>
+                <field
+                    name="x_source_location_id"
+                    options="{'no_create': True}"
+                    context="{
+                        'sale_source_inventory_filter': True,
+                        'sale_source_product_id': product_id,
+                        'sale_source_product_uom_id': product_uom_id,
+                        'sale_source_product_uom_qty': product_uom_qty,
+                        'sale_source_company_id': parent.company_id,
+                    }"
+                    readonly="parent.state not in ['draft', 'sent'] or is_downpayment"
+                    invisible="display_type or not is_storable"/>
+                <field
+                    name="x_source_available_qty"
+                    readonly="1"
+                    invisible="display_type or not is_storable"/>
+                <field
+                    name="x_source_can_fulfill"
+                    readonly="1"
+                    invisible="1"/>
+            </xpath>
+            <xpath expr="//field[@name='order_line']//list//field[@name='product_uom_qty']" position="after">
+                <field name="is_storable" column_invisible="1"/>
+                <field name="x_eligible_source_location_ids" invisible="1"/>
+                <field
+                    name="x_source_location_id"
+                    options="{'no_create': True}"
+                    context="{
+                        'sale_source_inventory_filter': True,
+                        'sale_source_product_id': product_id,
+                        'sale_source_product_uom_id': product_uom_id,
+                        'sale_source_product_uom_qty': product_uom_qty,
+                        'sale_source_company_id': parent.company_id,
+                    }"
+                    readonly="parent.state not in ['draft', 'sent'] or is_downpayment"
+                    invisible="display_type or not is_storable"
+                    optional="show"/>
+                <field
+                    name="x_source_available_qty"
+                    readonly="1"
+                    invisible="display_type or not is_storable"
+                    decoration-danger="not x_source_can_fulfill"
+                    optional="show"/>
+                <field name="x_source_can_fulfill" column_invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

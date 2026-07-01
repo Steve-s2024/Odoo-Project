@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_descendant_inventory_total_list" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.inventory.total.list</field>
+        <field name="model">stock.subwarehouse.inventory.total</field>
+        <field name="arch" type="xml">
+            <list string="下级产品汇总" create="0" edit="0" delete="0">
+                <header>
+                    <button
+                        name="action_transfer_selected_out_of_current_warehouse"
+                        type="object"
+                        string="转移所有已选项·"
+                        class="btn-primary"/>
+                </header>
+                <field name="product_id"/>
+                <field name="quantity" sum="现有总量"/>
+                <field name="reserved_quantity" sum="已预留总量"/>
+                <field name="available_quantity" sum="可用总量"/>
+                <field name="product_uom_id"/>
+                <field name="root_location_id" optional="hide"/>
+                <field name="warehouse_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+</odoo>

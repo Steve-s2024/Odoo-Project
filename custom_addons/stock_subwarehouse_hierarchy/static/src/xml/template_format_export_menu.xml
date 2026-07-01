@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="stock_subwarehouse_hierarchy.TemplateFormatExportMenu">
+        <DropdownItem class="'o_template_format_export_menu'" onSelected.bind="onExportTemplateFormat">
+            <i class="fa fa-fw fa-download me-1"/>按导入模板导出
+        </DropdownItem>
+    </t>
+</templates>

@@ -1,0 +1,30 @@
+# Local Odoo source checkouts. Re-clone from upstream Odoo instead of committing
+# the full framework into this project backup repository.
+/odoo/
+/odoo-git/
+
+# Runtime data, databases, logs, downloaded tools, and generated artifacts.
+/work/
+/.agents/
+/.codex/
+/outputs/*
+
+# Python and Odoo caches.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments.
+.venv/
+venv/
+env/
+
+# OS/editor noise.
+.DS_Store
+Thumbs.db
+*.swp
+
+# Keep the small helper scripts in outputs.
+!/outputs/
+!/outputs/*.ps1
