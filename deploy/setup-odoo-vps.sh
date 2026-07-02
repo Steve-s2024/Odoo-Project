@@ -63,8 +63,15 @@ apt-get install -y \
     python3-wheel \
     rsync \
     ufw \
-    wkhtmltopdf \
     zlib1g-dev
+
+if apt-cache policy wkhtmltopdf | grep -q "Candidate: (none)"; then
+    echo "==> wkhtmltopdf is not available from this Debian release; continuing without it"
+    echo "    Odoo will run, but PDF report rendering may be unavailable until wkhtmltopdf is installed separately."
+else
+    echo "==> Installing wkhtmltopdf"
+    apt-get install -y wkhtmltopdf
+fi
 
 if ! id "$ODOO_USER" >/dev/null 2>&1; then
     echo "==> Creating system user: $ODOO_USER"
