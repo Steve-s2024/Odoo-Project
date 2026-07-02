@@ -65,7 +65,7 @@ apt-get install -y \
     ufw \
     zlib1g-dev
 
-if apt-cache show wkhtmltopdf >/dev/null 2>&1; then
+if apt-get install --simulate -y wkhtmltopdf >/dev/null 2>&1; then
     echo "==> Installing wkhtmltopdf"
     apt-get install -y wkhtmltopdf
 else
