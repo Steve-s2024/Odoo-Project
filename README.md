@@ -33,3 +33,17 @@ http://127.0.0.1:8069/
 Odoo is distributed under its upstream open-source licenses. This repository does not remove or replace those notices. The custom addon is declared as `LGPL-3` in its Odoo manifest.
 
 Generated spreadsheets, logs, local database files, downloaded tools, and virtual environments are intentionally excluded from this backup.
+
+## VPS Deployment
+
+Deployment scripts are in:
+
+```text
+deploy/
+```
+
+For a fresh Ubuntu VPS, see:
+
+```text
+deploy/README.md
+```
