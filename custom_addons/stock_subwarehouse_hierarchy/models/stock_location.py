@@ -83,7 +83,7 @@ class StockLocation(models.Model):
         Quant = self.env["stock.quant"]
         eligible_ids = []
         for location in self.search(candidates_domain):
-            available_qty = Quant._get_available_quantity(product, location)
+            available_qty = Quant._get_available_quantity(product, location, strict=True)
             if float_compare(available_qty, required_qty, precision_digits=precision) >= 0:
                 eligible_ids.append(location.id)
         return [("id", "in", eligible_ids)] if eligible_ids else [("id", "=", 0)]

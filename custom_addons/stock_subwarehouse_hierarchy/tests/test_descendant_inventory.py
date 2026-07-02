@@ -327,8 +327,10 @@ class TestDescendantInventoryTotals(TransactionCase):
         line = order.order_line
 
         self.assertEqual(line.x_source_location_id, self.subwarehouse)
-        self.assertEqual(line.x_source_available_qty, 5.0)
-        self.assertTrue(line.x_source_can_fulfill)
+        self.assertEqual(line.x_source_available_qty, 0.0)
+        self.assertFalse(line.x_source_can_fulfill)
+        with self.assertRaises(UserError):
+            order.action_confirm()
 
     def test_sale_line_source_inventory_options_only_include_locations_that_can_fulfill(self):
         self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
@@ -437,6 +439,29 @@ class TestDescendantInventoryTotals(TransactionCase):
         move = order.order_line.move_ids.filtered(lambda stock_move: stock_move.product_id == self.product_a)
         self.assertTrue(move)
         self.assertEqual(move[:1].location_id, self.bin_a)
+
+    def test_internal_transfer_from_parent_location_does_not_reserve_child_stock(self):
+        self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
+        picking = self.env["stock.picking"].create({
+            "picking_type_id": self.warehouse.int_type_id.id,
+            "location_id": self.subwarehouse.id,
+            "location_dest_id": self.warehouse.lot_stock_id.id,
+            "move_ids": [(0, 0, {
+                "description_picking": self.product_a.display_name,
+                "product_id": self.product_a.id,
+                "product_uom_qty": 3.0,
+                "product_uom": self.product_a.uom_id.id,
+                "location_id": self.subwarehouse.id,
+                "location_dest_id": self.warehouse.lot_stock_id.id,
+            })],
+        })
+
+        picking.action_confirm()
+        picking.action_assign()
+
+        move = picking.move_ids.filtered(lambda stock_move: stock_move.product_id == self.product_a)
+        self.assertNotEqual(move.state, "assigned")
+        self.assertFalse(move.move_line_ids.filtered(lambda line: line.location_id == self.bin_a))
 
     def test_product_attribute_apply_wizard_adds_attribute_to_all_products(self):
         templates = self.env["product.template"].search([])

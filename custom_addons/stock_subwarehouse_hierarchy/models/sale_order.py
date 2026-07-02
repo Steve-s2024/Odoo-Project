@@ -189,9 +189,21 @@ class SaleOrder(models.Model):
             )
 
         shortages = []
+        for line in self.order_line:
+            if (
+                line.display_type
+                or not line.is_storable
+                or float_compare(line.product_uom_qty, 0.0, precision_digits=precision) <= 0
+                or line.x_source_location_id
+            ):
+                continue
+            shortages.append(_(
+                "%(product)s：请选择有足够现货的来源库存。",
+                product=line.product_id.display_name,
+            ))
         for (product, location), demand in demands.items():
             line = demand["line"]
-            available = self.env["stock.quant"]._get_available_quantity(product, location)
+            available = self.env["stock.quant"]._get_available_quantity(product, location, strict=True)
             if float_compare(
                 demand["requested"],
                 available,

@@ -45,7 +45,7 @@ class SaleOrderLine(models.Model):
 
             eligible_location_ids = []
             for location in candidates:
-                available_qty = Quant._get_available_quantity(line.product_id, location)
+                available_qty = Quant._get_available_quantity(line.product_id, location, strict=True)
                 if float_compare(available_qty, required_qty, precision_digits=precision) >= 0:
                     eligible_location_ids.append(location.id)
             line.x_eligible_source_location_ids = Location.browse(eligible_location_ids)
@@ -111,6 +111,7 @@ class SaleOrderLine(models.Model):
             available_qty = Quant._get_available_quantity(
                 line.product_id,
                 line.x_source_location_id,
+                strict=True,
             )
             if line.product_uom_id and line.product_id.uom_id != line.product_uom_id:
                 available_qty = line.product_id.uom_id._compute_quantity(
