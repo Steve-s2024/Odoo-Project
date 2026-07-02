@@ -462,6 +462,8 @@ class TestDescendantInventoryTotals(TransactionCase):
         move = picking.move_ids.filtered(lambda stock_move: stock_move.product_id == self.product_a)
         self.assertNotEqual(move.state, "assigned")
         self.assertFalse(move.move_line_ids.filtered(lambda line: line.location_id == self.bin_a))
+        with self.assertRaises(UserError):
+            picking.button_validate()
 
     def test_product_attribute_apply_wizard_adds_attribute_to_all_products(self):
         templates = self.env["product.template"].search([])
