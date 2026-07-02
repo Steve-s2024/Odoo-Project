@@ -247,7 +247,7 @@ class ProductTemplate(models.Model):
             if not attribute:
                 matches = ProductAttribute.name_search(
                     name=attribute_name,
-                    args=[("x_apply_to_all_products", "=", True)],
+                    domain=[("x_apply_to_all_products", "=", True)],
                     operator="=",
                     limit=1,
                 )

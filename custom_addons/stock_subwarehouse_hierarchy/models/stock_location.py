@@ -36,7 +36,9 @@ class StockLocation(models.Model):
             location.x_child_location_count = len(location.child_ids)
 
     @api.model
-    def name_search(self, name="", domain=None, operator="ilike", limit=100):
+    def name_search(self, name="", domain=None, operator="ilike", limit=100, **kwargs):
+        if domain is None and "args" in kwargs:
+            domain = kwargs.pop("args")
         source_domain = self._get_sale_source_location_name_search_domain()
         if source_domain is not None:
             domain = list(domain or []) + source_domain
