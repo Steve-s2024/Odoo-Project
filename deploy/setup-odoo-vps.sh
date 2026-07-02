@@ -161,20 +161,31 @@ WantedBy=multi-user.target
 EOF
 
 echo "==> Initializing or updating Odoo database"
-MODULE_STATE="$(
+MODULE_TABLE="$(
     sudo -u postgres psql -d "$ODOO_DB" -tAc \
-        "SELECT state FROM ir_module_module WHERE name='stock_subwarehouse_hierarchy' LIMIT 1" \
+        "SELECT to_regclass('public.ir_module_module')" \
         2>/dev/null | xargs || true
 )"
-if [[ "$MODULE_STATE" == "installed" ]]; then
-    ODOO_MODULE_FLAG="-u"
-else
+if [[ -z "$MODULE_TABLE" ]]; then
     ODOO_MODULE_FLAG="-i"
+    ODOO_MODULES="base,stock_subwarehouse_hierarchy"
+else
+    MODULE_STATE="$(
+        sudo -u postgres psql -d "$ODOO_DB" -tAc \
+            "SELECT state FROM ir_module_module WHERE name='stock_subwarehouse_hierarchy' LIMIT 1" \
+            2>/dev/null | xargs || true
+    )"
+    if [[ "$MODULE_STATE" == "installed" ]]; then
+        ODOO_MODULE_FLAG="-u"
+    else
+        ODOO_MODULE_FLAG="-i"
+    fi
+    ODOO_MODULES="stock_subwarehouse_hierarchy"
 fi
 sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/python" "$ODOO_SRC/odoo-bin" \
     -c "$ODOO_CONFIG" \
     -d "$ODOO_DB" \
-    "$ODOO_MODULE_FLAG" stock_subwarehouse_hierarchy \
+    "$ODOO_MODULE_FLAG" "$ODOO_MODULES" \
     --stop-after-init \
     --no-http
 
