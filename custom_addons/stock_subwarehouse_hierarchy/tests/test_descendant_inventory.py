@@ -572,6 +572,7 @@ class TestDescendantInventoryTotals(TransactionCase):
         import_headers = import_rows[0]
         chinese_labels = import_rows[1]
         self.assertIn("name", import_headers)
+        self.assertIn("is_storable", import_headers)
         self.assertIn("x_import_custom_attribute_1", import_headers)
         self.assertIn("x_import_custom_attribute_value_1", import_headers)
         self.assertIn("产品名称", chinese_labels)
@@ -617,12 +618,38 @@ class TestDescendantInventoryTotals(TransactionCase):
 
         self.assertFalse(result["messages"])
         product = self.env["product.template"].browse(result["ids"][0])
+        self.assertTrue(product.is_storable)
         values_by_attribute = {
             value.attribute_id.name: value.value_text
             for value in product.x_custom_attribute_value_ids
         }
         self.assertEqual(values_by_attribute["测试属性"], "全场9九折 这个商品非常好")
         self.assertEqual(values_by_attribute["测试属性2号"], "第二个属性也应该显示导入值")
+
+    def test_product_import_without_is_storable_still_tracks_inventory(self):
+        result = self.env["product.template"].load(
+            ["name", "default_code", "type"],
+            [["Imported Stock Product", "IMPORTED-STOCK-PRODUCT", "consu"]],
+        )
+
+        self.assertFalse(result["messages"])
+        product_template = self.env["product.template"].browse(result["ids"][0])
+        self.assertTrue(product_template.is_storable)
+
+        product = product_template.product_variant_id
+        action = self.bin_a.action_manufacture_product()
+        production = self.env["mrp.production"].with_context(action["context"]).create({
+            "product_id": product.id,
+            "product_qty": 1.0,
+            "product_uom_id": product.uom_id.id,
+            "picking_type_id": self.warehouse.manu_type_id.id,
+        })
+        production.action_confirm()
+        production.qty_producing = 1.0
+        production.button_mark_done()
+
+        quantity = self.StockQuant._get_available_quantity(product, self.bin_a)
+        self.assertEqual(quantity, 1.0)
 
     def test_product_import_preserves_legacy_repeated_custom_attribute_columns(self):
         self.env["stock.subwarehouse.product.attribute.apply.wizard"].create({

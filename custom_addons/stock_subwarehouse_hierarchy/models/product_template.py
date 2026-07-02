@@ -159,6 +159,7 @@ class ProductTemplate(models.Model):
 
     @api.model
     def load(self, fields, data):
+        fields, data = self._ensure_inventory_product_import_storable(fields, data)
         custom_pairs = self._extract_custom_attribute_import_pairs(fields, data)
         if not custom_pairs:
             return super().load(fields, data)
@@ -188,6 +189,22 @@ class ProductTemplate(models.Model):
             for product, row_pairs in zip(products, custom_pairs):
                 product._write_imported_custom_attribute_values(row_pairs)
         return result
+
+    @api.model
+    def _ensure_inventory_product_import_storable(self, import_fields, import_data):
+        if "is_storable" in import_fields:
+            return import_fields, import_data
+        uses_inventory_template = (
+            "type" in import_fields
+            or any(field_name.startswith("x_import_custom_attribute_") for field_name in import_fields)
+            or "x_custom_attribute_value_ids/attribute_id" in import_fields
+        )
+        if not uses_inventory_template or "is_storable" not in self._fields:
+            return import_fields, import_data
+        return (
+            [*import_fields, "is_storable"],
+            [[*row, "1"] for row in import_data],
+        )
 
     @api.model
     def _extract_custom_attribute_import_pairs(self, import_fields, import_data):
@@ -310,6 +327,7 @@ class ProductTemplate(models.Model):
             ("name", "\u4ea7\u54c1\u540d\u79f0"),
             ("default_code", "\u5185\u90e8\u7f16\u53f7"),
             ("type", "\u4ea7\u54c1\u7c7b\u578b"),
+            ("is_storable", "\u53ef\u5e93\u5b58"),
             ("categ_id", "\u4ea7\u54c1\u7c7b\u522b"),
             ("list_price", "\u9500\u552e\u4ef7\u683c"),
             ("standard_price", "\u6210\u672c"),
@@ -349,6 +367,7 @@ class ProductTemplate(models.Model):
             "\u793a\u4f8b\u4ea7\u54c1",
             "EXAMPLE-001",
             "consu",
+            "1",
             "\u5168\u90e8",
             0,
             0,
