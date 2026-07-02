@@ -283,6 +283,14 @@ class StockLocation(models.Model):
         ], limit=1)
         if child_location:
             return child_location
+        if self.usage == "view":
+            return self.env["stock.location"].create({
+                "name": _("Stock"),
+                "usage": "internal",
+                "location_id": self.id,
+                "company_id": self.company_id.id,
+                "x_is_subwarehouse": True,
+            })
         warehouse = self.warehouse_id or self.env["stock.warehouse"].search([
             "|",
             ("company_id", "=", self.company_id.id),

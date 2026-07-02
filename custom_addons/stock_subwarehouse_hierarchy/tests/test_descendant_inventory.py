@@ -203,6 +203,28 @@ class TestDescendantInventoryTotals(TransactionCase):
             (self.bin_a | self.bin_b).ids,
         )
 
+    def test_warehouse_create_subwarehouse_creates_internal_location(self):
+        action = self.warehouse.action_create_subwarehouse()
+        location = self.StockLocation.browse(action["res_id"])
+
+        self.assertEqual(location.usage, "internal")
+        self.assertEqual(location.location_id, self.warehouse.view_location_id)
+        self.assertTrue(location.x_is_subwarehouse)
+
+    def test_view_location_manufacture_product_action_creates_internal_child_when_missing(self):
+        view_location = self.StockLocation.create({
+            "name": "Empty Manufacturing Subwarehouse",
+            "usage": "view",
+            "location_id": self.warehouse.view_location_id.id,
+        })
+
+        action = view_location.action_manufacture_product()
+        internal_child = self.StockLocation.browse(action["context"]["default_location_dest_id"])
+
+        self.assertEqual(internal_child.usage, "internal")
+        self.assertEqual(internal_child.location_id, view_location)
+        self.assertTrue(internal_child.x_is_subwarehouse)
+
     def test_manufacturing_order_defaults_keep_subwarehouse_location(self):
         action = self.bin_a.action_manufacture_product()
         defaults = self.env["mrp.production"].with_context(
@@ -225,6 +247,22 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(production.location_src_id, self.bin_a)
         self.assertEqual(production.location_dest_id, self.bin_a)
         self.assertNotEqual(production.location_dest_id, self.warehouse.lot_stock_id)
+
+    def test_manufacturing_completion_adds_stock_to_subwarehouse_inventory(self):
+        action = self.bin_a.action_manufacture_product()
+        production = self.env["mrp.production"].with_context(action["context"]).create({
+            "product_id": self.product_a.id,
+            "product_qty": 2.0,
+            "product_uom_id": self.product_a.uom_id.id,
+            "picking_type_id": self.warehouse.manu_type_id.id,
+        })
+
+        production.action_confirm()
+        production.qty_producing = 2.0
+        production.button_mark_done()
+
+        quantity = self.StockQuant._get_available_quantity(self.product_a, self.bin_a)
+        self.assertEqual(quantity, 2.0)
 
     def test_location_import_manufacturing_sheet_action_uses_builtin_import(self):
         action = self.subwarehouse.action_import_manufacturing_sheet()

@@ -44,7 +44,7 @@ class StockWarehouse(models.Model):
             "context": {
                 "default_company_id": self.company_id.id,
                 "default_location_id": self.view_location_id.id,
-                "default_usage": "view",
+                "default_usage": "internal",
                 "search_default_group_by_parent_location": 1,
             },
         }
@@ -142,9 +142,10 @@ class StockWarehouse(models.Model):
         ])
         location = self.env["stock.location"].create({
             "name": _("新建子仓库 %s", existing_count + 1),
-            "usage": "view",
+            "usage": "internal",
             "location_id": self.view_location_id.id,
             "company_id": self.company_id.id,
+            "x_is_subwarehouse": True,
         })
         return {
             "type": "ir.actions.act_window",
