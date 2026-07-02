@@ -371,6 +371,28 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertNotIn(self.bin_b.id, dropdown_location_ids)
         self.assertIn(other_warehouse.lot_stock_id.id, dropdown_location_ids)
 
+    def test_sale_source_inventory_name_search_can_return_more_than_default_dropdown_limit(self):
+        stocked_locations = self.env["stock.location"]
+        for index in range(9):
+            location = self.StockLocation.create({
+                "name": f"Overflow Source {index}",
+                "usage": "internal",
+                "location_id": self.warehouse.view_location_id.id,
+            })
+            stocked_locations |= location
+            self.StockQuant._update_available_quantity(self.product_a, location, 5.0)
+
+        dropdown_options = self.StockLocation.with_context(
+            sale_source_inventory_filter=True,
+            sale_source_product_id=self.product_a.id,
+            sale_source_product_uom_id=self.product_a.uom_id.id,
+            sale_source_product_uom_qty=3.0,
+            sale_source_warehouse_id=self.warehouse.id,
+        ).name_search(limit=10)
+        dropdown_location_ids = {location_id for location_id, _name in dropdown_options}
+
+        self.assertTrue(set(stocked_locations.ids).issubset(dropdown_location_ids))
+
     def test_sale_line_source_inventory_options_are_empty_for_zero_or_negative_quantity(self):
         self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
         order = self.env["sale.order"].create({
