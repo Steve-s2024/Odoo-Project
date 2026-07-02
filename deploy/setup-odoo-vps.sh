@@ -65,12 +65,12 @@ apt-get install -y \
     ufw \
     zlib1g-dev
 
-if apt-cache policy wkhtmltopdf | grep -q "Candidate: (none)"; then
-    echo "==> wkhtmltopdf is not available from this Debian release; continuing without it"
-    echo "    Odoo will run, but PDF report rendering may be unavailable until wkhtmltopdf is installed separately."
-else
+if apt-cache show wkhtmltopdf >/dev/null 2>&1; then
     echo "==> Installing wkhtmltopdf"
     apt-get install -y wkhtmltopdf
+else
+    echo "==> wkhtmltopdf is not available from this Debian release; continuing without it"
+    echo "    Odoo will run, but PDF report rendering may be unavailable until wkhtmltopdf is installed separately."
 fi
 
 if ! id "$ODOO_USER" >/dev/null 2>&1; then
