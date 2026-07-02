@@ -160,6 +160,24 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
+echo "==> Initializing or updating Odoo database"
+MODULE_STATE="$(
+    sudo -u postgres psql -d "$ODOO_DB" -tAc \
+        "SELECT state FROM ir_module_module WHERE name='stock_subwarehouse_hierarchy' LIMIT 1" \
+        2>/dev/null | xargs || true
+)"
+if [[ "$MODULE_STATE" == "installed" ]]; then
+    ODOO_MODULE_FLAG="-u"
+else
+    ODOO_MODULE_FLAG="-i"
+fi
+sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/python" "$ODOO_SRC/odoo-bin" \
+    -c "$ODOO_CONFIG" \
+    -d "$ODOO_DB" \
+    "$ODOO_MODULE_FLAG" stock_subwarehouse_hierarchy \
+    --stop-after-init \
+    --no-http
+
 SERVER_NAME="_"
 if [[ -n "$DOMAIN" ]]; then
     SERVER_NAME="$DOMAIN"
