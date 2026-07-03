@@ -893,3 +893,19 @@ class TestDescendantInventoryTotals(TransactionCase):
 
         self.assertFalse(product.taxes_id)
         self.assertFalse(product.supplier_taxes_id)
+
+    def test_currency_symbols_use_yuan(self):
+        usd = self.env.ref("base.USD")
+        cny = self.env.ref("base.CNY")
+
+        self.env["res.currency"].action_use_yuan_symbol_everywhere()
+
+        self.assertTrue(cny.active)
+        self.assertEqual(cny.symbol, "￥")
+        self.assertEqual(usd.symbol, "￥")
+        self.assertEqual(self.env.company.currency_id, cny)
+        if "product.pricelist" in self.env:
+            self.assertTrue(all(
+                pricelist.currency_id == cny
+                for pricelist in self.env["product.pricelist"].search([])
+            ))

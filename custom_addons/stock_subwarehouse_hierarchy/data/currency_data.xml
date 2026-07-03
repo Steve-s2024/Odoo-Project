@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <function model="res.currency" name="action_use_yuan_symbol_everywhere"/>
+</odoo>

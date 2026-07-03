@@ -8,6 +8,7 @@
     "depends": ["stock", "web_hierarchy", "mrp", "sale_stock"],
     "data": [
         "security/ir.model.access.csv",
+        "data/currency_data.xml",
         "views/descendant_inventory_total_views.xml",
         "views/product_attribute_apply_views.xml",
         "views/import_format_export_actions.xml",
