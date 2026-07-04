@@ -622,11 +622,10 @@ class TestDescendantInventoryTotals(TransactionCase):
         chinese_labels = import_rows[1]
         self.assertIn("name", import_headers)
         self.assertIn("is_storable", import_headers)
-        self.assertIn("x_import_custom_attribute_1", import_headers)
         self.assertIn("x_import_custom_attribute_value_1", import_headers)
+        self.assertNotIn("x_import_custom_attribute_1", import_headers)
         self.assertIn("产品名称", chinese_labels)
-        self.assertIn("自定义属性1", chinese_labels)
-        self.assertIn("自定义属性值1", chinese_labels)
+        self.assertIn("Import Matched Attribute", chinese_labels)
 
         custom_attribute_rows = list(workbook["自定义属性列表"].iter_rows(values_only=True))
         flattened_attribute_rows = "\n".join(
@@ -636,7 +635,7 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertIn("Import Matched Attribute", flattened_attribute_rows)
         self.assertIn("Import Matched Value", flattened_attribute_rows)
 
-    def test_product_import_preserves_multiple_custom_attribute_values_with_unique_columns(self):
+    def test_product_import_preserves_multiple_custom_attribute_values_with_one_column_per_attribute(self):
         self.env["stock.subwarehouse.product.attribute.apply.wizard"].create({
             "attribute_name": "测试属性",
             "value_name": "default",
@@ -650,17 +649,13 @@ class TestDescendantInventoryTotals(TransactionCase):
             [
                 "name",
                 "default_code",
-                "x_import_custom_attribute_1",
                 "x_import_custom_attribute_value_1",
-                "x_import_custom_attribute_2",
                 "x_import_custom_attribute_value_2",
             ],
             [[
                 "Imported Multi Custom Attribute Product",
                 "IMPORTED-MULTI-CUSTOM-ATTRIBUTE",
-                "测试属性",
                 "全场9九折 这个商品非常好",
-                "测试属性2号",
                 "第二个属性也应该显示导入值",
             ]],
         )
@@ -848,12 +843,11 @@ class TestDescendantInventoryTotals(TransactionCase):
             tuple(field_name for field_name, _label in self.env["product.template"]._get_dynamic_product_import_columns()),
         )
         self.assertEqual(product_rows[2][product_rows[0].index("default_code")], "EXPORT-PRODUCT-A")
-        attribute_column_index = product_rows[2].index(export_attribute_name)
-        value_field = product_rows[0][attribute_column_index].replace(
-            "x_import_custom_attribute_",
-            "x_import_custom_attribute_value_",
-        )
-        self.assertEqual(product_rows[2][product_rows[0].index(value_field)], export_attribute_value)
+        self.assertNotIn(export_attribute_name, product_rows[2])
+        self.assertIn(export_attribute_name, product_rows[1])
+        attribute_column_index = product_rows[1].index(export_attribute_name)
+        self.assertTrue(product_rows[0][attribute_column_index].startswith("x_import_custom_attribute_value_"))
+        self.assertEqual(product_rows[2][attribute_column_index], export_attribute_value)
 
         manufacturing_workbook = load_workbook(
             BytesIO(production._generate_dynamic_export_xlsx()),

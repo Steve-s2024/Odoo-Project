@@ -222,6 +222,8 @@ class ProductTemplate(models.Model):
         ]
 
         slot_pairs = []
+        value_only_slots = []
+        global_attributes = self._get_global_custom_attributes()
         for slot_number in range(1, IMPORT_CUSTOM_ATTRIBUTE_SLOT_COUNT + 1):
             attribute_slot = f"x_import_custom_attribute_{slot_number}"
             value_slot = f"x_import_custom_attribute_value_{slot_number}"
@@ -230,10 +232,16 @@ class ProductTemplate(models.Model):
                     import_fields.index(attribute_slot),
                     import_fields.index(value_slot),
                 ))
+            elif value_slot in import_fields and len(global_attributes) >= slot_number:
+                value_only_slots.append((
+                    global_attributes[slot_number - 1].display_name,
+                    import_fields.index(value_slot),
+                ))
 
         if (
             (not legacy_attribute_indexes or not legacy_value_indexes)
             and not slot_pairs
+            and not value_only_slots
         ):
             return []
 
@@ -250,6 +258,8 @@ class ProductTemplate(models.Model):
                 value_text = str(row[value_index] or "").strip()
                 if attribute_name:
                     pairs.append((attribute_name, value_text))
+            for attribute_name, value_index in value_only_slots:
+                pairs.append((attribute_name, str(row[value_index] or "").strip()))
             pairs_by_row.append(pairs)
         return pairs_by_row
 
@@ -342,8 +352,7 @@ class ProductTemplate(models.Model):
             start=1,
         ):
             columns += [
-                (f"x_import_custom_attribute_{slot_number}", f"\u81ea\u5b9a\u4e49\u5c5e\u6027{slot_number}"),
-                (f"x_import_custom_attribute_value_{slot_number}", f"\u81ea\u5b9a\u4e49\u5c5e\u6027\u503c{slot_number}"),
+                (f"x_import_custom_attribute_value_{slot_number}", _attribute.display_name),
             ]
         return columns
 
@@ -379,7 +388,6 @@ class ProductTemplate(models.Model):
         ]
         for attribute in self._get_global_custom_attributes()[:IMPORT_CUSTOM_ATTRIBUTE_SLOT_COUNT]:
             sample_row += [
-                attribute.display_name,
                 attribute.x_default_custom_value or "\u4efb\u610f\u6587\u672c",
             ]
         import_sheet.append(sample_row)
