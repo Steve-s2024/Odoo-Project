@@ -5,6 +5,15 @@ from odoo.tools import float_compare
 class SaleOrderLine(models.Model):
     _inherit = "sale.order.line"
 
+    x_product_default_code = fields.Char(
+        string="产品ID",
+        related="product_id.default_code",
+    )
+    x_import_product_name = fields.Char(string="品名")
+    x_color = fields.Char(string="颜色")
+    x_size = fields.Char(string="尺码")
+    x_flex = fields.Char(string="款型")
+
     x_eligible_source_location_ids = fields.Many2many(
         "stock.location",
         string="可选来源库存",
@@ -94,6 +103,25 @@ class SaleOrderLine(models.Model):
         domain="[('usage', 'in', ['view', 'internal']), '|', ('company_id', '=', False), ('company_id', '=', company_id)]",
         help="用于供应此报价单明细的内部仓库或子仓库库位。",
     )
+
+    @api.onchange("product_id")
+    def _onchange_product_id_fill_finance_details(self):
+        for line in self:
+            if not line.product_id:
+                continue
+            template = line.product_id.product_tmpl_id
+            custom_values = {
+                value.attribute_id.name: value.value_text
+                for value in template.x_custom_attribute_value_ids
+            }
+            if not line.x_import_product_name:
+                line.x_import_product_name = template.categ_id.display_name or template.display_name
+            if not line.x_color:
+                line.x_color = custom_values.get("颜色") or custom_values.get("颜色分类") or ""
+            if not line.x_size:
+                line.x_size = custom_values.get("尺码") or custom_values.get("尺寸") or ""
+            if not line.x_flex:
+                line.x_flex = custom_values.get("硬度") or custom_values.get("款型") or ""
 
     @api.depends("product_id", "product_uom_id", "product_uom_qty", "x_source_location_id", "is_storable")
     def _compute_x_source_available_qty(self):

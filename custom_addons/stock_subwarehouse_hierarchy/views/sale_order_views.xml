@@ -5,6 +5,26 @@
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//sheet//field[@name='user_id']" position="after">
+                <field name="x_platform"/>
+                <field name="x_channel"/>
+                <field name="x_sale_nature"/>
+                <field name="x_finance_remark"/>
+            </xpath>
+            <xpath expr="//field[@name='order_line']//form//field[@name='product_id']" position="after">
+                <field name="x_product_default_code" readonly="1"/>
+                <field name="x_import_product_name"/>
+                <field name="x_color"/>
+                <field name="x_size"/>
+                <field name="x_flex"/>
+            </xpath>
+            <xpath expr="//field[@name='order_line']//list//field[@name='product_template_id']" position="after">
+                <field name="x_product_default_code" readonly="1" optional="show"/>
+                <field name="x_import_product_name" optional="show"/>
+                <field name="x_color" optional="show"/>
+                <field name="x_size" optional="show"/>
+                <field name="x_flex" optional="show"/>
+            </xpath>
             <xpath expr="//field[@name='order_line']//form//div[@name='ordered_qty']" position="after">
                 <field name="is_storable" invisible="1"/>
                 <field name="x_eligible_source_location_ids" invisible="1"/>

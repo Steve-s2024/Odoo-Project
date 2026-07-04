@@ -781,18 +781,24 @@ class TestDescendantInventoryTotals(TransactionCase):
         rows = list(workbook["报价单导入"].iter_rows(values_only=True))
 
         self.assertEqual(rows[0][0], "Order Reference")
-        self.assertEqual(rows[1][0], "订单参考号")
-        self.assertEqual(rows[0][:10], (
+        self.assertEqual(rows[1][0], "订单号")
+        self.assertEqual(rows[0][:16], (
             "Order Reference",
             "Customer*",
             "Order Date",
-            "Expiration",
-            "Payment Terms",
+            "x_platform",
+            "x_channel",
+            "Salesperson",
+            "x_sale_nature",
             "Order Lines/Products*",
+            "Order Lines/x_import_product_name",
+            "Order Lines/x_color",
+            "Order Lines/x_size",
+            "Order Lines/x_flex",
             "Order Lines/Quantity",
             "Order Lines/Unit Price",
-            "Order Lines/Taxes",
-            "Sales Team",
+            "Order Lines/x_source_location_id",
+            "x_finance_remark",
         ))
         self.assertIn("Order Lines/Products*", rows[0])
         self.assertNotIn("order_line/product_id/default_code", rows[0])
@@ -800,8 +806,10 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertNotIn("order_line/product_id", rows[0])
         self.assertEqual(
             rows[1][rows[0].index("Order Lines/Products*")],
-            "产品名称或产品ID",
+            "产品ID",
         )
+        self.assertEqual(rows[1][rows[0].index("Order Lines/x_color")], "颜色")
+        self.assertEqual(rows[1][rows[0].index("Order Lines/x_source_location_id")], "发货仓库")
 
     def test_template_format_exports_match_import_headers(self):
         from openpyxl import load_workbook
@@ -815,6 +823,10 @@ class TestDescendantInventoryTotals(TransactionCase):
         }).action_apply()
         sale_order = self.env["sale.order"].create({
             "partner_id": self.customer.id,
+            "x_platform": "有赞",
+            "x_channel": "凌动雪具",
+            "x_sale_nature": "retail",
+            "x_finance_remark": "财务备注",
             "order_line": [(
                 0,
                 0,
@@ -822,6 +834,11 @@ class TestDescendantInventoryTotals(TransactionCase):
                     "product_id": self.product_a.id,
                     "product_uom_qty": 2,
                     "price_unit": 15,
+                    "x_import_product_name": "双板鞋",
+                    "x_color": "黑色",
+                    "x_size": "260",
+                    "x_flex": "硬度100",
+                    "x_source_location_id": self.bin_a.id,
                 },
             )],
         })
@@ -869,8 +886,16 @@ class TestDescendantInventoryTotals(TransactionCase):
             sale_rows[0],
             tuple(field_name for field_name, _label in self.env["sale.order"]._get_sale_order_import_template_columns()),
         )
-        self.assertEqual(sale_rows[1][sale_rows[0].index("Order Lines/Products*")], "产品名称或产品ID")
+        self.assertEqual(sale_rows[1][sale_rows[0].index("Order Lines/Products*")], "产品ID")
         self.assertEqual(sale_rows[2][sale_rows[0].index("Order Lines/Products*")], "EXPORT-PRODUCT-A")
+        self.assertEqual(sale_rows[2][sale_rows[0].index("x_platform")], "有赞")
+        self.assertEqual(sale_rows[2][sale_rows[0].index("x_sale_nature")], "零售")
+        self.assertEqual(sale_rows[2][sale_rows[0].index("Order Lines/x_import_product_name")], "双板鞋")
+        self.assertEqual(sale_rows[2][sale_rows[0].index("Order Lines/x_color")], "黑色")
+        self.assertEqual(sale_rows[2][sale_rows[0].index("Order Lines/x_size")], "260")
+        self.assertEqual(sale_rows[2][sale_rows[0].index("Order Lines/x_flex")], "硬度100")
+        self.assertEqual(sale_rows[2][sale_rows[0].index("Order Lines/x_source_location_id")], self.bin_a.display_name)
+        self.assertEqual(sale_rows[2][sale_rows[0].index("x_finance_remark")], "财务备注")
 
         product_action = self.product_a.product_tmpl_id.action_export_import_template_format()
         manufacturing_action = production.action_export_import_template_format()

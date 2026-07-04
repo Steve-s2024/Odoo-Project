@@ -12,6 +12,19 @@ SALE_ORDER_IMPORT_TEMPLATE_ROUTE = "/stock_subwarehouse_hierarchy/import_templat
 class SaleOrder(models.Model):
     _inherit = "sale.order"
 
+    x_platform = fields.Char(string="平台")
+    x_channel = fields.Char(string="渠道")
+    x_sale_nature = fields.Selection(
+        [
+            ("retail", "零售"),
+            ("trade_in", "以旧换新"),
+            ("bulk_purchase", "批量采购"),
+            ("other", "其他"),
+        ],
+        string="性质",
+    )
+    x_finance_remark = fields.Char(string="备注")
+
     @api.model
     def get_import_templates(self):
         return [{
@@ -21,16 +34,22 @@ class SaleOrder(models.Model):
 
     def _get_sale_order_import_template_columns(self):
         return [
-            ("Order Reference", "订单参考号"),
+            ("Order Reference", "订单号"),
             ("Customer*", "客户"),
-            ("Order Date", "报价日期"),
-            ("Expiration", "到期日期"),
-            ("Payment Terms", "付款条款"),
-            ("Order Lines/Products*", "产品名称或产品ID"),
-            ("Order Lines/Quantity", "订单行 / 数量"),
-            ("Order Lines/Unit Price", "订单行 / 单价"),
-            ("Order Lines/Taxes", "订单行 / 税"),
-            ("Sales Team", "销售团队"),
+            ("Order Date", "下单时间"),
+            ("x_platform", "平台"),
+            ("x_channel", "渠道"),
+            ("Salesperson", "销售人员"),
+            ("x_sale_nature", "性质"),
+            ("Order Lines/Products*", "产品ID"),
+            ("Order Lines/x_import_product_name", "品名"),
+            ("Order Lines/x_color", "颜色"),
+            ("Order Lines/x_size", "尺码"),
+            ("Order Lines/x_flex", "款型"),
+            ("Order Lines/Quantity", "数量"),
+            ("Order Lines/Unit Price", "单价"),
+            ("Order Lines/x_source_location_id", "发货仓库"),
+            ("x_finance_remark", "备注"),
         ]
 
     def _generate_sale_order_import_template_xlsx(self):
@@ -51,13 +70,19 @@ class SaleOrder(models.Model):
             "S00001",
             self.env.user.partner_id.display_name,
             fields.Date.today().strftime("%Y-%m-%d"),
-            fields.Date.today().strftime("%Y-%m-%d"),
-            "30 天",
+            "有赞",
+            "凌动雪具",
+            self.env.user.display_name,
+            "零售",
             "152410Yb-MK000-H001150",
+            "双板鞋",
+            "黑色",
+            "260",
+            "硬度100",
             10,
             111,
+            "张家口/Stock",
             "",
-            "销售",
         ])
         import_sheet.append([
             "",
@@ -65,7 +90,13 @@ class SaleOrder(models.Model):
             "",
             "",
             "",
+            "",
+            "",
             "072409Y-MA000-G001##S",
+            "滑雪服",
+            "绿色",
+            "S",
+            "",
             1,
             4000,
             "",
@@ -132,23 +163,23 @@ class SaleOrder(models.Model):
 
     def _sale_order_export_row(self, order, line, include_order=True):
         product = line.product_id if line else self.env["product.product"]
-        taxes = ""
-        if line:
-            if "tax_ids" in line._fields:
-                taxes = ", ".join(line.tax_ids.mapped("name"))
-            elif "tax_id" in line._fields:
-                taxes = ", ".join(line.tax_id.mapped("name"))
         return [
             order.name if include_order else "",
             order.partner_id.display_name if include_order else "",
             order.date_order.strftime("%Y-%m-%d") if include_order and order.date_order else "",
-            order.validity_date.strftime("%Y-%m-%d") if include_order and order.validity_date else "",
-            order.payment_term_id.display_name if include_order and order.payment_term_id else "",
+            order.x_platform if include_order else "",
+            order.x_channel if include_order else "",
+            order.user_id.display_name if include_order and order.user_id else "",
+            dict(order._fields["x_sale_nature"].selection).get(order.x_sale_nature, "") if include_order else "",
             product.default_code or product.display_name or "",
+            line.x_import_product_name if line else "",
+            line.x_color if line else "",
+            line.x_size if line else "",
+            line.x_flex if line else "",
             line.product_uom_qty if line else "",
             line.price_unit if line else "",
-            taxes,
-            order.team_id.display_name if include_order and order.team_id else "",
+            line.x_source_location_id.display_name if line and line.x_source_location_id else "",
+            order.x_finance_remark if include_order else "",
         ]
 
     def _format_sale_order_export_workbook(self, workbook):
