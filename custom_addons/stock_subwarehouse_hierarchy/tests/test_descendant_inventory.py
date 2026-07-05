@@ -64,6 +64,16 @@ class TestDescendantInventoryTotals(TransactionCase):
             ]).mapped("location_id").ids,
         )
 
+    def test_webclient_bootstrap_uses_dashboard_home_instead_of_discuss(self):
+        user = self.env.user.sudo()
+        dashboard = self.env.ref("spreadsheet_dashboard.ir_actions_dashboard_action")
+        discuss = self.env.ref("mail.action_discuss")
+        user.action_id = discuss.id
+
+        user._on_webclient_bootstrap()
+
+        self.assertEqual(user.action_id.id, dashboard.id)
+
     def test_descendant_inventory_action_filters_internal_descendants(self):
         action = self.warehouse.action_view_descendant_inventory_totals()
 

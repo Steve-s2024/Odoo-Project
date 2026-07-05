@@ -5,7 +5,7 @@
     "category": "库存/库存",
     "author": "Local",
     "license": "LGPL-3",
-    "depends": ["stock", "web_hierarchy", "mrp", "sale_stock"],
+    "depends": ["stock", "web_hierarchy", "mrp", "sale_stock", "spreadsheet_dashboard"],
     "data": [
         "security/ir.model.access.csv",
         "data/currency_data.xml",
@@ -26,4 +26,5 @@
     },
     "installable": True,
     "application": False,
+    "post_init_hook": "post_init_hook",
 }

@@ -1,5 +1,6 @@
 from . import mrp_production
 from . import product_template
+from . import res_users
 from . import res_currency
 from . import sale_order
 from . import sale_order_line
