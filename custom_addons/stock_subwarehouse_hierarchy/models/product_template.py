@@ -51,6 +51,20 @@ class ProductTemplateCustomAttributeValue(models.Model):
 class ProductTemplate(models.Model):
     _inherit = "product.template"
 
+    x_material_type = fields.Selection(
+        selection=[
+            ("finished", "\u6210\u54c1"),
+            ("semi_finished", "\u534a\u6210\u54c1"),
+            ("component", "\u90e8\u4ef6"),
+            ("raw_material", "\u539f\u6599"),
+            ("packaging", "\u5305\u88c5\u6750\u6599"),
+        ],
+        string="\u7269\u6599\u7c7b\u578b",
+        default="finished",
+        copy=True,
+        index=True,
+    )
+
     x_custom_attribute_value_ids = fields.One2many(
         "product.template.custom.attribute.value",
         "product_tmpl_id",
@@ -100,6 +114,14 @@ class ProductTemplate(models.Model):
     x_import_custom_attribute_value_19 = fields.Char(string="导入自定义属性值 19", copy=False)
     x_import_custom_attribute_20 = fields.Char(string="导入自定义属性 20", copy=False)
     x_import_custom_attribute_value_20 = fields.Char(string="导入自定义属性值 20", copy=False)
+
+    def init(self):
+        super().init()
+        self.env.cr.execute("""
+            UPDATE product_template
+               SET x_material_type = 'finished'
+             WHERE x_material_type IS NULL
+        """)
 
     @api.model
     def _get_global_custom_attributes(self):
@@ -337,6 +359,7 @@ class ProductTemplate(models.Model):
             ("name", "\u4ea7\u54c1\u540d\u79f0"),
             ("default_code", "\u5185\u90e8\u7f16\u53f7"),
             ("type", "\u4ea7\u54c1\u7c7b\u578b"),
+            ("x_material_type", "\u7269\u6599\u7c7b\u578b"),
             ("is_storable", "\u53ef\u5e93\u5b58"),
             ("categ_id", "\u4ea7\u54c1\u7c7b\u522b"),
             ("list_price", "\u9500\u552e\u4ef7\u683c"),
@@ -376,6 +399,7 @@ class ProductTemplate(models.Model):
             "\u793a\u4f8b\u4ea7\u54c1",
             "EXAMPLE-001",
             "consu",
+            "finished",
             "1",
             "\u5168\u90e8",
             0,

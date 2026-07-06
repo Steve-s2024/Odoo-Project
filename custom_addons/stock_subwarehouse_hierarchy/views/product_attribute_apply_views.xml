@@ -119,6 +119,47 @@
         </field>
     </record>
 
+    <record id="product_template_list_material_type_visible" model="ir.ui.view">
+        <field name="name">product.template.list.material.type.visible</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="account.product_template_list_view_sellable_inherit"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='default_code']" position="after">
+                <field name="x_material_type" string="&#29289;&#26009;&#31867;&#22411;" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="product_template_form_material_type_visible" model="ir.ui.view">
+        <field name="name">product.template.form.material.type.visible</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_only_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='type']" position="after">
+                <field name="x_material_type" string="&#29289;&#26009;&#31867;&#22411;"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="product_template_search_material_type_filters" model="ir.ui.view">
+        <field name="name">product.template.search.material.type.filters</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_search_view"/>
+        <field name="arch" type="xml">
+            <filter name="goods" position="before">
+                <filter string="&#25104;&#21697;" name="material_finished" domain="[('x_material_type', '=', 'finished')]"/>
+                <filter string="&#21322;&#25104;&#21697;" name="material_semi_finished" domain="[('x_material_type', '=', 'semi_finished')]"/>
+                <filter string="&#37096;&#20214;" name="material_component" domain="[('x_material_type', '=', 'component')]"/>
+                <filter string="&#21407;&#26009;" name="material_raw_material" domain="[('x_material_type', '=', 'raw_material')]"/>
+                <filter string="&#21253;&#35013;&#26448;&#26009;" name="material_packaging" domain="[('x_material_type', '=', 'packaging')]"/>
+                <separator/>
+            </filter>
+            <filter name="group_by_type" position="after">
+                <filter string="&#29289;&#26009;&#31867;&#22411;" name="group_by_material_type" context="{'group_by':'x_material_type'}"/>
+            </filter>
+        </field>
+    </record>
+
     <record id="product_template_form_custom_attributes_visible" model="ir.ui.view">
         <field name="name">product.template.form.custom.attributes.visible</field>
         <field name="model">product.template</field>

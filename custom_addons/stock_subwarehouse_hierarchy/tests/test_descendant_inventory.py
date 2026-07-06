@@ -570,6 +570,22 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertIn('name="x_custom_attribute_value_ids"', view.arch_db)
         self.assertIn('name="value_text"', view.arch_db)
 
+    def test_product_views_show_material_type(self):
+        form_view = self.env.ref(
+            "stock_subwarehouse_hierarchy.product_template_form_material_type_visible"
+        )
+        list_view = self.env.ref(
+            "stock_subwarehouse_hierarchy.product_template_list_material_type_visible"
+        )
+        search_view = self.env.ref(
+            "stock_subwarehouse_hierarchy.product_template_search_material_type_filters"
+        )
+
+        self.assertIn('name="x_material_type"', form_view.arch_db)
+        self.assertIn('name="x_material_type"', list_view.arch_db)
+        self.assertIn("material_component", search_view.arch_db)
+        self.assertIn("group_by_material_type", search_view.arch_db)
+
     def test_remove_global_custom_attribute_only_removes_managed_attribute(self):
         wizard = self.env["stock.subwarehouse.product.attribute.apply.wizard"].create({
             "attribute_name": "Removable Custom Attribute",
@@ -631,9 +647,14 @@ class TestDescendantInventoryTotals(TransactionCase):
         import_headers = import_rows[0]
         chinese_labels = import_rows[1]
         self.assertIn("name", import_headers)
+        self.assertIn("x_material_type", import_headers)
         self.assertIn("is_storable", import_headers)
         self.assertIn("x_import_custom_attribute_value_1", import_headers)
         self.assertNotIn("x_import_custom_attribute_1", import_headers)
+        self.assertEqual(
+            chinese_labels[import_headers.index("x_material_type")],
+            "\u7269\u6599\u7c7b\u578b",
+        )
         self.assertIn("产品名称", chinese_labels)
         self.assertIn("Import Matched Attribute", chinese_labels)
 
@@ -682,13 +703,14 @@ class TestDescendantInventoryTotals(TransactionCase):
 
     def test_product_import_without_is_storable_still_tracks_inventory(self):
         result = self.env["product.template"].load(
-            ["name", "default_code", "type"],
-            [["Imported Stock Product", "IMPORTED-STOCK-PRODUCT", "consu"]],
+            ["name", "default_code", "type", "x_material_type"],
+            [["Imported Stock Product", "IMPORTED-STOCK-PRODUCT", "consu", "component"]],
         )
 
         self.assertFalse(result["messages"])
         product_template = self.env["product.template"].browse(result["ids"][0])
         self.assertTrue(product_template.is_storable)
+        self.assertEqual(product_template.x_material_type, "component")
 
         product = product_template.product_variant_id
         action = self.bin_a.action_manufacture_product()
@@ -825,6 +847,7 @@ class TestDescendantInventoryTotals(TransactionCase):
         from openpyxl import load_workbook
 
         self.product_a.default_code = "EXPORT-PRODUCT-A"
+        self.product_a.product_tmpl_id.x_material_type = "component"
         export_attribute_name = "Export Custom Attribute"
         export_attribute_value = "Export Real Custom Value 88"
         self.env["stock.subwarehouse.product.attribute.apply.wizard"].create({
@@ -870,6 +893,7 @@ class TestDescendantInventoryTotals(TransactionCase):
             tuple(field_name for field_name, _label in self.env["product.template"]._get_dynamic_product_import_columns()),
         )
         self.assertEqual(product_rows[2][product_rows[0].index("default_code")], "EXPORT-PRODUCT-A")
+        self.assertEqual(product_rows[2][product_rows[0].index("x_material_type")], "component")
         self.assertNotIn(export_attribute_name, product_rows[2])
         self.assertIn(export_attribute_name, product_rows[1])
         attribute_column_index = product_rows[1].index(export_attribute_name)
