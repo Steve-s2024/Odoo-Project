@@ -1,12 +1,19 @@
 from collections import defaultdict
 
-from odoo import _, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError
 from odoo.fields import Command
 
 
 class StockQuant(models.Model):
     _inherit = "stock.quant"
+
+    x_material_type = fields.Selection(
+        related="product_tmpl_id.x_material_type",
+        string="物料类型",
+        store=True,
+        index=True,
+    )
 
     def action_transfer_selected_out_of_descendant_inventory(self):
         quants = self.filtered(lambda quant: quant.product_uom_id.compare(quant.available_quantity, 0) > 0)

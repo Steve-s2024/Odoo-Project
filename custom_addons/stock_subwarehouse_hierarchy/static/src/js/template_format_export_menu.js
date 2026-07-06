@@ -9,6 +9,7 @@ const cogMenuRegistry = registry.category("cogMenu");
 
 const TEMPLATE_EXPORT_ROUTES = {
     "product.template": "/stock_subwarehouse_hierarchy/export/product_template.xlsx",
+    "mrp.bom": "/stock_subwarehouse_hierarchy/export/mrp_bom.xlsx",
     "mrp.production": "/stock_subwarehouse_hierarchy/export/mrp_production.xlsx",
     "sale.order": "/stock_subwarehouse_hierarchy/export/sale_order.xlsx",
 };
@@ -45,4 +46,3 @@ const templateFormatExportItem = {
 cogMenuRegistry.add("stock-subwarehouse-template-format-export-menu", templateFormatExportItem, {
     sequence: 11,
 });
-

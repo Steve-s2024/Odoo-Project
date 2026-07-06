@@ -586,6 +586,27 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertIn("material_component", search_view.arch_db)
         self.assertIn("group_by_material_type", search_view.arch_db)
 
+    def test_inventory_material_type_actions_filter_finished_and_components(self):
+        self.product_a.product_tmpl_id.x_material_type = "finished"
+        self.product_b.product_tmpl_id.x_material_type = "component"
+
+        finished_action = self.env.ref(
+            "stock_subwarehouse_hierarchy.action_finished_product_inventory"
+        )
+        component_action = self.env.ref(
+            "stock_subwarehouse_hierarchy.action_component_inventory"
+        )
+        search_view = self.env.ref(
+            "stock_subwarehouse_hierarchy.stock_quant_search_material_type_filters"
+        )
+
+        self.assertIn("x_material_type", finished_action.domain)
+        self.assertIn("finished", finished_action.domain)
+        self.assertIn("x_material_type", component_action.domain)
+        self.assertIn("component", component_action.domain)
+        self.assertIn("material_finished_inventory", search_view.arch_db)
+        self.assertIn("material_component_inventory", search_view.arch_db)
+
     def test_remove_global_custom_attribute_only_removes_managed_attribute(self):
         wizard = self.env["stock.subwarehouse.product.attribute.apply.wizard"].create({
             "attribute_name": "Removable Custom Attribute",
@@ -798,6 +819,91 @@ class TestDescendantInventoryTotals(TransactionCase):
             (attribute.id, attribute.display_name, attribute.create_variant, value.id, value.display_name),
             attribute_rows,
         )
+
+    def test_bom_import_template_is_available_on_import_page(self):
+        templates = self.env["mrp.bom"].get_import_templates()
+
+        self.assertEqual(
+            [template["template"] for template in templates],
+            ["/stock_subwarehouse_hierarchy/import_template/mrp_bom.xlsx"],
+        )
+
+    def test_bom_import_template_can_create_component_lines(self):
+        self.product_b.default_code = "BOM-COMPONENT-B"
+        self.product_b.product_tmpl_id.x_material_type = "component"
+
+        result = self.env["mrp.bom"].load(
+            [
+                "product_tmpl_id",
+                "product_qty",
+                "product_uom_id",
+                "type",
+                "code",
+                "x_import_bom_component_product_1",
+                "x_import_bom_component_qty_1",
+                "x_import_bom_component_uom_1",
+            ],
+            [[
+                self.product_a.product_tmpl_id.display_name,
+                1,
+                self.product_a.uom_id.display_name,
+                "normal",
+                "BOM-IMPORT-TEST",
+                "BOM-COMPONENT-B",
+                2,
+                self.product_b.uom_id.display_name,
+            ]],
+        )
+
+        self.assertFalse(result["messages"])
+        bom = self.env["mrp.bom"].browse(result["ids"][0])
+        self.assertEqual(bom.code, "BOM-IMPORT-TEST")
+        self.assertEqual(len(bom.bom_line_ids), 1)
+        self.assertEqual(bom.bom_line_ids.product_id, self.product_b)
+        self.assertEqual(bom.bom_line_ids.product_qty, 2)
+
+    def test_bom_import_export_template_matches_component_slots(self):
+        from openpyxl import load_workbook
+
+        self.product_b.default_code = "BOM-EXPORT-COMPONENT"
+        bom = self.env["mrp.bom"].create({
+            "product_tmpl_id": self.product_a.product_tmpl_id.id,
+            "product_qty": 1,
+            "product_uom_id": self.product_a.uom_id.id,
+            "code": "BOM-EXPORT-TEST",
+            "bom_line_ids": [(0, 0, {
+                "product_id": self.product_b.id,
+                "product_qty": 3,
+                "product_uom_id": self.product_b.uom_id.id,
+            })],
+        })
+
+        import_workbook = load_workbook(
+            BytesIO(self.env["mrp.bom"]._generate_bom_import_template_xlsx()),
+            read_only=True,
+        )
+        import_rows = list(import_workbook["物料清单导入"].iter_rows(values_only=True))
+        self.assertIn("x_import_bom_component_product_1", import_rows[0])
+        self.assertEqual(
+            import_rows[1][import_rows[0].index("x_import_bom_component_product_1")],
+            "组件产品 1",
+        )
+
+        export_workbook = load_workbook(
+            BytesIO(bom._generate_bom_export_xlsx()),
+            read_only=True,
+        )
+        export_rows = list(export_workbook["物料清单导出"].iter_rows(values_only=True))
+        self.assertEqual(
+            export_rows[0],
+            tuple(field_name for field_name, _label in self.env["mrp.bom"]._get_bom_import_template_columns()),
+        )
+        self.assertEqual(export_rows[2][export_rows[0].index("code")], "BOM-EXPORT-TEST")
+        self.assertEqual(
+            export_rows[2][export_rows[0].index("x_import_bom_component_product_1")],
+            "BOM-EXPORT-COMPONENT",
+        )
+        self.assertEqual(export_rows[2][export_rows[0].index("x_import_bom_component_qty_1")], 3)
 
     def test_sale_order_import_template_uses_product_internal_reference_and_chinese_labels(self):
         from openpyxl import load_workbook

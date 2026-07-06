@@ -42,6 +42,25 @@ class StockSubwarehouseImportTemplateController(Controller):
         return request.make_response(content, headers=headers)
 
     @route(
+        "/stock_subwarehouse_hierarchy/import_template/mrp_bom.xlsx",
+        type="http",
+        auth="user",
+    )
+    def download_mrp_bom_import_template(self, **kwargs):
+        content = request.env["mrp.bom"]._generate_bom_import_template_xlsx()
+        headers = [
+            (
+                "Content-Type",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ),
+            (
+                "Content-Disposition",
+                content_disposition("bom_import_template_zh.xlsx"),
+            ),
+        ]
+        return request.make_response(content, headers=headers)
+
+    @route(
         "/stock_subwarehouse_hierarchy/import_template/product_template.xlsx",
         type="http",
         auth="user",
@@ -115,6 +134,26 @@ class StockSubwarehouseImportTemplateController(Controller):
             (
                 "Content-Disposition",
                 content_disposition("manufacturing_export_import_format_zh.xlsx"),
+            ),
+        ]
+        return request.make_response(content, headers=headers)
+
+    @route(
+        "/stock_subwarehouse_hierarchy/export/mrp_bom.xlsx",
+        type="http",
+        auth="user",
+    )
+    def export_mrp_bom_import_format(self, ids="", domain="[]", **kwargs):
+        records = self._records_from_request("mrp.bom", ids=ids, domain=domain)
+        content = records._generate_bom_export_xlsx()
+        headers = [
+            (
+                "Content-Type",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ),
+            (
+                "Content-Disposition",
+                content_disposition("bom_export_import_format_zh.xlsx"),
             ),
         ]
         return request.make_response(content, headers=headers)

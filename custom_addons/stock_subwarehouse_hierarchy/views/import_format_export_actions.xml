@@ -18,6 +18,15 @@
         <field name="code">action = records.action_export_import_template_format()</field>
     </record>
 
+    <record id="action_mrp_bom_export_import_format" model="ir.actions.server">
+        <field name="name">&#25353;&#23548;&#20837;&#27169;&#26495;&#23548;&#20986;&#29289;&#26009;&#28165;&#21333;</field>
+        <field name="model_id" ref="mrp.model_mrp_bom"/>
+        <field name="binding_model_id" ref="mrp.model_mrp_bom"/>
+        <field name="binding_type">action</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_export_import_template_format()</field>
+    </record>
+
     <record id="action_sale_order_export_import_format" model="ir.actions.server">
         <field name="name">按导入模板导出报价单</field>
         <field name="model_id" ref="sale.model_sale_order"/>

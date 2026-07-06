@@ -1,5 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <record id="stock_quant_search_material_type_filters" model="ir.ui.view">
+        <field name="name">stock.quant.search.material.type.filters</field>
+        <field name="model">stock.quant</field>
+        <field name="inherit_id" ref="stock.quant_search_view"/>
+        <field name="arch" type="xml">
+            <filter name="internal_loc" position="before">
+                <filter string="&#25104;&#21697;&#24211;&#23384;" name="material_finished_inventory" domain="[('x_material_type', '=', 'finished')]"/>
+                <filter string="&#21322;&#25104;&#21697;&#24211;&#23384;" name="material_semi_finished_inventory" domain="[('x_material_type', '=', 'semi_finished')]"/>
+                <filter string="&#37096;&#20214;&#24211;&#23384;" name="material_component_inventory" domain="[('x_material_type', '=', 'component')]"/>
+                <filter string="&#21407;&#26009;&#24211;&#23384;" name="material_raw_material_inventory" domain="[('x_material_type', '=', 'raw_material')]"/>
+                <filter string="&#21253;&#35013;&#26448;&#26009;&#24211;&#23384;" name="material_packaging_inventory" domain="[('x_material_type', '=', 'packaging')]"/>
+                <separator/>
+            </filter>
+            <filter name="productcategorygroup" position="after">
+                <filter string="&#29289;&#26009;&#31867;&#22411;" name="materialtypegroup" context="{'group_by': 'x_material_type'}"/>
+            </filter>
+        </field>
+    </record>
+
+    <record id="action_finished_product_inventory" model="ir.actions.act_window">
+        <field name="name">&#25104;&#21697;&#24211;&#23384;</field>
+        <field name="res_model">stock.quant</field>
+        <field name="view_mode">list,pivot,graph,form</field>
+        <field name="search_view_id" ref="stock.quant_search_view"/>
+        <field name="domain">[('x_material_type', '=', 'finished'), ('location_id.usage', '=', 'internal')]</field>
+        <field name="context">{'search_default_internal_loc': 1, 'search_default_productgroup': 1, 'search_default_locationgroup': 1}</field>
+    </record>
+
+    <record id="action_component_inventory" model="ir.actions.act_window">
+        <field name="name">&#37096;&#20214;&#24211;&#23384;</field>
+        <field name="res_model">stock.quant</field>
+        <field name="view_mode">list,pivot,graph,form</field>
+        <field name="search_view_id" ref="stock.quant_search_view"/>
+        <field name="domain">[('x_material_type', '=', 'component'), ('location_id.usage', '=', 'internal')]</field>
+        <field name="context">{'search_default_internal_loc': 1, 'search_default_productgroup': 1, 'search_default_locationgroup': 1}</field>
+    </record>
+
+    <menuitem
+        id="menu_finished_product_inventory"
+        name="&#25104;&#21697;&#24211;&#23384;"
+        parent="stock.menu_stock_inventory_control"
+        action="action_finished_product_inventory"
+        sequence="30"/>
+
+    <menuitem
+        id="menu_component_inventory"
+        name="&#37096;&#20214;&#24211;&#23384;"
+        parent="stock.menu_stock_inventory_control"
+        action="action_component_inventory"
+        sequence="31"/>
+
     <record id="view_stock_quant_tree_descendant_transfer_button" model="ir.ui.view">
         <field name="name">stock.quant.list.descendant.transfer.button</field>
         <field name="model">stock.quant</field>
