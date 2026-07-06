@@ -452,6 +452,35 @@ class ProductTemplate(models.Model):
             "target": "self",
         }
 
+    def action_configure_product_bom(self):
+        self.ensure_one()
+        action = self.env["ir.actions.actions"]._for_xml_id("mrp.mrp_bom_form_action")
+        form_view = self.env.ref("mrp.mrp_bom_form_view")
+        bom = self.env["mrp.bom"].search([
+            ("product_tmpl_id", "=", self.id),
+            ("type", "=", "normal"),
+        ], limit=1)
+
+        action.update({
+            "name": _("配置物料清单"),
+            "domain": [("product_tmpl_id", "=", self.id)],
+            "context": {
+                "default_product_tmpl_id": self.id,
+                "default_product_qty": 1.0,
+                "default_product_uom_id": self.uom_id.id,
+                "default_type": "normal",
+                "default_company_id": self.company_id.id or self.env.company.id,
+            },
+            "views": [(form_view.id, "form")],
+            "view_mode": "form",
+            "target": "current",
+        })
+        if bom:
+            action["res_id"] = bom.id
+        else:
+            action.pop("res_id", None)
+        return action
+
     def _generate_dynamic_product_export_xlsx(self):
         try:
             from openpyxl import Workbook

@@ -141,6 +141,27 @@
         </field>
     </record>
 
+    <record id="product_template_form_configure_bom_button" model="ir.ui.view">
+        <field name="name">product.template.form.configure.bom.button</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_only_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button
+                    name="action_configure_product_bom"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-list"
+                    string="&#37197;&#32622;BOM"
+                    invisible="x_material_type != 'finished'">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_text">&#37197;&#32622;BOM</span>
+                    </div>
+                </button>
+            </xpath>
+        </field>
+    </record>
+
     <record id="product_template_search_material_type_filters" model="ir.ui.view">
         <field name="name">product.template.search.material.type.filters</field>
         <field name="model">product.template</field>

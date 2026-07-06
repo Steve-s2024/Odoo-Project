@@ -5,4 +5,9 @@
             <i class="fa fa-fw fa-download me-1"/>按导入模板导出
         </DropdownItem>
     </t>
+    <t t-name="stock_subwarehouse_hierarchy.ProductBomImportMenu">
+        <DropdownItem class="'o_product_bom_import_menu'" onSelected.bind="onImportProductBom">
+            <i class="fa fa-fw fa-upload me-1"/>&#23548;&#20837;&#20135;&#21697;BOM
+        </DropdownItem>
+    </t>
 </templates>

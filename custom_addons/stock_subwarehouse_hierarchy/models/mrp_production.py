@@ -39,8 +39,22 @@ class MrpProduction(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         location = self._get_subwarehouse_manufacturing_location()
-        if location:
-            for vals in vals_list:
+        for vals in vals_list:
+            if vals.get("product_id") and not vals.get("bom_id"):
+                product = self.env["product.product"].browse(vals["product_id"])
+                picking_type = (
+                    vals.get("picking_type_id")
+                    and self.env["stock.picking.type"].browse(vals["picking_type_id"])
+                )
+                bom = self.env["mrp.bom"].with_context(active_test=True)._bom_find(
+                    product,
+                    picking_type=picking_type,
+                    company_id=vals.get("company_id") or self.env.company.id,
+                    bom_type="normal",
+                )[product]
+                if bom:
+                    vals["bom_id"] = bom.id
+            if location:
                 vals.setdefault("location_src_id", location.id)
                 vals.setdefault("location_dest_id", location.id)
         return super().create(vals_list)
