@@ -1,7 +1,7 @@
 from io import BytesIO
 from urllib.parse import urlencode
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.fields import Command
 
 
@@ -73,6 +73,7 @@ class MrpBom(models.Model):
     x_import_bom_component_qty_20 = fields.Float(string="导入组件数量 20", copy=False)
     x_import_bom_component_uom_20 = fields.Char(string="导入组件单位 20", copy=False)
 
+    @api.model
     def get_import_templates(self):
         return [{
             "label": _("物料清单导入模板"),

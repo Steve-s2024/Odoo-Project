@@ -827,6 +827,10 @@ class TestDescendantInventoryTotals(TransactionCase):
             [template["template"] for template in templates],
             ["/stock_subwarehouse_hierarchy/import_template/mrp_bom.xlsx"],
         )
+        self.assertTrue(
+            getattr(type(self.env["mrp.bom"]).get_import_templates, "_api_model", False),
+            "BOM import templates must be callable by the import screen without record ids.",
+        )
 
     def test_product_bom_button_opens_existing_bom_or_new_form(self):
         bom = self.env["mrp.bom"].create({
