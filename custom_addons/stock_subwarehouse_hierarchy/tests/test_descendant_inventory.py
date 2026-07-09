@@ -928,6 +928,31 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(bom.bom_line_ids.product_id, self.product_b)
         self.assertEqual(bom.bom_line_ids.product_qty, 2)
 
+    def test_bom_import_fails_when_component_product_is_missing(self):
+        with self.assertRaisesRegex(UserError, "MISSING-COMPONENT-REF"):
+            self.env["mrp.bom"].load(
+                [
+                    "product_tmpl_id",
+                    "product_qty",
+                    "product_uom_id",
+                    "type",
+                    "code",
+                    "x_import_bom_component_product_1",
+                    "x_import_bom_component_qty_1",
+                    "x_import_bom_component_uom_1",
+                ],
+                [[
+                    self.product_a.product_tmpl_id.display_name,
+                    1,
+                    self.product_a.uom_id.display_name,
+                    "normal",
+                    "BOM-MISSING-COMPONENT-TEST",
+                    "MISSING-COMPONENT-REF",
+                    2,
+                    self.product_b.uom_id.display_name,
+                ]],
+            )
+
     def test_bom_import_export_template_matches_component_slots(self):
         from openpyxl import load_workbook
 

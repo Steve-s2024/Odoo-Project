@@ -2,6 +2,7 @@ from io import BytesIO
 from urllib.parse import urlencode
 
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 from odoo.fields import Command
 
 
@@ -138,16 +139,29 @@ class MrpBom(models.Model):
 
     def _write_imported_bom_components(self, component_values):
         commands = [Command.clear()]
+        missing_products = []
+        missing_uoms = []
         for product_ref, quantity, uom_ref in component_values:
             product = self._find_bom_product(product_ref)
             if not product:
+                missing_products.append(product_ref)
                 continue
-            uom = self._find_bom_uom(uom_ref) or product.uom_id
+            uom = self._find_bom_uom(uom_ref) if uom_ref else product.uom_id
+            if not uom:
+                missing_uoms.append(uom_ref)
+                continue
             commands.append(Command.create({
                 "product_id": product.id,
                 "product_qty": quantity,
                 "product_uom_id": uom.id,
             }))
+        if missing_products or missing_uoms:
+            messages = []
+            if missing_products:
+                messages.append(_("找不到以下BOM组件产品：%s") % ", ".join(sorted(set(missing_products))))
+            if missing_uoms:
+                messages.append(_("找不到以下BOM组件单位：%s") % ", ".join(sorted(set(missing_uoms))))
+            raise UserError("\n".join(messages))
         self.write({"bom_line_ids": commands})
 
     def _find_bom_product(self, product_ref):
