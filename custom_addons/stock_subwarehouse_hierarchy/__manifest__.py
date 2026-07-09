@@ -9,6 +9,8 @@
     "data": [
         "security/ir.model.access.csv",
         "data/currency_data.xml",
+        "data/branding_data.xml",
+        "views/branding_views.xml",
         "views/descendant_inventory_total_views.xml",
         "views/product_attribute_apply_views.xml",
         "views/import_format_export_actions.xml",

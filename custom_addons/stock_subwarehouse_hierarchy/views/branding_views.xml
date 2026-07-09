@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="sun_web_layout_branding" inherit_id="web.layout" name="SUN Web Layout Branding">
+        <xpath expr="//title" position="replace">
+            <title t-esc="title or 'SUN ERP'"/>
+        </xpath>
+        <xpath expr="//link[@rel='shortcut icon']" position="replace">
+            <link type="image/png" rel="shortcut icon" href="/stock_subwarehouse_hierarchy/static/img/logo.png"/>
+        </xpath>
+    </template>
+
+    <template id="sun_brand_promotion_message" inherit_id="web.brand_promotion_message" name="SUN Brand Promotion">
+        <xpath expr="//a[hasclass('badge')]" position="replace">
+            <span class="badge text-bg-light">
+                <img alt="SUN"
+                    src="/stock_subwarehouse_hierarchy/static/img/logo.png"
+                    width="62" height="20"
+                    style="width: auto; height: 1em; vertical-align: baseline;"/>
+            </span>
+        </xpath>
+    </template>
+
+    <template id="sun_login_footer_branding" inherit_id="web.login_layout" name="SUN Login Footer Branding">
+        <xpath expr="//a[contains(@href, 'odoo.com')]" position="replace">
+            <span>SUN ERP</span>
+        </xpath>
+    </template>
+</odoo>

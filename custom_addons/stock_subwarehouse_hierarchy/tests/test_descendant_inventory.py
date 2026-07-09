@@ -74,6 +74,13 @@ class TestDescendantInventoryTotals(TransactionCase):
 
         self.assertEqual(user.action_id.id, dashboard.id)
 
+    def test_apply_sun_logo_updates_company_logo(self):
+        expected_logo = self.env["res.company"]._get_sun_logo_binary()
+
+        self.env["res.company"].action_apply_sun_logo()
+
+        self.assertEqual(self.env.company.logo, expected_logo)
+
     def test_descendant_inventory_action_filters_internal_descendants(self):
         action = self.warehouse.action_view_descendant_inventory_totals()
 

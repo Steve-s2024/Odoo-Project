@@ -4,6 +4,8 @@ from . import wizards
 
 
 def post_init_hook(env):
+    env["res.company"].action_apply_sun_logo()
+
     dashboard = env.ref(
         "spreadsheet_dashboard.ir_actions_dashboard_action",
         raise_if_not_found=False,
