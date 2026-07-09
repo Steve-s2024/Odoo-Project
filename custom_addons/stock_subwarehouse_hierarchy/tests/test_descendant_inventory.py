@@ -894,6 +894,36 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(len(raw_move), 1)
         self.assertEqual(raw_move.product_uom_qty, 6)
 
+    def test_mrp_production_form_onchange_shows_bom_components(self):
+        self.product_a.product_tmpl_id.x_material_type = "finished"
+        self.product_b.product_tmpl_id.x_material_type = "component"
+        bom = self.env["mrp.bom"].create({
+            "product_tmpl_id": self.product_a.product_tmpl_id.id,
+            "product_qty": 1,
+            "product_uom_id": self.product_a.uom_id.id,
+            "type": "normal",
+            "bom_line_ids": [(0, 0, {
+                "product_id": self.product_b.id,
+                "product_qty": 2,
+                "product_uom_id": self.product_b.uom_id.id,
+            })],
+        })
+
+        production = self.env["mrp.production"].new({
+            "product_id": self.product_a.id,
+            "product_qty": 3,
+            "product_uom_id": self.product_a.uom_id.id,
+            "location_src_id": self.bin_a.id,
+            "location_dest_id": self.bin_a.id,
+            "company_id": self.env.company.id,
+        })
+        production._onchange_product_id_use_default_bom_components()
+
+        self.assertEqual(production.bom_id, bom)
+        raw_move = production.move_raw_ids.filtered(lambda move: move.product_id == self.product_b)
+        self.assertEqual(len(raw_move), 1)
+        self.assertEqual(raw_move.product_uom_qty, 6)
+
     def test_bom_import_template_can_create_component_lines(self):
         self.product_b.default_code = "BOM-COMPONENT-B"
         self.product_b.product_tmpl_id.x_material_type = "component"

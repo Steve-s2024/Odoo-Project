@@ -36,6 +36,36 @@ class MrpProduction(models.Model):
                 production.location_src_id = location
                 production.location_dest_id = location
 
+    def _get_default_bom_for_product(self, product, picking_type=False, company_id=False):
+        if not product:
+            return self.env["mrp.bom"]
+        boms_by_product = self.env["mrp.bom"].with_context(active_test=True)._bom_find(
+            product,
+            picking_type=picking_type,
+            company_id=company_id or self.env.company.id,
+            bom_type="normal",
+        )
+        return boms_by_product.get(product, self.env["mrp.bom"])
+
+    @api.onchange("product_id", "picking_type_id", "company_id")
+    def _onchange_product_id_use_default_bom_components(self):
+        for production in self:
+            if not production.product_id:
+                continue
+            bom = production._get_default_bom_for_product(
+                production.product_id,
+                picking_type=production.picking_type_id,
+                company_id=production.company_id.id or self.env.company.id,
+            )
+            if bom and (
+                not production.bom_id
+                or production.bom_id.product_tmpl_id != production.product_tmpl_id
+                or (production.bom_id.product_id and production.bom_id.product_id != production.product_id)
+            ):
+                production.bom_id = bom
+            if production.bom_id:
+                production._compute_move_raw_ids()
+
     @api.model_create_multi
     def create(self, vals_list):
         location = self._get_subwarehouse_manufacturing_location()
@@ -46,12 +76,11 @@ class MrpProduction(models.Model):
                     vals.get("picking_type_id")
                     and self.env["stock.picking.type"].browse(vals["picking_type_id"])
                 )
-                bom = self.env["mrp.bom"].with_context(active_test=True)._bom_find(
+                bom = self._get_default_bom_for_product(
                     product,
                     picking_type=picking_type,
                     company_id=vals.get("company_id") or self.env.company.id,
-                    bom_type="normal",
-                )[product]
+                )
                 if bom:
                     vals["bom_id"] = bom.id
             if location:
