@@ -81,6 +81,15 @@ class TestDescendantInventoryTotals(TransactionCase):
 
         self.assertEqual(self.env.company.logo, expected_logo)
 
+    def test_chinese_language_is_default_for_users_and_partners(self):
+        self.env["res.lang"].action_use_chinese_by_default()
+
+        zh_cn = self.env["res.lang"].with_context(active_test=False).search([("code", "=", "zh_CN")])
+        self.assertTrue(zh_cn.active)
+        self.assertEqual(self.env["ir.default"]._get("res.partner", "lang"), "zh_CN")
+        self.assertEqual(self.env.user.lang, "zh_CN")
+        self.assertEqual(self.env.user.partner_id.lang, "zh_CN")
+
     def test_descendant_inventory_action_filters_internal_descendants(self):
         action = self.warehouse.action_view_descendant_inventory_totals()
 

@@ -2,6 +2,7 @@ from . import mrp_bom
 from . import mrp_production
 from . import product_template
 from . import res_company
+from . import res_lang
 from . import res_users
 from . import res_currency
 from . import sale_order

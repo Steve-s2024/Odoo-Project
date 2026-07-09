@@ -5,6 +5,7 @@ from . import wizards
 
 def post_init_hook(env):
     env["res.company"].action_apply_sun_logo()
+    env["res.lang"].action_use_chinese_by_default()
 
     dashboard = env.ref(
         "spreadsheet_dashboard.ir_actions_dashboard_action",
