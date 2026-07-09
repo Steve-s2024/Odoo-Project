@@ -39,6 +39,36 @@ class MrpProduction(models.Model):
     def _get_default_bom_for_product(self, product, picking_type=False, company_id=False):
         if not product:
             return self.env["mrp.bom"]
+        domain = [
+            ("type", "=", "normal"),
+            ("product_tmpl_id", "=", product.product_tmpl_id.id),
+            "|",
+            ("product_id", "=", product.id),
+            ("product_id", "=", False),
+            "|",
+            ("company_id", "=", company_id or self.env.company.id),
+            ("company_id", "=", False),
+        ]
+        if picking_type:
+            domain += [
+                "|",
+                ("picking_type_id", "=", picking_type.id),
+                ("picking_type_id", "=", False),
+            ]
+        candidate_boms = self.env["mrp.bom"].with_context(active_test=True).search(
+            domain,
+            order="write_date desc, id desc",
+        )
+        product_boms = candidate_boms.filtered(lambda bom: bom.product_id == product)
+        template_boms = candidate_boms.filtered(lambda bom: not bom.product_id)
+        for boms in (
+            product_boms.filtered("bom_line_ids"),
+            template_boms.filtered("bom_line_ids"),
+            product_boms,
+            template_boms,
+        ):
+            if boms:
+                return boms[0]
         boms_by_product = self.env["mrp.bom"].with_context(active_test=True)._bom_find(
             product,
             picking_type=picking_type,
@@ -60,6 +90,7 @@ class MrpProduction(models.Model):
             if bom and (
                 not production.bom_id
                 or production.bom_id.product_tmpl_id != production.product_tmpl_id
+                or (not production.bom_id.bom_line_ids and bom.bom_line_ids)
                 or (production.bom_id.product_id and production.bom_id.product_id != production.product_id)
             ):
                 production.bom_id = bom
