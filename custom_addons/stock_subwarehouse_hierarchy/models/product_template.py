@@ -456,10 +456,11 @@ class ProductTemplate(models.Model):
         self.ensure_one()
         action = self.env["ir.actions.actions"]._for_xml_id("mrp.mrp_bom_form_action")
         form_view = self.env.ref("mrp.mrp_bom_form_view")
-        bom = self.env["mrp.bom"].search([
+        boms = self.env["mrp.bom"].search([
             ("product_tmpl_id", "=", self.id),
             ("type", "=", "normal"),
-        ], limit=1)
+        ], order="write_date desc, id desc")
+        bom = boms.filtered("bom_line_ids")[:1] or boms[:1]
 
         action.update({
             "name": _("配置物料清单"),

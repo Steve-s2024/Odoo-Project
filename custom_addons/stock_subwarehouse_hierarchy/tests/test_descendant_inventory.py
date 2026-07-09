@@ -832,12 +832,23 @@ class TestDescendantInventoryTotals(TransactionCase):
             "BOM import templates must be callable by the import screen without record ids.",
         )
 
-    def test_product_bom_button_opens_existing_bom_or_new_form(self):
+    def test_product_bom_button_opens_component_bom_or_new_form(self):
+        self.env["mrp.bom"].create({
+            "product_tmpl_id": self.product_a.product_tmpl_id.id,
+            "product_qty": 1,
+            "product_uom_id": self.product_a.uom_id.id,
+            "type": "normal",
+        })
         bom = self.env["mrp.bom"].create({
             "product_tmpl_id": self.product_a.product_tmpl_id.id,
             "product_qty": 1,
             "product_uom_id": self.product_a.uom_id.id,
             "type": "normal",
+            "bom_line_ids": [(0, 0, {
+                "product_id": self.product_b.id,
+                "product_qty": 2,
+                "product_uom_id": self.product_b.uom_id.id,
+            })],
         })
 
         existing_action = self.product_a.product_tmpl_id.action_configure_product_bom()
