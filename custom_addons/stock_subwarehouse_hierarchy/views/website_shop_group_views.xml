@@ -62,48 +62,155 @@
     <template id="product_page_shop_group_siblings" inherit_id="website_sale.product" name="Same-name shop variants">
         <xpath expr="//t[@name='variant_info']" position="after">
             <t t-set="shop_group_siblings" t-value="product.sudo()._get_shop_group_siblings()"/>
+            <t t-set="shop_group_variant_rows" t-value="product.sudo()._get_shop_group_variant_rows()"/>
+            <t t-set="shop_group_option_groups" t-value="product.sudo()._get_shop_group_variant_option_groups()"/>
+            <t t-set="current_variant_values" t-value="product.sudo()._get_shop_variant_display_values()"/>
+            <t t-set="current_shop_available" t-value="product.sudo()._is_shop_available()"/>
             <div
                 t-if="len(shop_group_siblings) &gt; 1"
-                class="o_wsale_product_details_content_section mb-4"
+                class="o_wsale_product_details_content_section mb-4 o_shop_group_variant_selector"
+                t-att-data-current-product-id="product.id"
             >
-                <strong>同款规格</strong>
-                <div class="table-responsive mt-2">
-                    <table class="table table-sm align-middle">
-                        <thead>
-                            <tr>
-                                <th>产品ID</th>
-                                <th>颜色</th>
-                                <th>尺码</th>
-                                <th>硬度/款型</th>
-                                <th>成人/儿童</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr
-                                t-foreach="shop_group_siblings"
-                                t-as="sibling"
-                                t-att-class="'table-active' if sibling.id == product.id else ''"
-                            >
-                                <t t-set="variant_values" t-value="sibling._get_shop_variant_display_values()"/>
-                                <td t-out="variant_values['default_code'] or '-'"/>
-                                <td t-out="variant_values['color'] or '-'"/>
-                                <td t-out="variant_values['size'] or '-'"/>
-                                <td t-out="variant_values['flex'] or '-'"/>
-                                <td t-out="variant_values['audience'] or '-'"/>
-                                <td class="text-end">
-                                    <span t-if="sibling.id == product.id" class="badge text-bg-primary">当前</span>
-                                    <a
-                                        t-else=""
-                                        class="btn btn-sm btn-outline-primary"
-                                        t-att-href="sibling._get_product_url(category)"
-                                    >选择</a>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <style>
+                    .o_shop_group_variant_selector .o_shop_variant_choice {
+                        min-width: 4.5rem;
+                    }
+                    .o_shop_group_variant_selector .o_shop_variant_choice_input:checked + .o_shop_variant_choice {
+                        border-color: #111 !important;
+                        background: #111;
+                        color: #fff;
+                    }
+                    .o_shop_unavailable_cta {
+                        pointer-events: none;
+                        opacity: .65;
+                    }
+                </style>
+                <div
+                    t-foreach="shop_group_option_groups"
+                    t-as="option_group"
+                    class="mb-3"
+                >
+                    <div class="fw-semibold mb-2" t-out="option_group['label']"/>
+                    <div class="d-flex flex-wrap gap-2">
+                        <t t-foreach="option_group['values']" t-as="option_value">
+                            <t
+                                t-set="option_input_id"
+                                t-value="'o_shop_variant_%s_%s' % (option_group['key'], option_value)"
+                            />
+                            <input
+                                type="radio"
+                                class="btn-check o_shop_variant_choice_input"
+                                t-att-name="'o_shop_variant_%s' % option_group['key']"
+                                t-att-id="option_input_id"
+                                t-att-value="option_value"
+                                t-att-data-option-key="option_group['key']"
+                                t-att-checked="option_value == current_variant_values.get(option_group['key'])"
+                                autocomplete="off"
+                            />
+                            <label
+                                class="btn btn-light border rounded-0 px-3 py-2 o_shop_variant_choice"
+                                t-att-for="option_input_id"
+                                t-out="option_value"
+                            />
+                        </t>
+                    </div>
                 </div>
+                <div class="d-none o_shop_group_variant_map">
+                    <span
+                        t-foreach="shop_group_variant_rows"
+                        t-as="variant_row"
+                        t-att-data-product-id="variant_row['product'].id"
+                        t-att-data-url="variant_row['product']._get_product_url(category)"
+                        t-att-data-color="variant_row['values']['color']"
+                        t-att-data-size="variant_row['values']['size']"
+                        t-att-data-flex="variant_row['values']['flex']"
+                        t-att-data-available="'1' if variant_row['is_available'] else '0'"
+                        t-att-data-quantity="variant_row['available_quantity']"
+                    />
+                </div>
+                <div
+                    t-if="not current_shop_available"
+                    class="alert alert-warning py-2 mb-0 o_shop_current_variant_unavailable"
+                >
+                    当前规格库存不足，暂时无法加入购物车。
+                </div>
+                <div
+                    class="alert alert-warning py-2 mb-0 d-none o_shop_selected_variant_unavailable"
+                >
+                    该规格库存不足，暂时无法加入购物车。
+                </div>
+                <script>
+                    <![CDATA[
+                    (function () {
+                        const root = document.currentScript.closest(".o_shop_group_variant_selector");
+                        if (!root) {
+                            return;
+                        }
+                        const addToCart = document.querySelector("#add_to_cart");
+                        const selectedWarning = root.querySelector(".o_shop_selected_variant_unavailable");
+                        const currentWarning = root.querySelector(".o_shop_current_variant_unavailable");
+
+                        function selectedValue(key) {
+                            const input = root.querySelector(`input[data-option-key="${key}"]:checked`);
+                            return input ? input.value : "";
+                        }
+
+                        function findSelectedVariant() {
+                            const color = selectedValue("color");
+                            const size = selectedValue("size");
+                            const flex = selectedValue("flex");
+                            return Array.from(root.querySelectorAll(".o_shop_group_variant_map [data-product-id]")).find((entry) => {
+                                return entry.dataset.color === color
+                                    && entry.dataset.size === size
+                                    && entry.dataset.flex === flex;
+                            });
+                        }
+
+                        function setCartAvailability(isAvailable) {
+                            if (!addToCart) {
+                                return;
+                            }
+                            addToCart.classList.toggle("disabled", !isAvailable);
+                            addToCart.classList.toggle("o_shop_unavailable_cta", !isAvailable);
+                            addToCart.setAttribute("aria-disabled", isAvailable ? "false" : "true");
+                        }
+
+                        function refreshSelection(redirect) {
+                            const variant = findSelectedVariant();
+                            if (!variant) {
+                                setCartAvailability(false);
+                                selectedWarning && selectedWarning.classList.remove("d-none");
+                                currentWarning && currentWarning.classList.add("d-none");
+                                return;
+                            }
+                            const isAvailable = variant.dataset.available === "1";
+                            if (redirect && variant.dataset.productId !== root.dataset.currentProductId) {
+                                window.location.href = variant.dataset.url;
+                                return;
+                            }
+                            setCartAvailability(isAvailable);
+                            if (selectedWarning) {
+                                selectedWarning.classList.toggle("d-none", isAvailable);
+                            }
+                        }
+
+                        root.addEventListener("change", function (event) {
+                            if (event.target.matches(".o_shop_variant_choice_input")) {
+                                refreshSelection(true);
+                            }
+                        });
+                        refreshSelection(false);
+                    })();
+                    ]]>
+                </script>
             </div>
+        </xpath>
+    </template>
+
+    <template id="product_page_disable_add_to_cart_when_shop_unavailable" inherit_id="website_sale.cta_wrapper" name="Disable add to cart when shop unavailable">
+        <xpath expr="//a[@id='add_to_cart']" position="attributes">
+            <attribute name="t-attf-class">btn btn-primary js_check_product a-submit flex-grow-1 {{'disabled o_shop_unavailable_cta' if not product.sudo()._is_shop_available() else ''}}</attribute>
+            <attribute name="t-att-aria-disabled">'true' if not product.sudo()._is_shop_available() else 'false'</attribute>
         </xpath>
     </template>
 

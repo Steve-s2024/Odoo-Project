@@ -182,6 +182,62 @@ class ProductTemplate(models.Model):
             ("website_published", "=", True),
         ], order="default_code, id")
 
+    def _get_shop_group_variant_rows(self):
+        self.ensure_one()
+        rows = []
+        for sibling in self._get_shop_group_siblings():
+            available_quantity = sibling._get_shop_available_quantity()
+            rows.append({
+                "product": sibling,
+                "values": sibling._get_shop_variant_display_values(),
+                "available_quantity": available_quantity,
+                "is_available": sibling._is_shop_available(),
+            })
+        return rows
+
+    def _get_shop_group_variant_option_groups(self):
+        self.ensure_one()
+        rows = self._get_shop_group_variant_rows()
+        option_specs = [
+            ("color", "颜色"),
+            ("size", "尺码"),
+            ("flex", "硬度"),
+        ]
+        groups = []
+        for key, label in option_specs:
+            values = []
+            seen_values = set()
+            for row in rows:
+                value = row["values"].get(key) or "未识别"
+                if value in seen_values:
+                    continue
+                seen_values.add(value)
+                values.append(value)
+            groups.append({
+                "key": key,
+                "label": label,
+                "values": values,
+            })
+        return groups
+
+    def _get_shop_available_quantity(self):
+        self.ensure_one()
+        product_variant = self.product_variant_id
+        if not product_variant or not product_variant.is_storable:
+            return 1.0
+        quants = self.env["stock.quant"].sudo().search([
+            ("product_id", "=", product_variant.id),
+            ("location_id.usage", "=", "internal"),
+        ])
+        return sum(quants.mapped("available_quantity"))
+
+    def _is_shop_available(self):
+        self.ensure_one()
+        product_variant = self.product_variant_id
+        if not product_variant or not product_variant.is_storable:
+            return True
+        return self._get_shop_available_quantity() > 0
+
     def _get_visible_website_attribute_lines(self):
         self.ensure_one()
         return self.valid_product_template_attribute_line_ids.filtered(

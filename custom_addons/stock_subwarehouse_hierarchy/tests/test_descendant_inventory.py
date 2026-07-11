@@ -405,6 +405,54 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(variant_values["flex"], "787")
         self.assertEqual(variant_values["audience"], "儿童/青少年")
 
+    def test_shop_group_variant_option_groups_use_same_name_products(self):
+        product_1, product_2, product_3 = self.env["product.template"].create([
+            {
+                "name": "Shop Selector Test",
+                "default_code": "152410Yb-MK000-H001150",
+                "sale_ok": True,
+            },
+            {
+                "name": "Shop Selector Test",
+                "default_code": "152410Yb-MK000-W001155",
+                "sale_ok": True,
+            },
+            {
+                "name": "Shop Selector Test",
+                "default_code": "152410Yb-MK100-H001150",
+                "sale_ok": True,
+            },
+        ])
+        (product_1 | product_2 | product_3).action_publish_to_shop()
+
+        option_groups = product_1._get_shop_group_variant_option_groups()
+        options_by_key = {
+            group["key"]: group["values"]
+            for group in option_groups
+        }
+
+        self.assertEqual(options_by_key["color"], ["黑", "白"])
+        self.assertEqual(options_by_key["size"], ["150", "155"])
+        self.assertEqual(options_by_key["flex"], ["无硬度", "100"])
+
+    def test_shop_availability_uses_current_product_on_hand(self):
+        product = self.env["product.template"].create({
+            "name": "Shop Stock Test",
+            "is_storable": True,
+            "sale_ok": True,
+        })
+
+        self.assertFalse(product._is_shop_available())
+
+        self.StockQuant._update_available_quantity(
+            product.product_variant_id,
+            self.warehouse.lot_stock_id,
+            2.0,
+        )
+
+        self.assertTrue(product._is_shop_available())
+        self.assertEqual(product._get_shop_available_quantity(), 2.0)
+
     def test_shop_publish_actions_toggle_website_visibility(self):
         product = self.env["product.template"].create({
             "name": "Publish Action Test",
