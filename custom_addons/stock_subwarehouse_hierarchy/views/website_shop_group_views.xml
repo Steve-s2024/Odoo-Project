@@ -94,4 +94,13 @@
             </style>
         </xpath>
     </template>
+
+    <template id="product_page_hide_managed_custom_variants" inherit_id="website_sale.variants" name="Hide managed custom shop variants">
+        <xpath expr="//t[@t-set='has_configurable_attribute_line']" position="attributes">
+            <attribute name="t-value">any(ptal._is_configurable() for ptal in product._get_visible_website_attribute_lines())</attribute>
+        </xpath>
+        <xpath expr="//t[@t-foreach='product.valid_product_template_attribute_line_ids']" position="attributes">
+            <attribute name="t-foreach">product._get_visible_website_attribute_lines()</attribute>
+        </xpath>
+    </template>
 </odoo>

@@ -1,3 +1,4 @@
+import re
 from io import BytesIO
 from urllib.parse import urlencode
 
@@ -143,6 +144,33 @@ class ProductTemplate(models.Model):
             representative_ids.append(product.id)
         return ProductTemplate.browse(representative_ids)
 
+    def _get_shop_product_family(self):
+        self.ensure_one()
+        name = f"{self.name or ''} {self.display_name or ''} {self.default_code or ''}".casefold()
+        product_code = self._get_shop_product_code_from_default_code()
+
+        if any(term in name for term in ("单板鞋", "单板", "snowboard")):
+            return "snowboard"
+        if any(term in name for term in ("双板鞋", "双板", "雪杖", "滑雪杖", "ski boot", "ski pole")):
+            return "ski"
+
+        if product_code in {"S1", "SE"} or product_code.startswith(("D", "DC", "DZ")):
+            return "snowboard"
+        if product_code in {"S", "S2"} or product_code.startswith(("X", "Z")):
+            return "ski"
+        return "other"
+
+    def _get_shop_product_code_from_default_code(self):
+        self.ensure_one()
+        first_code_part = (self.default_code or "").split("-", 1)[0]
+        match = re.match(r"\[?(\d{6})([A-Za-z0-9]+)", first_code_part.strip())
+        return match.group(2).upper() if match else ""
+
+    def _filter_shop_products_by_family(self, family):
+        if family == "other":
+            return self.filtered(lambda product: product._get_shop_product_family() == "other")
+        return self.filtered(lambda product: product._get_shop_product_family() == family)
+
     def _get_shop_group_siblings(self):
         self.ensure_one()
         normalized_name = " ".join((self.name or "").split())
@@ -153,6 +181,12 @@ class ProductTemplate(models.Model):
             ("sale_ok", "=", True),
             ("website_published", "=", True),
         ], order="default_code, id")
+
+    def _get_visible_website_attribute_lines(self):
+        self.ensure_one()
+        return self.valid_product_template_attribute_line_ids.filtered(
+            lambda line: not line.attribute_id.x_apply_to_all_products
+        )
 
     def _compute_x_shop_group_variant_count(self):
         for product in self:

@@ -1,5 +1,6 @@
 from io import BytesIO
 
+from odoo import Command
 from odoo.exceptions import UserError
 from odoo.tests import TransactionCase, tagged
 
@@ -289,6 +290,51 @@ class TestDescendantInventoryTotals(TransactionCase):
 
         self.assertEqual(grouped_products, product_1 | product_3)
         self.assertEqual(product_1.x_shop_group_variant_count, 2)
+
+    def test_shop_product_family_filter_splits_ski_snowboard_and_other(self):
+        ski, bracketed_ski, snowboard, other = self.env["product.template"].create([
+            {"name": "零售滑雪双板", "default_code": "062410X-MA006-W001170", "sale_ok": True},
+            {"name": "滑雪杖", "default_code": "[012410Z-MA000-HR01130]", "sale_ok": True},
+            {"name": "儿童单板刻滑滑雪板", "default_code": "052411Dc-MK787-HX02135", "sale_ok": True},
+            {"name": "滑雪手套", "default_code": "112411T1-MA000-P001##L", "sale_ok": True},
+        ])
+
+        products = ski | bracketed_ski | snowboard | other
+
+        self.assertEqual(products._filter_shop_products_by_family("ski"), ski | bracketed_ski)
+        self.assertEqual(products._filter_shop_products_by_family("snowboard"), snowboard)
+        self.assertEqual(products._filter_shop_products_by_family("other"), other)
+
+    def test_managed_custom_attributes_are_hidden_from_website_lines(self):
+        custom_attribute = self.env["product.attribute"].create({
+            "name": "测试自定义属性",
+            "x_apply_to_all_products": True,
+        })
+        visible_attribute = self.env["product.attribute"].create({
+            "name": "公开规格",
+        })
+        visible_value = self.env["product.attribute.value"].create({
+            "name": "公开值",
+            "attribute_id": visible_attribute.id,
+        })
+        product = self.env["product.template"].create({
+            "name": "Website Attribute Test",
+            "sale_ok": True,
+            "attribute_line_ids": [
+                Command.create({
+                    "attribute_id": visible_attribute.id,
+                    "value_ids": [Command.set(visible_value.ids)],
+                }),
+            ],
+        })
+
+        visible_lines = product._get_visible_website_attribute_lines()
+        single_values = product.valid_product_template_attribute_line_ids._prepare_single_value_for_display()
+
+        self.assertNotIn(custom_attribute, visible_lines.attribute_id)
+        self.assertIn(visible_attribute, visible_lines.attribute_id)
+        self.assertNotIn(custom_attribute, single_values)
+        self.assertIn(visible_attribute, single_values)
 
     def test_shop_group_variant_values_use_custom_attributes(self):
         color_attribute = self.env["product.attribute"].create({
