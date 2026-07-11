@@ -55,6 +55,37 @@
                 .products_attributes_filters {
                     display: none !important;
                 }
+                .o_wsale_products_grid_table {
+                    gap: 28px !important;
+                }
+                .o_wsale_product_grid_wrapper {
+                    border: 0 !important;
+                    box-shadow: none !important;
+                    background: #fff;
+                }
+                .o_wsale_product_grid_wrapper .oe_product_cart,
+                .o_wsale_product_grid_wrapper article {
+                    border: 0 !important;
+                    border-radius: 0 !important;
+                    background: #fff;
+                }
+                .o_wsale_product_grid_wrapper img {
+                    background: #f6f6f6;
+                }
+                .o_wsale_products_item_title {
+                    font-size: .92rem !important;
+                    font-weight: 800 !important;
+                    letter-spacing: .02em;
+                    text-transform: uppercase;
+                }
+                .o_wsale_product_information {
+                    padding-top: 14px;
+                }
+                .o_wsale_product_sub .oe_currency_value,
+                .o_wsale_product_sub .oe_price {
+                    font-weight: 800;
+                    color: #111;
+                }
             </style>
         </xpath>
     </template>
@@ -73,16 +104,33 @@
             >
                 <style>
                     .o_shop_group_variant_selector .o_shop_variant_choice {
-                        min-width: 4.5rem;
+                        min-width: 4.8rem;
+                        min-height: 3.25rem;
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: 700;
+                        color: #111;
+                        background: #f7f7f7;
+                        border-color: #f7f7f7 !important;
+                        transition: border-color .15s ease, background-color .15s ease, color .15s ease;
                     }
                     .o_shop_group_variant_selector .o_shop_variant_choice_input:checked + .o_shop_variant_choice {
                         border-color: #111 !important;
                         background: #111;
                         color: #fff;
                     }
+                    .o_shop_group_variant_selector .fw-semibold {
+                        font-size: .9rem;
+                        font-weight: 800 !important;
+                        color: #111;
+                    }
                     .o_shop_unavailable_cta {
                         pointer-events: none;
                         opacity: .65;
+                    }
+                    .o_shop_group_variant_selector .alert {
+                        border-radius: 0;
                     }
                 </style>
                 <div
@@ -217,6 +265,41 @@
     <template id="product_page_hide_standard_product_attributes" inherit_id="website_sale.product" name="Hide standard shop attributes">
         <xpath expr="//t[@name='variant_info']" position="before">
             <style>
+                .o_wsale_breadcrumb {
+                    display: none !important;
+                }
+                .o_wsale_product_page #o_wsale_product_details_content {
+                    max-width: 560px;
+                }
+                .o_wsale_product_page .o_wsale_product_details_content_section_title h1,
+                .o_wsale_product_page h1[itemprop="name"] {
+                    font-size: 1.65rem;
+                    line-height: 1.15;
+                    font-weight: 900;
+                    letter-spacing: .02em;
+                    text-transform: uppercase;
+                }
+                .o_wsale_product_page .product_price .oe_price {
+                    font-size: 1.4rem;
+                    font-weight: 900;
+                    color: #111;
+                }
+                .o_wsale_product_page .o_wsale_product_details_content_section {
+                    border: 0 !important;
+                }
+                #add_to_cart {
+                    min-height: 3.8rem;
+                    border-radius: 0;
+                    border-color: #111;
+                    background: #111;
+                    font-weight: 900;
+                    letter-spacing: .03em;
+                    text-transform: uppercase;
+                }
+                #add_to_cart:not(.disabled):hover {
+                    background: #333;
+                    border-color: #333;
+                }
                 #product_attributes_simple {
                     display: none !important;
                 }

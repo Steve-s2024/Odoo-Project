@@ -229,7 +229,9 @@ class ProductTemplate(models.Model):
             ("product_id", "=", product_variant.id),
             ("location_id.usage", "=", "internal"),
         ])
-        return sum(quants.mapped("available_quantity"))
+        quant_available = sum(quants.mapped("available_quantity"))
+        stock_available = max(product_variant.free_qty, product_variant.qty_available, 0.0)
+        return max(quant_available, stock_available)
 
     def _is_shop_available(self):
         self.ensure_one()
