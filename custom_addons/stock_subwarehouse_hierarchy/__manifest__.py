@@ -10,6 +10,7 @@
         "web_hierarchy",
         "mrp",
         "sale_stock",
+        "website_sale",
         "spreadsheet_dashboard",
         "website",
         "payment_wechatpay",

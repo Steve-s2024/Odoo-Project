@@ -28,6 +28,11 @@ class SaleOrderLine(models.Model):
         string="可满足",
         compute="_compute_x_source_available_qty",
     )
+    x_website_stock_reserved_until = fields.Datetime(
+        string="Website Stock Reserved Until",
+        copy=False,
+        readonly=True,
+    )
 
     @api.depends(
         "order_id.warehouse_id",
@@ -54,7 +59,14 @@ class SaleOrderLine(models.Model):
 
             eligible_location_ids = []
             for location in candidates:
-                available_qty = Quant._get_available_quantity(line.product_id, location, strict=True)
+                if line.order_id:
+                    available_qty = line.order_id._get_available_qty_for_source_location(
+                        line.product_id,
+                        location,
+                        exclude_order=line.order_id,
+                    )
+                else:
+                    available_qty = Quant._get_available_quantity(line.product_id, location, strict=True)
                 if float_compare(available_qty, required_qty, precision_digits=precision) >= 0:
                     eligible_location_ids.append(location.id)
             line.x_eligible_source_location_ids = Location.browse(eligible_location_ids)
@@ -141,6 +153,12 @@ class SaleOrderLine(models.Model):
                 line.x_source_location_id,
                 strict=True,
             )
+            if line.order_id:
+                available_qty = line.order_id._get_available_qty_for_source_location(
+                    line.product_id,
+                    line.x_source_location_id,
+                    exclude_order=line.order_id,
+                )
             if line.product_uom_id and line.product_id.uom_id != line.product_uom_id:
                 available_qty = line.product_id.uom_id._compute_quantity(
                     available_qty,

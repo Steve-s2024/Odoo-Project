@@ -87,6 +87,11 @@ class PaymentTransaction(models.Model):
         )
         return f"data:image/png;base64,{base64.b64encode(barcode).decode()}"
 
+    def _extract_amount_data(self, payment_data):
+        if self.provider_code != "wechatpay":
+            return super()._extract_amount_data(payment_data)
+        return None
+
     def _apply_updates(self, payment_data):
         if self.provider_code != "wechatpay":
             return super()._apply_updates(payment_data)

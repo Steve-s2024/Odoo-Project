@@ -1,4 +1,5 @@
 from io import BytesIO
+from dateutil.relativedelta import relativedelta
 from urllib.parse import urlencode
 
 from odoo import _, api, fields, models
@@ -24,6 +25,11 @@ class SaleOrder(models.Model):
         string="性质",
     )
     x_finance_remark = fields.Char(string="备注")
+    x_website_stock_reserved_at = fields.Datetime(
+        string="Website Stock Reserved At",
+        copy=False,
+        readonly=True,
+    )
 
     @api.model
     def get_import_templates(self):
@@ -250,6 +256,149 @@ class SaleOrder(models.Model):
                 ))
         if shortages:
             raise UserError(_("所选来源库存无法满足此报价单：\n%s") % "\n".join(shortages))
+
+    def _get_website_reserved_qty_for_source_location(self, product, location, exclude_order=False):
+        now = fields.Datetime.now()
+        domain = [
+            ("product_id", "=", product.id),
+            ("x_source_location_id", "=", location.id),
+            ("x_website_stock_reserved_until", ">", now),
+            ("order_id.state", "in", ["draft", "sent"]),
+        ]
+        if exclude_order:
+            domain.append(("order_id", "!=", exclude_order.id))
+        reserved_qty = 0.0
+        reserved_lines = self.env["sale.order.line"].sudo().search(domain)
+        for line in reserved_lines:
+            reserved_qty += line.product_uom_id._compute_quantity(
+                line.product_uom_qty,
+                product.uom_id,
+            )
+        return reserved_qty
+
+    def _get_available_qty_for_source_location(self, product, location, exclude_order=False):
+        physical_qty = self.env["stock.quant"].sudo()._get_available_quantity(
+            product,
+            location,
+            strict=True,
+        )
+        reserved_qty = self._get_website_reserved_qty_for_source_location(
+            product,
+            location,
+            exclude_order=exclude_order,
+        )
+        return max(physical_qty - reserved_qty, 0.0)
+
+    def _auto_assign_website_source_locations(self):
+        precision = self.env["decimal.precision"].precision_get("Product Unit")
+        StockLocation = self.env["stock.location"]
+        for order in self:
+            planned_demands = {}
+            lines = order.order_line.filtered(
+                lambda line: (
+                    not line.display_type
+                    and line.product_id
+                    and line.is_storable
+                    and float_compare(line.product_uom_qty, 0.0, precision_digits=precision) > 0
+                )
+            )
+            for line in lines:
+                product = line.product_id
+                required_qty = line._get_required_qty_in_product_uom()
+                current_location = line.x_source_location_id
+                if current_location:
+                    planned_key = (product.id, current_location.id)
+                    available_qty = order._get_available_qty_for_source_location(
+                        product,
+                        current_location,
+                        exclude_order=order,
+                    ) - planned_demands.get(planned_key, 0.0)
+                    if float_compare(available_qty, required_qty, precision_digits=precision) >= 0:
+                        planned_demands[planned_key] = planned_demands.get(planned_key, 0.0) + required_qty
+                        continue
+
+                best_location = StockLocation
+                best_available_qty = False
+                for location in line._get_source_location_candidates():
+                    planned_key = (product.id, location.id)
+                    available_qty = order._get_available_qty_for_source_location(
+                        product,
+                        location,
+                        exclude_order=order,
+                    ) - planned_demands.get(planned_key, 0.0)
+                    if float_compare(available_qty, required_qty, precision_digits=precision) < 0:
+                        continue
+                    if best_available_qty is False or available_qty < best_available_qty:
+                        best_location = location
+                        best_available_qty = available_qty
+
+                line.x_source_location_id = best_location
+                if best_location:
+                    planned_key = (product.id, best_location.id)
+                    planned_demands[planned_key] = planned_demands.get(planned_key, 0.0) + required_qty
+
+    def _get_source_inventory_shortages(self):
+        precision = self.env["decimal.precision"].precision_get("Product Unit")
+        demands = {}
+        shortages = []
+        for line in self.order_line:
+            if (
+                line.display_type
+                or not line.is_storable
+                or float_compare(line.product_uom_qty, 0.0, precision_digits=precision) <= 0
+            ):
+                continue
+            if not line.x_source_location_id:
+                shortages.append(_("%(product)s：没有可满足数量的发货仓库。", product=line.product_id.display_name))
+                continue
+            key = (line.product_id, line.x_source_location_id)
+            demands.setdefault(key, {
+                "line": line,
+                "requested": 0.0,
+            })
+            demands[key]["requested"] += line.product_uom_id._compute_quantity(
+                line.product_uom_qty,
+                line.product_id.uom_id,
+            )
+
+        for (product, location), demand in demands.items():
+            available = self._get_available_qty_for_source_location(
+                product,
+                location,
+                exclude_order=self,
+            )
+            if float_compare(demand["requested"], available, precision_digits=precision) > 0:
+                shortages.append(_(
+                    "%(product)s 来自 %(location)s：需要 %(requested)s %(uom)s，可用 %(available)s %(uom)s",
+                    product=product.display_name,
+                    location=location.display_name,
+                    requested=demand["requested"],
+                    available=available,
+                    uom=product.uom_id.display_name,
+                ))
+        return shortages
+
+    def _check_source_inventory_availability(self):
+        shortages = self._get_source_inventory_shortages()
+        if shortages:
+            raise UserError(_("所选来源库存无法满足此报价单：\n%s") % "\n".join(shortages))
+
+    def _prepare_website_stock_for_payment(self, hold_minutes=15):
+        self._auto_assign_website_source_locations()
+        self._check_source_inventory_availability()
+        reserved_until = fields.Datetime.now() + relativedelta(minutes=hold_minutes)
+        for order in self:
+            reservable_lines = order.order_line.filtered(
+                lambda line: (
+                    not line.display_type
+                    and line.product_id
+                    and line.is_storable
+                    and line.x_source_location_id
+                    and line.product_uom_qty > 0
+                )
+            )
+            reservable_lines.write({"x_website_stock_reserved_until": reserved_until})
+            order.x_website_stock_reserved_at = fields.Datetime.now()
 
     def action_confirm(self):
         self._check_source_inventory_availability()

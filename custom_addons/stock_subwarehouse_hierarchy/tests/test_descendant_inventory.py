@@ -237,6 +237,53 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(location.location_id, self.warehouse.view_location_id)
         self.assertTrue(location.x_is_subwarehouse)
 
+    def _create_sale_order_line(self, product, quantity, source_location=False):
+        order = self.env["sale.order"].create({
+            "partner_id": self.customer.id,
+            "warehouse_id": self.warehouse.id,
+        })
+        line_values = {
+            "order_id": order.id,
+            "product_id": product.id,
+            "product_uom_qty": quantity,
+            "product_uom_id": product.uom_id.id,
+        }
+        if source_location:
+            line_values["x_source_location_id"] = source_location.id
+        line = self.env["sale.order.line"].create(line_values)
+        return order, line
+
+    def test_website_payment_auto_assigns_exact_stocked_subwarehouse(self):
+        self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 2.0)
+        self.StockQuant._update_available_quantity(self.product_a, self.bin_b, 5.0)
+        order, line = self._create_sale_order_line(self.product_a, 4.0)
+        line.x_source_location_id = False
+
+        order._prepare_website_stock_for_payment()
+
+        self.assertEqual(line.x_source_location_id, self.bin_b)
+        self.assertTrue(line.x_website_stock_reserved_until)
+        self.assertTrue(order.x_website_stock_reserved_at)
+
+    def test_website_payment_hold_blocks_second_quotation(self):
+        self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
+        first_order, first_line = self._create_sale_order_line(self.product_a, 4.0)
+        first_line.x_source_location_id = False
+        first_order._prepare_website_stock_for_payment()
+
+        second_order, second_line = self._create_sale_order_line(self.product_a, 2.0)
+        second_line.x_source_location_id = False
+
+        with self.assertRaises(UserError):
+            second_order._prepare_website_stock_for_payment()
+
+    def test_source_location_check_does_not_use_descendant_stock(self):
+        self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
+        order, _line = self._create_sale_order_line(self.product_a, 1.0, self.subwarehouse)
+
+        with self.assertRaises(UserError):
+            order._check_source_inventory_availability()
+
     def test_view_location_manufacture_product_action_creates_internal_child_when_missing(self):
         view_location = self.StockLocation.create({
             "name": "Empty Manufacturing Subwarehouse",
