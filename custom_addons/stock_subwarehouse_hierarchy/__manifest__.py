@@ -5,7 +5,7 @@
     "category": "库存/库存",
     "author": "Local",
     "license": "LGPL-3",
-    "depends": ["stock", "web_hierarchy", "mrp", "sale_stock", "spreadsheet_dashboard"],
+    "depends": ["stock", "web_hierarchy", "mrp", "sale_stock", "spreadsheet_dashboard", "website"],
     "data": [
         "security/ir.model.access.csv",
         "data/currency_data.xml",
@@ -19,6 +19,7 @@
         "views/stock_location_views.xml",
         "views/stock_warehouse_views.xml",
         "views/sale_order_views.xml",
+        "views/website_video_views.xml",
     ],
     "assets": {
         "web.assets_backend": [

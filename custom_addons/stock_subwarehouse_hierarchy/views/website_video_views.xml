@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_website_video_upload_wizard_form" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.website.video.upload.wizard.form</field>
+        <field name="model">stock.subwarehouse.website.video.upload.wizard</field>
+        <field name="arch" type="xml">
+            <form string="上传网站视频">
+                <group>
+                    <field name="name"/>
+                    <field name="video_file" filename="filename"/>
+                    <field name="filename" invisible="1"/>
+                    <field name="result_url" readonly="1" placeholder="上传后生成链接"/>
+                    <field name="embed_code" readonly="1" placeholder="上传后生成可粘贴到嵌入代码模块的 HTML"/>
+                </group>
+                <footer>
+                    <button name="action_upload_video" string="上传并生成链接" type="object" class="btn-primary"/>
+                    <button string="关闭" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_website_video_upload" model="ir.actions.act_window">
+        <field name="name">上传网站视频</field>
+        <field name="res_model">stock.subwarehouse.website.video.upload.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem
+        id="menu_website_video_upload"
+        name="上传网站视频"
+        parent="website.menu_website_global_configuration"
+        action="action_website_video_upload"
+        sequence="95"/>
+
+    <template id="s_local_video" name="本地视频">
+        <section class="s_local_video py-4" data-name="本地视频">
+            <div class="container">
+                <div class="ratio ratio-16x9">
+                    <video class="w-100 h-100" controls="controls" preload="metadata" playsinline="playsinline">
+                        <source src="/web/content/0" type="video/mp4"/>
+                    </video>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <template id="snippets_local_video" inherit_id="website.snippets">
+        <xpath expr="//snippets[@id='snippet_structure']//t[@t-snippet='website.s_media_list']" position="after">
+            <t t-snippet="stock_subwarehouse_hierarchy.s_local_video" string="本地视频" group="content">
+                <keywords>video, mp4, local video, website video, 视频, 本地视频</keywords>
+            </t>
+        </xpath>
+        <xpath expr="//snippets[@id='snippet_content']//t[@t-snippet='website.s_video']" position="after">
+            <t t-snippet="stock_subwarehouse_hierarchy.s_local_video" string="本地视频" t-thumbnail="/website/static/src/img/snippets_thumbs/s_video.svg"/>
+        </xpath>
+    </template>
+</odoo>
