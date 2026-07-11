@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_publish_products_to_shop" model="ir.actions.server">
+        <field name="name">发布到网店</field>
+        <field name="model_id" ref="product.model_product_template"/>
+        <field name="binding_model_id" ref="product.model_product_template"/>
+        <field name="binding_view_types">list,form</field>
+        <field name="state">code</field>
+        <field name="code">records.action_publish_to_shop()</field>
+    </record>
+
+    <record id="action_unpublish_products_from_shop" model="ir.actions.server">
+        <field name="name">从网店下架</field>
+        <field name="model_id" ref="product.model_product_template"/>
+        <field name="binding_model_id" ref="product.model_product_template"/>
+        <field name="binding_view_types">list,form</field>
+        <field name="state">code</field>
+        <field name="code">records.action_unpublish_from_shop()</field>
+    </record>
+
+    <record id="product_template_list_shop_group_fields" model="ir.ui.view">
+        <field name="name">product.template.list.shop.group.fields</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="account.product_template_list_view_sellable_inherit"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="website_published" string="已发布" optional="show"/>
+                <field name="x_shop_group_variant_count" string="同名规格数" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <template id="products_item_shop_group_summary" inherit_id="website_sale.products_item" name="Shop product group summary">
+        <xpath expr="//h2[hasclass('o_wsale_products_item_title')]" position="after">
+            <t t-set="shop_group_summary" t-value="product.sudo()._get_shop_group_summary()"/>
+            <div t-if="shop_group_summary" class="text-muted small mt-1" t-out="shop_group_summary"/>
+        </xpath>
+    </template>
+
+    <template id="product_page_shop_group_siblings" inherit_id="website_sale.product" name="Same-name shop variants">
+        <xpath expr="//t[@name='variant_info']" position="after">
+            <t t-set="shop_group_siblings" t-value="product.sudo()._get_shop_group_siblings()"/>
+            <div
+                t-if="len(shop_group_siblings) &gt; 1"
+                class="o_wsale_product_details_content_section mb-4"
+            >
+                <strong>同款规格</strong>
+                <div class="table-responsive mt-2">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>产品ID</th>
+                                <th>颜色</th>
+                                <th>尺码</th>
+                                <th>硬度/款型</th>
+                                <th>成人/儿童</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                t-foreach="shop_group_siblings"
+                                t-as="sibling"
+                                t-att-class="'table-active' if sibling.id == product.id else ''"
+                            >
+                                <t t-set="variant_values" t-value="sibling._get_shop_variant_display_values()"/>
+                                <td t-out="variant_values['default_code'] or '-'"/>
+                                <td t-out="variant_values['color'] or '-'"/>
+                                <td t-out="variant_values['size'] or '-'"/>
+                                <td t-out="variant_values['flex'] or '-'"/>
+                                <td t-out="variant_values['audience'] or '-'"/>
+                                <td class="text-end">
+                                    <span t-if="sibling.id == product.id" class="badge text-bg-primary">当前</span>
+                                    <a
+                                        t-else=""
+                                        class="btn btn-sm btn-outline-primary"
+                                        t-att-href="sibling._get_product_url(category)"
+                                    >选择</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </xpath>
+    </template>
+</odoo>

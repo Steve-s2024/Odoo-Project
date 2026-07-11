@@ -29,6 +29,7 @@
         "views/stock_warehouse_views.xml",
         "views/sale_order_views.xml",
         "views/website_video_views.xml",
+        "views/website_shop_group_views.xml",
     ],
     "assets": {
         "web.assets_backend": [

@@ -277,6 +277,62 @@ class TestDescendantInventoryTotals(TransactionCase):
         with self.assertRaises(UserError):
             second_order._prepare_website_stock_for_payment()
 
+    def test_shop_groups_published_same_name_products_by_representative(self):
+        product_1, product_2, product_3 = self.env["product.template"].create([
+            {"name": "Shop Group Test", "sale_ok": True},
+            {"name": "Shop Group Test", "sale_ok": True},
+            {"name": "Different Shop Group", "sale_ok": True},
+        ])
+        (product_1 | product_2 | product_3).action_publish_to_shop()
+
+        grouped_products = (product_1 | product_2 | product_3)._get_shop_grouped_products()
+
+        self.assertEqual(grouped_products, product_1 | product_3)
+        self.assertEqual(product_1.x_shop_group_variant_count, 2)
+
+    def test_shop_group_variant_values_use_custom_attributes(self):
+        color_attribute = self.env["product.attribute"].create({
+            "name": "颜色",
+            "x_apply_to_all_products": True,
+        })
+        size_attribute = self.env["product.attribute"].create({
+            "name": "尺码",
+            "x_apply_to_all_products": True,
+        })
+        product = self.env["product.template"].create({
+            "name": "Variant Value Test",
+            "default_code": "SKU-001",
+            "sale_ok": True,
+        })
+        product.x_custom_attribute_value_ids.filtered(
+            lambda value: value.attribute_id == color_attribute
+        ).value_text = "黑色"
+        product.x_custom_attribute_value_ids.filtered(
+            lambda value: value.attribute_id == size_attribute
+        ).value_text = "260"
+
+        variant_values = product._get_shop_variant_display_values()
+
+        self.assertEqual(variant_values["default_code"], "SKU-001")
+        self.assertEqual(variant_values["color"], "黑色")
+        self.assertEqual(variant_values["size"], "260")
+
+    def test_shop_publish_actions_toggle_website_visibility(self):
+        product = self.env["product.template"].create({
+            "name": "Publish Action Test",
+            "sale_ok": False,
+            "website_published": False,
+        })
+
+        product.action_publish_to_shop()
+
+        self.assertTrue(product.sale_ok)
+        self.assertTrue(product.website_published)
+
+        product.action_unpublish_from_shop()
+
+        self.assertFalse(product.website_published)
+
     def test_source_location_check_does_not_use_descendant_stock(self):
         self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
         order, _line = self._create_sale_order_line(self.product_a, 1.0, self.subwarehouse)

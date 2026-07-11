@@ -71,6 +71,10 @@ class ProductTemplate(models.Model):
         string="自定义属性",
         copy=True,
     )
+    x_shop_group_variant_count = fields.Integer(
+        string="同名网店规格数",
+        compute="_compute_x_shop_group_variant_count",
+    )
 
     # Unique import-only columns. They avoid repeated one2many field paths, which
     # Odoo can pair incorrectly during spreadsheet imports.
@@ -122,6 +126,84 @@ class ProductTemplate(models.Model):
                SET x_material_type = 'finished'
              WHERE x_material_type IS NULL
         """)
+
+    def _normalize_shop_group_name(self):
+        self.ensure_one()
+        return " ".join((self.name or "").split()).casefold()
+
+    def _get_shop_grouped_products(self):
+        ProductTemplate = self.env["product.template"]
+        representative_ids = []
+        seen_keys = set()
+        for product in self:
+            key = product._normalize_shop_group_name()
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            representative_ids.append(product.id)
+        return ProductTemplate.browse(representative_ids)
+
+    def _get_shop_group_siblings(self):
+        self.ensure_one()
+        normalized_name = " ".join((self.name or "").split())
+        if not normalized_name:
+            return self
+        return self.search([
+            ("name", "=ilike", normalized_name),
+            ("sale_ok", "=", True),
+            ("website_published", "=", True),
+        ], order="default_code, id")
+
+    def _compute_x_shop_group_variant_count(self):
+        for product in self:
+            product.x_shop_group_variant_count = len(product._get_shop_group_siblings())
+
+    def _get_custom_attribute_value(self, aliases):
+        self.ensure_one()
+        normalized_aliases = {"".join(alias.lower().split()) for alias in aliases}
+        fallback_value = ""
+        for custom_value in self.x_custom_attribute_value_ids:
+            attribute_name = "".join((custom_value.attribute_id.name or "").lower().split())
+            if attribute_name in normalized_aliases:
+                value_text = custom_value.value_text or ""
+                if value_text and value_text.lower() not in {"default", "默认"}:
+                    return value_text
+                fallback_value = fallback_value or value_text
+        return fallback_value
+
+    def _get_shop_variant_display_values(self):
+        self.ensure_one()
+        return {
+            "default_code": self.default_code or "",
+            "color": self._get_custom_attribute_value(["颜色", "颜色分类", "colour", "color"]),
+            "size": self._get_custom_attribute_value(["尺码", "尺寸", "size"]),
+            "flex": self._get_custom_attribute_value(["硬度", "款型", "flex"]),
+            "audience": self._get_custom_attribute_value(["成人儿童", "成人/儿童", "适用人群", "人群", "kids/adult", "kid/adult"]),
+        }
+
+    def _get_shop_group_summary(self):
+        self.ensure_one()
+        siblings = self._get_shop_group_siblings()
+        if len(siblings) <= 1:
+            return ""
+        sibling_values = [sibling._get_shop_variant_display_values() for sibling in siblings]
+        colors = sorted({values["color"] for values in sibling_values if values["color"]})
+        sizes = sorted({values["size"] for values in sibling_values if values["size"]})
+        parts = [f"{len(siblings)}个规格"]
+        if colors:
+            parts.append("颜色：" + " / ".join(colors[:4]) + ("..." if len(colors) > 4 else ""))
+        if sizes:
+            parts.append("尺码：" + " / ".join(sizes[:4]) + ("..." if len(sizes) > 4 else ""))
+        return "，".join(parts)
+
+    def action_publish_to_shop(self):
+        self.write({
+            "sale_ok": True,
+            "website_published": True,
+        })
+
+    def action_unpublish_from_shop(self):
+        self.write({"website_published": False})
 
     @api.model
     def _get_global_custom_attributes(self):
