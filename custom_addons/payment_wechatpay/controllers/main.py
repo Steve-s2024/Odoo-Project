@@ -26,6 +26,22 @@ class WeChatPayController(Controller):
         )
         return request.redirect("/payment/status")
 
+    @route(const.SIMULATE_SUCCESS_ROUTE, type="http", auth="public", methods=["POST"], csrf=False)
+    def wechatpay_simulate_success(self, **post):
+        tx = request.env["payment.transaction"].sudo().search([
+            ("provider_code", "=", "wechatpay"),
+            ("reference", "=", post.get("reference")),
+        ], limit=1)
+        if not tx or not tx.provider_id.sudo().wechatpay_simulation_mode:
+            return request.redirect("/payment/status")
+
+        tx._process("wechatpay", {
+            "out_trade_no": tx.wechatpay_out_trade_no,
+            "transaction_id": f"SIM-{tx.reference}",
+            "trade_state": "SUCCESS",
+        })
+        return request.redirect("/payment/status")
+
     @route(const.NOTIFY_ROUTE, type="http", auth="public", methods=["POST"], csrf=False)
     def wechatpay_notify(self, **kwargs):
         body = request.httprequest.get_data(as_text=True)

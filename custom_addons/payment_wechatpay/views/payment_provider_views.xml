@@ -7,16 +7,19 @@
         <field name="arch" type="xml">
             <page name="credentials" position="inside">
                 <group invisible="code != 'wechatpay'">
+                    <group string="测试">
+                        <field name="wechatpay_simulation_mode"/>
+                    </group>
                     <group string="商户配置">
-                        <field name="wechatpay_appid" required="code == 'wechatpay' and state != 'disabled'"/>
-                        <field name="wechatpay_mchid" required="code == 'wechatpay' and state != 'disabled'"/>
-                        <field name="wechatpay_api_v3_key" password="True" required="code == 'wechatpay' and state != 'disabled'"/>
-                        <field name="wechatpay_merchant_serial_no" required="code == 'wechatpay' and state != 'disabled'"/>
+                        <field name="wechatpay_appid" required="code == 'wechatpay' and state != 'disabled' and not wechatpay_simulation_mode"/>
+                        <field name="wechatpay_mchid" required="code == 'wechatpay' and state != 'disabled' and not wechatpay_simulation_mode"/>
+                        <field name="wechatpay_api_v3_key" password="True" required="code == 'wechatpay' and state != 'disabled' and not wechatpay_simulation_mode"/>
+                        <field name="wechatpay_merchant_serial_no" required="code == 'wechatpay' and state != 'disabled' and not wechatpay_simulation_mode"/>
                     </group>
                     <group string="证书和私钥">
-                        <field name="wechatpay_platform_serial_no" required="code == 'wechatpay' and state != 'disabled'"/>
-                        <field name="wechatpay_private_key" password="True" required="code == 'wechatpay' and state != 'disabled'"/>
-                        <field name="wechatpay_platform_certificate" password="True" required="code == 'wechatpay' and state != 'disabled'"/>
+                        <field name="wechatpay_platform_serial_no" required="code == 'wechatpay' and state != 'disabled' and not wechatpay_simulation_mode"/>
+                        <field name="wechatpay_private_key" password="True" required="code == 'wechatpay' and state != 'disabled' and not wechatpay_simulation_mode"/>
+                        <field name="wechatpay_platform_certificate" password="True" required="code == 'wechatpay' and state != 'disabled' and not wechatpay_simulation_mode"/>
                     </group>
                 </group>
             </page>

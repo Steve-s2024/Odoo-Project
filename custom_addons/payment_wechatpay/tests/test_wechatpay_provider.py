@@ -1,4 +1,5 @@
 from odoo.tests.common import TransactionCase, tagged
+from odoo.exceptions import ValidationError
 
 
 @tagged("post_install", "-at_install")
@@ -35,3 +36,32 @@ class TestWeChatPayProvider(TransactionCase):
         })
         tx.wechatpay_code_url = "weixin://wxpay/bizpayurl?pr=test"
         self.assertTrue(tx._get_wechatpay_qr_data_uri().startswith("data:image/png;base64,"))
+
+    def test_simulation_mode_creates_fake_qr_without_credentials(self):
+        provider = self.env.ref("payment_wechatpay.payment_provider_wechatpay")
+        provider.write({
+            "state": "test",
+            "wechatpay_simulation_mode": True,
+        })
+        method = self.env.ref("payment_wechatpay.payment_method_wechatpay")
+        cny = self.env.ref("base.CNY")
+        tx = self.env["payment.transaction"].create({
+            "provider_id": provider.id,
+            "payment_method_id": method.id,
+            "reference": "WX-SIM-TEST",
+            "amount": 1.0,
+            "currency_id": cny.id,
+            "partner_id": self.env.ref("base.public_partner").id,
+            "operation": "online_redirect",
+        })
+        tx._wechatpay_ensure_native_order()
+        self.assertEqual(tx.state, "pending")
+        self.assertTrue(tx.wechatpay_code_url.startswith("weixin://wxpay/simulated/"))
+
+    def test_live_mode_requires_credentials(self):
+        provider = self.env.ref("payment_wechatpay.payment_provider_wechatpay")
+        with self.assertRaises(ValidationError):
+            provider.write({
+                "state": "test",
+                "wechatpay_simulation_mode": False,
+            })

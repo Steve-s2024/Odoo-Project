@@ -7,7 +7,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
 from odoo.addons.payment_wechatpay import const
@@ -22,38 +22,35 @@ class PaymentProvider(models.Model):
     )
     wechatpay_appid = fields.Char(
         string="微信 AppID",
-        required_if_provider="wechatpay",
         groups="base.group_system",
     )
     wechatpay_mchid = fields.Char(
         string="微信支付商户号",
-        required_if_provider="wechatpay",
         groups="base.group_system",
     )
     wechatpay_api_v3_key = fields.Char(
         string="API v3 密钥",
-        required_if_provider="wechatpay",
         groups="base.group_system",
     )
     wechatpay_merchant_serial_no = fields.Char(
         string="商户证书序列号",
-        required_if_provider="wechatpay",
         groups="base.group_system",
     )
     wechatpay_private_key = fields.Text(
         string="商户 API 私钥",
-        required_if_provider="wechatpay",
         groups="base.group_system",
     )
     wechatpay_platform_serial_no = fields.Char(
         string="微信平台证书序列号",
-        required_if_provider="wechatpay",
         groups="base.group_system",
     )
     wechatpay_platform_certificate = fields.Text(
         string="微信平台证书",
-        required_if_provider="wechatpay",
         groups="base.group_system",
+    )
+    wechatpay_simulation_mode = fields.Boolean(
+        string="模拟模式",
+        help="Use fake WeChat Pay QR codes and manual success confirmation for checkout testing.",
     )
 
     def _compute_feature_support_fields(self):
@@ -76,6 +73,39 @@ class PaymentProvider(models.Model):
         if self.code != "wechatpay":
             return super()._get_supported_currencies()
         return self.env["res.currency"].with_context(active_test=False).search([("name", "=", "CNY")])
+
+    @api.constrains(
+        "state",
+        "code",
+        "wechatpay_simulation_mode",
+        "wechatpay_appid",
+        "wechatpay_mchid",
+        "wechatpay_api_v3_key",
+        "wechatpay_merchant_serial_no",
+        "wechatpay_private_key",
+        "wechatpay_platform_serial_no",
+        "wechatpay_platform_certificate",
+    )
+    def _check_wechatpay_credentials(self):
+        credential_fields = [
+            "wechatpay_appid",
+            "wechatpay_mchid",
+            "wechatpay_api_v3_key",
+            "wechatpay_merchant_serial_no",
+            "wechatpay_private_key",
+            "wechatpay_platform_serial_no",
+            "wechatpay_platform_certificate",
+        ]
+        for provider in self.filtered(lambda p: p.code == "wechatpay" and p.state != "disabled"):
+            if provider.wechatpay_simulation_mode:
+                continue
+            missing_labels = [
+                self.env["ir.model.fields"]._get(self._name, field_name).field_description
+                for field_name in credential_fields
+                if not provider[field_name]
+            ]
+            if missing_labels:
+                raise ValidationError(_("微信支付正式模式缺少配置字段：%s", ", ".join(missing_labels)))
 
     def _build_request_url(self, endpoint, **kwargs):
         if self.code != "wechatpay":

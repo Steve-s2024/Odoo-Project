@@ -38,6 +38,14 @@ class PaymentTransaction(models.Model):
             return
 
         out_trade_no = self.wechatpay_out_trade_no or f"ODOO{self.id}"
+        if provider.wechatpay_simulation_mode:
+            self.write({
+                "wechatpay_code_url": f"weixin://wxpay/simulated/{out_trade_no}",
+                "wechatpay_out_trade_no": out_trade_no,
+            })
+            self._set_pending()
+            return
+
         base_url = self.provider_id.get_base_url().rstrip("/")
         payload = {
             "appid": provider.wechatpay_appid,
