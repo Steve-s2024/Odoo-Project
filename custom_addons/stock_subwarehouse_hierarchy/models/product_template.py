@@ -171,14 +171,88 @@ class ProductTemplate(models.Model):
                 fallback_value = fallback_value or value_text
         return fallback_value
 
+    def _is_missing_shop_variant_value(self, value):
+        return not value or value.strip().lower() in {"default", "默认"}
+
+    def _decode_shop_variant_values_from_default_code(self):
+        self.ensure_one()
+        code_parts = (self.default_code or "").split("-")
+        decoded = {
+            "color": "未识别",
+            "size": "未识别",
+            "flex": "未识别",
+            "audience": "未识别",
+        }
+        if len(code_parts) < 3:
+            return decoded
+
+        spec_code = code_parts[-2].strip().upper()
+        color_size_code = code_parts[-1].strip().upper()
+
+        if len(spec_code) >= 2:
+            decoded["audience"] = {
+                "A": "成人",
+                "K": "儿童/青少年",
+            }.get(spec_code[1], decoded["audience"])
+        if len(spec_code) >= 5:
+            flex_code = spec_code[2:5]
+            decoded["flex"] = "无硬度" if flex_code == "000" else flex_code.lstrip("0") or flex_code
+
+        if len(color_size_code) >= 4:
+            decoded["color"] = self._decode_shop_color_code(color_size_code[:4])
+        if len(color_size_code) >= 3:
+            size_code = color_size_code[-3:]
+            decoded["size"] = "通码" if size_code == "###" else size_code.replace("#", "") or "通码"
+
+        return decoded
+
+    def _decode_shop_color_code(self, color_code):
+        color_names = {
+            "CY": "青",
+            "B": "蓝",
+            "H": "黑",
+            "W": "白",
+            "R": "红",
+            "G": "绿",
+            "A": "灰",
+            "P": "粉",
+            "Y": "黄",
+            "O": "橙",
+            "Z": "棕",
+        }
+        colors = []
+        index = 0
+        while index < len(color_code):
+            two_char_token = color_code[index:index + 2]
+            one_char_token = color_code[index]
+            if two_char_token in color_names:
+                colors.append(color_names[two_char_token])
+                index += 2
+            elif one_char_token in color_names:
+                colors.append(color_names[one_char_token])
+                index += 1
+            else:
+                index += 1
+        return "".join(colors) or "未识别"
+
+    def _shop_variant_value_or_decoded(self, custom_value, decoded_value):
+        if self._is_missing_shop_variant_value(custom_value):
+            return decoded_value
+        return custom_value
+
     def _get_shop_variant_display_values(self):
         self.ensure_one()
+        decoded_values = self._decode_shop_variant_values_from_default_code()
+        color = self._get_custom_attribute_value(["颜色", "颜色分类", "colour", "color"])
+        size = self._get_custom_attribute_value(["尺码", "尺寸", "size"])
+        flex = self._get_custom_attribute_value(["硬度", "款型", "flex"])
+        audience = self._get_custom_attribute_value(["成人儿童", "成人/儿童", "适用人群", "人群", "kids/adult", "kid/adult"])
         return {
             "default_code": self.default_code or "",
-            "color": self._get_custom_attribute_value(["颜色", "颜色分类", "colour", "color"]),
-            "size": self._get_custom_attribute_value(["尺码", "尺寸", "size"]),
-            "flex": self._get_custom_attribute_value(["硬度", "款型", "flex"]),
-            "audience": self._get_custom_attribute_value(["成人儿童", "成人/儿童", "适用人群", "人群", "kids/adult", "kid/adult"]),
+            "color": self._shop_variant_value_or_decoded(color, decoded_values["color"]),
+            "size": self._shop_variant_value_or_decoded(size, decoded_values["size"]),
+            "flex": self._shop_variant_value_or_decoded(flex, decoded_values["flex"]),
+            "audience": self._shop_variant_value_or_decoded(audience, decoded_values["audience"]),
         }
 
     def _get_shop_group_summary(self):

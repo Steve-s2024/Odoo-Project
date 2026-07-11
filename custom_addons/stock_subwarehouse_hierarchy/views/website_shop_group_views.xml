@@ -84,4 +84,8 @@
             </div>
         </xpath>
     </template>
+
+    <template id="product_page_hide_standard_product_attributes" inherit_id="website_sale.product" name="Hide standard shop attributes">
+        <xpath expr="//div[@id='product_attributes_simple']" position="replace"/>
+    </template>
 </odoo>

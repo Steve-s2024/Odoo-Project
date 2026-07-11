@@ -317,6 +317,48 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(variant_values["color"], "黑色")
         self.assertEqual(variant_values["size"], "260")
 
+    def test_shop_variant_values_decode_missing_values_from_product_id(self):
+        product = self.env["product.template"].create({
+            "name": "Decoded Variant Test",
+            "default_code": "152410Yb-MK000-H001150",
+            "sale_ok": True,
+        })
+
+        variant_values = product._get_shop_variant_display_values()
+
+        self.assertEqual(variant_values["color"], "黑")
+        self.assertEqual(variant_values["size"], "150")
+        self.assertEqual(variant_values["flex"], "无硬度")
+        self.assertEqual(variant_values["audience"], "儿童/青少年")
+
+    def test_shop_variant_values_decode_mixed_color_and_letter_size(self):
+        product = self.env["product.template"].create({
+            "name": "Decoded Letter Size Test",
+            "default_code": "072409Y-MA000-G001##S",
+            "sale_ok": True,
+        })
+
+        variant_values = product._get_shop_variant_display_values()
+
+        self.assertEqual(variant_values["color"], "绿")
+        self.assertEqual(variant_values["size"], "S")
+        self.assertEqual(variant_values["flex"], "无硬度")
+        self.assertEqual(variant_values["audience"], "成人")
+
+    def test_shop_variant_values_decode_hardness_and_multiple_colors(self):
+        product = self.env["product.template"].create({
+            "name": "Decoded Flex Test",
+            "default_code": "152410Y-MK787-HW02130",
+            "sale_ok": True,
+        })
+
+        variant_values = product._get_shop_variant_display_values()
+
+        self.assertEqual(variant_values["color"], "黑白")
+        self.assertEqual(variant_values["size"], "130")
+        self.assertEqual(variant_values["flex"], "787")
+        self.assertEqual(variant_values["audience"], "儿童/青少年")
+
     def test_shop_publish_actions_toggle_website_visibility(self):
         product = self.env["product.template"].create({
             "name": "Publish Action Test",
