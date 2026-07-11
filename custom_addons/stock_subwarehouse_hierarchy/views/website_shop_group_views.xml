@@ -33,7 +33,29 @@
     <template id="products_item_shop_group_summary" inherit_id="website_sale.products_item" name="Shop product group summary">
         <xpath expr="//h2[hasclass('o_wsale_products_item_title')]" position="after">
             <t t-set="shop_group_summary" t-value="product.sudo()._get_shop_group_summary()"/>
-            <div t-if="shop_group_summary" class="text-muted small mt-1" t-out="shop_group_summary"/>
+            <div t-if="shop_group_summary and not x_segmented_shop_page" class="text-muted small mt-1" t-out="shop_group_summary"/>
+        </xpath>
+    </template>
+
+    <template id="segmented_shop_page_hide_filters" inherit_id="website_sale.products" name="Segmented shop pages without filters">
+        <xpath expr="//aside[@id='products_grid_before']" position="attributes">
+            <attribute name="t-if">hasLeftColumn and not x_segmented_shop_page</attribute>
+        </xpath>
+        <xpath expr="//header[@id='o_wsale_products_header']" position="attributes">
+            <attribute name="t-if">not x_segmented_shop_page</attribute>
+        </xpath>
+        <xpath expr="//div[@id='products_grid']" position="before">
+            <style t-if="x_segmented_shop_page">
+                #products_grid_before,
+                #o_wsale_categories_filmstrip,
+                #o_wsale_products_header,
+                #o_wsale_price_range_option,
+                #o_wsale_price_range_option_inner,
+                [id*="o_wsale_price_range_option"],
+                .products_attributes_filters {
+                    display: none !important;
+                }
+            </style>
         </xpath>
     </template>
 

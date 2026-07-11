@@ -13,6 +13,7 @@ class WebsiteSaleStockSource(WebsiteSale):
     )
     def ski_products(self, page=0, search="", min_price=0.0, max_price=0.0, tags="", **post):
         post["x_shop_product_family"] = "ski"
+        post["x_segmented_shop_page"] = True
         return self.shop(
             page=page,
             search=search,
@@ -23,13 +24,14 @@ class WebsiteSaleStockSource(WebsiteSale):
         )
 
     @route(
-        ["/snow-board-products", "/snow-board-products/page/<int:page>"],
+        ["/snowboard-products", "/snowboard-products/page/<int:page>"],
         type="http",
         auth="public",
         website=True,
     )
     def snowboard_products(self, page=0, search="", min_price=0.0, max_price=0.0, tags="", **post):
         post["x_shop_product_family"] = "snowboard"
+        post["x_segmented_shop_page"] = True
         return self.shop(
             page=page,
             search=search,
@@ -47,6 +49,7 @@ class WebsiteSaleStockSource(WebsiteSale):
     )
     def other_products(self, page=0, search="", min_price=0.0, max_price=0.0, tags="", **post):
         post["x_shop_product_family"] = "other"
+        post["x_segmented_shop_page"] = True
         return self.shop(
             page=page,
             search=search,
@@ -76,6 +79,9 @@ class WebsiteSaleStockSource(WebsiteSale):
             additional_values["attributes"] = attributes.filtered(
                 lambda attribute: not attribute.x_apply_to_all_products
             )
+        additional_values["x_segmented_shop_page"] = bool(kwargs.get("x_segmented_shop_page"))
+        if additional_values["x_segmented_shop_page"]:
+            additional_values["attributes"] = self.env["product.attribute"]
         return additional_values
 
     def _get_shop_payment_errors(self, order):
