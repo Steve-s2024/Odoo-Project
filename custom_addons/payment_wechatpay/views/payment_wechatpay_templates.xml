@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="redirect_form">
+        <form t-att-action="api_url" method="post">
+            <input type="hidden" name="reference" t-att-value="reference"/>
+        </form>
+    </template>
+
+    <template id="wechatpay_state_header" inherit_id="payment.state_header">
+        <xpath expr="//div[@name='o_payment_status_alert']" position="before">
+            <h1 t-if="tx.provider_id.sudo().code == 'wechatpay' and tx.state == 'pending'" class="mb-3">
+                请使用微信扫码支付
+            </h1>
+        </xpath>
+
+        <xpath expr="//div[@name='o_payment_status_alert']" position="inside">
+            <t t-if="tx.provider_id.sudo().code == 'wechatpay' and tx.state == 'pending' and tx.wechatpay_code_url">
+                <div class="card order-1 order-md-3 flex-shrink-0">
+                    <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                        <img class="mb-2 border rounded" t-att-src="tx._get_wechatpay_qr_data_uri()" alt="微信支付二维码"/>
+                        <small class="text-center">打开微信扫一扫完成支付</small>
+                    </div>
+                </div>
+            </t>
+        </xpath>
+    </template>
+</odoo>

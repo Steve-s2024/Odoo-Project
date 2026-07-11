@@ -5,7 +5,15 @@
     "category": "库存/库存",
     "author": "Local",
     "license": "LGPL-3",
-    "depends": ["stock", "web_hierarchy", "mrp", "sale_stock", "spreadsheet_dashboard", "website"],
+    "depends": [
+        "stock",
+        "web_hierarchy",
+        "mrp",
+        "sale_stock",
+        "spreadsheet_dashboard",
+        "website",
+        "payment_wechatpay",
+    ],
     "data": [
         "security/ir.model.access.csv",
         "data/currency_data.xml",

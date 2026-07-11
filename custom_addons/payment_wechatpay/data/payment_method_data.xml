@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="payment_method_wechatpay" model="payment.method">
+        <field name="name">微信支付</field>
+        <field name="code">wechatpay</field>
+        <field name="sequence">80</field>
+        <field name="active">False</field>
+        <field name="support_tokenization">False</field>
+        <field name="support_express_checkout">False</field>
+        <field name="support_manual_capture">none</field>
+        <field name="support_refund">none</field>
+    </record>
+</odoo>
