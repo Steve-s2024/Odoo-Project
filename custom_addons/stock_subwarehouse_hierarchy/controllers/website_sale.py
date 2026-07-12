@@ -1,4 +1,5 @@
 from odoo import _
+from odoo.addons.website.controllers.main import QueryURL
 from odoo.addons.website_sale.controllers.main import WebsiteSale
 from odoo.exceptions import UserError
 from odoo.http import route
@@ -14,6 +15,7 @@ class WebsiteSaleStockSource(WebsiteSale):
     def ski_products(self, page=0, search="", min_price=0.0, max_price=0.0, tags="", **post):
         post["x_shop_product_family"] = "ski"
         post["x_segmented_shop_page"] = True
+        post["x_segmented_shop_path"] = "/ski-products"
         return self.shop(
             page=page,
             search=search,
@@ -32,6 +34,7 @@ class WebsiteSaleStockSource(WebsiteSale):
     def snowboard_products(self, page=0, search="", min_price=0.0, max_price=0.0, tags="", **post):
         post["x_shop_product_family"] = "snowboard"
         post["x_segmented_shop_page"] = True
+        post["x_segmented_shop_path"] = "/snowboard-products"
         return self.shop(
             page=page,
             search=search,
@@ -50,6 +53,7 @@ class WebsiteSaleStockSource(WebsiteSale):
     def other_products(self, page=0, search="", min_price=0.0, max_price=0.0, tags="", **post):
         post["x_shop_product_family"] = "other"
         post["x_segmented_shop_page"] = True
+        post["x_segmented_shop_path"] = "/other-products"
         return self.shop(
             page=page,
             search=search,
@@ -82,6 +86,33 @@ class WebsiteSaleStockSource(WebsiteSale):
         additional_values["x_segmented_shop_page"] = bool(kwargs.get("x_segmented_shop_page"))
         if additional_values["x_segmented_shop_page"]:
             additional_values["attributes"] = self.env["product.attribute"]
+            segmented_path = kwargs.get("x_segmented_shop_path")
+            query_kwargs = {
+                key: value
+                for key, value in kwargs.items()
+                if key not in {
+                    "x_shop_product_family",
+                    "x_segmented_shop_page",
+                    "x_segmented_shop_path",
+                    "search",
+                    "min_price",
+                    "max_price",
+                    "order",
+                    "tags",
+                }
+            }
+            additional_values["keep"] = QueryURL(
+                segmented_path,
+                **self._shop_get_query_url_kwargs(
+                    values.get("search") or "",
+                    values.get("min_price") or 0,
+                    values.get("max_price") or 0,
+                    order=values.get("order") or kwargs.get("order"),
+                    tags=kwargs.get("tags"),
+                    **query_kwargs,
+                ),
+            )
+            additional_values["shop_path"] = segmented_path
         return additional_values
 
     def _get_shop_payment_errors(self, order):
