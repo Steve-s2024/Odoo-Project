@@ -80,6 +80,196 @@
         </field>
     </record>
 
+    <template id="custom_product_family_page" name="Custom Product Family Page">
+        <t t-call="website.layout">
+            <t t-set="additional_title" t-value="page_title"/>
+            <main id="wrap" class="x_custom_product_family_page">
+                <style>
+                    .x_custom_product_family_page {
+                        background: #fff;
+                        color: #111;
+                    }
+                    .x_custom_family_inner {
+                        width: min(1180px, calc(100% - 32px));
+                        margin: 0 auto;
+                    }
+                    .x_custom_family_hero {
+                        padding: 48px 0 24px;
+                        border-bottom: 1px solid #e6e6e6;
+                    }
+                    .x_custom_family_hero h1 {
+                        margin: 0;
+                        font-size: clamp(2rem, 5vw, 4.5rem);
+                        line-height: .95;
+                        font-weight: 900;
+                        letter-spacing: 0;
+                        text-transform: uppercase;
+                    }
+                    .x_custom_family_hero p {
+                        margin: 16px 0 0;
+                        max-width: 680px;
+                        color: #555;
+                        font-size: 1rem;
+                    }
+                    .x_custom_family_tools {
+                        display: flex;
+                        justify-content: space-between;
+                        gap: 16px;
+                        align-items: center;
+                        padding: 22px 0;
+                    }
+                    .x_custom_family_search {
+                        display: flex;
+                        min-width: min(420px, 100%);
+                        border-bottom: 2px solid #111;
+                    }
+                    .x_custom_family_search input {
+                        flex: 1;
+                        border: 0;
+                        outline: 0;
+                        min-height: 42px;
+                        font-weight: 700;
+                    }
+                    .x_custom_family_search button {
+                        border: 0;
+                        background: #111;
+                        color: #fff;
+                        font-weight: 800;
+                        padding: 0 18px;
+                    }
+                    .x_custom_family_count {
+                        color: #666;
+                        font-weight: 700;
+                    }
+                    .x_custom_product_grid {
+                        display: grid;
+                        grid-template-columns: repeat(4, minmax(0, 1fr));
+                        gap: 30px 22px;
+                        padding: 18px 0 56px;
+                    }
+                    .x_custom_product_card {
+                        color: #111;
+                        text-decoration: none;
+                    }
+                    .x_custom_product_image {
+                        display: block;
+                        aspect-ratio: 4 / 5;
+                        background: #f5f5f5;
+                        overflow: hidden;
+                    }
+                    .x_custom_product_image img {
+                        width: 100%;
+                        height: 100%;
+                        object-fit: contain;
+                        transition: transform 220ms ease;
+                    }
+                    .x_custom_product_card:hover .x_custom_product_image img {
+                        transform: scale(1.035);
+                    }
+                    .x_custom_product_meta {
+                        padding-top: 14px;
+                    }
+                    .x_custom_product_name {
+                        margin: 0;
+                        font-size: .92rem;
+                        font-weight: 900;
+                        text-transform: uppercase;
+                    }
+                    .x_custom_product_summary {
+                        margin-top: 6px;
+                        min-height: 1.4em;
+                        color: #777;
+                        font-size: .84rem;
+                    }
+                    .x_custom_product_footer {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        gap: 10px;
+                        margin-top: 10px;
+                        font-weight: 900;
+                    }
+                    .x_custom_product_specs {
+                        color: #777;
+                        font-size: .78rem;
+                        font-weight: 800;
+                    }
+                    .x_custom_empty {
+                        padding: 64px 0;
+                        color: #666;
+                        font-weight: 700;
+                    }
+                    @media (max-width: 900px) {
+                        .x_custom_product_grid {
+                            grid-template-columns: repeat(2, minmax(0, 1fr));
+                        }
+                        .x_custom_family_tools {
+                            align-items: stretch;
+                            flex-direction: column;
+                        }
+                    }
+                    @media (max-width: 520px) {
+                        .x_custom_product_grid {
+                            grid-template-columns: minmax(0, 1fr);
+                        }
+                    }
+                </style>
+                <section class="x_custom_family_hero">
+                    <div class="x_custom_family_inner">
+                        <h1 t-out="page_title"/>
+                        <p t-out="page_subtitle"/>
+                    </div>
+                </section>
+                <section class="x_custom_family_inner">
+                    <div class="x_custom_family_tools">
+                        <form class="x_custom_family_search" t-att-action="page_path" method="get">
+                            <input
+                                name="search"
+                                type="search"
+                                t-att-value="search"
+                                t-att-placeholder="'Search products' if is_english else '搜索产品'"
+                            />
+                            <button type="submit" t-out="'Search' if is_english else '搜索'"/>
+                        </form>
+                        <div class="x_custom_family_count">
+                            <t t-out="product_count"/>
+                            <t t-out="' products' if is_english else ' 个产品'"/>
+                        </div>
+                    </div>
+                    <div t-if="products" class="x_custom_product_grid">
+                        <a
+                            t-foreach="products"
+                            t-as="product"
+                            class="x_custom_product_card"
+                            t-att-href="product._get_product_url()"
+                        >
+                            <span class="x_custom_product_image">
+                                <img
+                                    t-att-src="'/web/image/product.template/%s/image_1024' % product.id"
+                                    t-att-alt="product.name"
+                                    loading="lazy"
+                                />
+                            </span>
+                            <span class="x_custom_product_meta">
+                                <h2 class="x_custom_product_name" t-out="product.name"/>
+                                <div class="x_custom_product_summary" t-out="product._get_shop_group_summary() or ''"/>
+                                <span class="x_custom_product_footer">
+                                    <span>￥<t t-out="'%.2f' % product.list_price"/></span>
+                                    <span class="x_custom_product_specs">
+                                        <t t-out="product.x_shop_group_variant_count or 1"/>
+                                        <t t-out="' variants' if is_english else ' 个规格'"/>
+                                    </span>
+                                </span>
+                            </span>
+                        </a>
+                    </div>
+                    <div t-else="" class="x_custom_empty" t-out="'No products found.' if is_english else '没有找到产品。'"/>
+                    <t t-call="website.pager"/>
+                </section>
+            </main>
+        </t>
+    </template>
+
     <template id="segmented_shop_page_hide_filters" inherit_id="website_sale.products" name="Segmented shop pages without filters">
         <xpath expr="//aside[@id='products_grid_before']" position="attributes">
             <attribute name="t-if">hasLeftColumn and not x_segmented_shop_page</attribute>

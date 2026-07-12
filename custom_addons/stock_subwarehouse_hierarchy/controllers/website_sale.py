@@ -52,20 +52,15 @@ class WebsiteSaleStockSource(WebsiteSale):
         website=True,
     )
     def snowboard_products(self, page=0, search="", min_price=0.0, max_price=0.0, tags="", **post):
-        post["x_shop_product_family"] = "snowboard"
-        post["x_segmented_shop_page"] = True
-        post["x_segmented_shop_path"] = "/snowboard-products"
-        response = self.shop(
+        return self._render_custom_product_family_page(
+            family="snowboard",
+            path="/snowboard-products",
             page=page,
             search=search,
-            min_price=min_price,
-            max_price=max_price,
-            tags=tags,
-            **post,
-        )
-        return self._with_segmented_shop_template(
-            response,
-            "stock_subwarehouse_hierarchy.snowboard_products_page",
+            zh_title="单板产品",
+            en_title="Snowboard Products",
+            zh_subtitle="单板、单板鞋与相关装备",
+            en_subtitle="Snowboards, snowboard boots, and related gear.",
         )
 
     @route(
@@ -75,21 +70,62 @@ class WebsiteSaleStockSource(WebsiteSale):
         website=True,
     )
     def other_products(self, page=0, search="", min_price=0.0, max_price=0.0, tags="", **post):
-        post["x_shop_product_family"] = "other"
-        post["x_segmented_shop_page"] = True
-        post["x_segmented_shop_path"] = "/other-products"
-        response = self.shop(
+        return self._render_custom_product_family_page(
+            family="other",
+            path="/other-products",
             page=page,
             search=search,
-            min_price=min_price,
-            max_price=max_price,
-            tags=tags,
-            **post,
+            zh_title="其他产品",
+            en_title="Other Products",
+            zh_subtitle="护具、雪镜、手套、服装与更多配件",
+            en_subtitle="Protection, goggles, gloves, apparel, and accessories.",
         )
-        return self._with_segmented_shop_template(
-            response,
-            "stock_subwarehouse_hierarchy.other_products_page",
+
+    def _render_custom_product_family_page(
+        self,
+        family,
+        path,
+        page=0,
+        search="",
+        zh_title="",
+        en_title="",
+        zh_subtitle="",
+        en_subtitle="",
+    ):
+        Product = request.env["product.template"].sudo()
+        products = Product.search([
+            ("sale_ok", "=", True),
+            ("website_published", "=", True),
+        ], order="name, default_code, id")
+        products = products._filter_shop_products_by_family(family)._get_shop_grouped_products()
+        if search:
+            search_text = search.casefold()
+            products = products.filtered(
+                lambda product: search_text in (product.name or "").casefold()
+                or search_text in (product.default_code or "").casefold()
+            )
+
+        page_size = 24
+        pager = request.website.pager(
+            url=path,
+            total=len(products),
+            page=page,
+            step=page_size,
+            scope=5,
+            url_args={"search": search} if search else {},
         )
+        current_products = products[pager["offset"]:pager["offset"] + page_size]
+        is_english = request.lang and request.lang.code == "en_US"
+        return request.render("stock_subwarehouse_hierarchy.custom_product_family_page", {
+            "products": current_products,
+            "product_count": len(products),
+            "pager": pager,
+            "search": search,
+            "page_path": path,
+            "page_title": en_title if is_english else zh_title,
+            "page_subtitle": en_subtitle if is_english else zh_subtitle,
+            "is_english": is_english,
+        })
 
     def _with_segmented_shop_template(self, response, template):
         if getattr(response, "template", None):
