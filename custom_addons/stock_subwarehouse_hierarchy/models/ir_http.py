@@ -9,29 +9,42 @@ class IrHttp(models.AbstractModel):
 
     @classmethod
     def _match(cls, path):
-        if request.httprequest.method != "POST":
-            request.is_frontend_multilang = False
         if path.rstrip("/") == "/shop" and request.httprequest.method != "POST":
             werkzeug.exceptions.abort(request.redirect("/product-categories"))
-        routing = super()._match(path)
-        shop_lang = request.cookies.get("stock_shop_lang")
-        if shop_lang:
-            lang = request.env["res.lang"]._get_data(code=shop_lang)
-            if lang:
-                request.lang = lang
-                request.update_context(lang=lang.code)
-        return routing
+        return super()._match(path)
 
     @classmethod
     def _sun_format_website_title(cls, title):
+        is_english = request.lang and request.lang.code == "en_US"
         if not title:
-            return "主页(home) | 思安奇SUN"
+            return "Home | SUN" if is_english else "主页(home) | 思安奇SUN"
 
         page_title, separator, _brand = title.partition(" | ")
         page_title = (page_title or "").strip()
         if not page_title:
-            page_title = "主页"
-        if "(" in page_title and ")" in page_title:
+            page_title = "Home" if is_english else "主页"
+        english_title_map = {
+            "home": "Home",
+            "shop": "Shop",
+            "cart": "Cart",
+            "shopping cart": "Shopping Cart",
+            "checkout": "Checkout",
+            "payment": "Payment",
+            "product categories": "Product Categories",
+            "ski products": "Ski Products",
+            "ski products sale": "Ski Products Sale",
+            "snowboard products": "Snowboard Products",
+            "other products": "Other Products",
+            "ski items": "Ski Products",
+            "snowboard items": "Snowboard Products",
+            "other items": "Other Products",
+            "stores": "Stores",
+            "contact us": "Contact Us",
+            "contact": "Contact",
+        }
+        if is_english:
+            formatted_page_title = english_title_map.get(page_title.casefold(), page_title)
+        elif "(" in page_title and ")" in page_title:
             formatted_page_title = page_title
         else:
             title_map = {
@@ -55,5 +68,5 @@ class IrHttp(models.AbstractModel):
             }
             formatted_page_title = title_map.get(page_title.casefold(), page_title)
         if separator:
-            return f"{formatted_page_title} | 思安奇SUN"
-        return f"{formatted_page_title} | 思安奇SUN"
+            return f"{formatted_page_title} | {'SUN' if is_english else '思安奇SUN'}"
+        return f"{formatted_page_title} | {'SUN' if is_english else '思安奇SUN'}"

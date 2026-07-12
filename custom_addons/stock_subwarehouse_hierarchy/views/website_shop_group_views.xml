@@ -300,15 +300,16 @@
                 'other-items': 'other',
             }.get(x_item_page_slug)"/>
             <t t-if="x_item_page_family">
+                <t t-set="x_item_page_is_english" t-value="request.lang and request.lang.code == 'en_US'"/>
                 <t t-set="x_item_page_title" t-value="{
-                    'ski-items': '双板产品(ski products)',
-                    'snowboard-items': '单板产品(snowboard products)',
-                    'other-items': '其他产品(other products)',
+                    'ski-items': 'Ski Products' if x_item_page_is_english else '双板产品(ski products)',
+                    'snowboard-items': 'Snowboard Products' if x_item_page_is_english else '单板产品(snowboard products)',
+                    'other-items': 'Other Products' if x_item_page_is_english else '其他产品(other products)',
                 }.get(x_item_page_slug)"/>
                 <t t-set="x_item_page_subtitle" t-value="{
-                    'ski-items': '双板、雪鞋、雪杖与滑雪装备。',
-                    'snowboard-items': '单板、单板鞋与相关雪场装备。',
-                    'other-items': '护具、雪镜、手套、服装与更多配件。',
+                    'ski-items': 'Skis, ski boots, poles, and alpine gear.' if x_item_page_is_english else '双板、雪鞋、雪杖与滑雪装备。',
+                    'snowboard-items': 'Snowboards, snowboard boots, and related mountain gear.' if x_item_page_is_english else '单板、单板鞋与相关雪场装备。',
+                    'other-items': 'Protection, goggles, gloves, apparel, and accessories.' if x_item_page_is_english else '护具、雪镜、手套、服装与更多配件。',
                 }.get(x_item_page_slug)"/>
                 <t t-set="x_item_page_search" t-value="(request.params.get('search') or '').strip()"/>
                 <t t-set="x_item_page_products" t-value="request.env['product.template']._get_item_page_products(x_item_page_family)"/>
@@ -457,22 +458,22 @@
                     </style>
                     <div class="x_item_product_cards_inner">
                         <header class="x_item_product_header">
-                            <p class="x_item_product_eyebrow">SUN PRODUCT COLLECTION</p>
+                            <p class="x_item_product_eyebrow" t-out="'SUN PRODUCT COLLECTION' if x_item_page_is_english else 'SUN 产品系列'"/>
                             <h1 t-out="x_item_page_title"/>
                             <p t-out="x_item_page_subtitle"/>
                             <div class="x_item_product_tools">
-                                <form class="x_item_product_search" t-att-action="'/%s' % x_item_page_slug" method="get">
+                                <form class="x_item_product_search" t-att-action="request.httprequest.path" method="get">
                                     <input
                                         name="search"
                                         type="search"
                                         t-att-value="x_item_page_search"
-                                        placeholder="搜索产品(search products)"
+                                        t-att-placeholder="'Search products' if x_item_page_is_english else '搜索产品(search products)'"
                                     />
-                                    <button type="submit">搜索(search)</button>
+                                    <button type="submit" t-out="'Search' if x_item_page_is_english else '搜索(search)'"/>
                                 </form>
                                 <div class="x_item_product_count">
                                     <t t-out="len(x_item_page_products)"/>
-                                    <t> 个产品(products)</t>
+                                    <t t-out="' products' if x_item_page_is_english else ' 个产品(products)'"/>
                                 </div>
                             </div>
                         </header>

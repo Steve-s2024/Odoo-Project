@@ -2,7 +2,7 @@
 <odoo>
     <template id="stores_page" name="SUN Stores Page">
         <t t-call="website.layout">
-            <t t-set="additional_title" t-value="'门店(stores)'"/>
+            <t t-set="additional_title" t-value="'Stores' if is_english else '门店(stores)'"/>
             <main id="wrap" class="x_stores_page">
                 <style>
                     .x_stores_page {
@@ -137,23 +137,26 @@
                 </style>
                 <section class="x_stores_hero">
                     <div class="x_stores_inner">
-                        <p class="x_stores_eyebrow">SUN STORE NETWORK</p>
-                        <h1>门店(stores)</h1>
-                        <p>
+                        <p class="x_stores_eyebrow" t-out="'SUN STORE NETWORK' if is_english else 'SUN 门店网络'"/>
+                        <h1 t-out="'Stores' if is_english else '门店(stores)'"/>
+                        <p t-if="is_english">
+                            Find SUN distributors, experience stores, and resort service points. This page can show each store's stock notes, pickup options, repair capability, and contact details.
+                        </p>
+                        <p t-else="">
                             查找思安奇线下经销商、体验店与雪场服务点。这里可以放每家门店的库存说明、提货方式、维修能力和联系方式。
                         </p>
                         <div class="x_stores_tools">
                             <div class="x_stores_tool">
-                                <strong>试穿与尺码建议</strong>
-                                <span>到店完成雪鞋、头盔、护具等装备的尺寸确认。</span>
+                                <strong t-out="'Fitting and Size Advice' if is_english else '试穿与尺码建议'"/>
+                                <span t-out="'Confirm boot, helmet, and protection sizes in store.' if is_english else '到店完成雪鞋、头盔、护具等装备的尺寸确认。'"/>
                             </div>
                             <div class="x_stores_tool">
-                                <strong>线上订单自提</strong>
-                                <span>支持指定门店提货，并在雪季前完成装备检查。</span>
+                                <strong t-out="'Online Order Pickup' if is_english else '线上订单自提'"/>
+                                <span t-out="'Pick up online orders at a selected store and complete pre-season checks.' if is_english else '支持指定门店提货，并在雪季前完成装备检查。'"/>
                             </div>
                             <div class="x_stores_tool">
-                                <strong>售后与维修登记</strong>
-                                <span>门店可协助登记维修、保养、退换货与租赁归还。</span>
+                                <strong t-out="'After-sales and Repair' if is_english else '售后与维修登记'"/>
+                                <span t-out="'Stores can help register repairs, maintenance, returns, exchanges, and rental returns.' if is_english else '门店可协助登记维修、保养、退换货与租赁归还。'"/>
                             </div>
                         </div>
                     </div>
@@ -164,30 +167,30 @@
                 <section class="x_stores_inner x_stores_list">
                     <article t-foreach="stores" t-as="store" class="x_store_card">
                         <div>
-                            <p class="x_store_city" t-out="store['city']"/>
-                            <h2 t-out="store['name']"/>
-                            <p class="x_store_en" t-out="store['english_name']"/>
+                            <p class="x_store_city" t-out="store['english_city'] if is_english else store['city']"/>
+                            <h2 t-out="store['english_name'] if is_english else store['name']"/>
+                            <p class="x_store_en" t-out="store['name'] if is_english else store['english_name']"/>
                         </div>
                         <div class="x_store_detail">
                             <p>
-                                <span class="x_store_label">地址(address)</span>
-                                <t t-out="store['address']"/>
+                                <span class="x_store_label" t-out="'Address' if is_english else '地址(address)'"/>
+                                <t t-out="store['english_address'] if is_english else store['address']"/>
                             </p>
                             <p>
-                                <span class="x_store_label">营业时间(hours)</span>
-                                <t t-out="store['hours']"/>
+                                <span class="x_store_label" t-out="'Hours' if is_english else '营业时间(hours)'"/>
+                                <t t-out="store['english_hours'] if is_english else store['hours']"/>
                             </p>
                             <p>
-                                <span class="x_store_label">电话(phone)</span>
+                                <span class="x_store_label" t-out="'Phone' if is_english else '电话(phone)'"/>
                                 <t t-out="store['phone']"/>
                             </p>
                             <p>
-                                <span class="x_store_label">服务(services)</span>
-                                <t t-out="store['services']"/>
+                                <span class="x_store_label" t-out="'Services' if is_english else '服务(services)'"/>
+                                <t t-out="store['english_services'] if is_english else store['services']"/>
                             </p>
                             <div class="x_store_actions">
-                                <a class="x_store_action" t-att-href="'tel:%s' % store['phone']">拨打电话(call)</a>
-                                <a class="x_store_action x_store_action_secondary" href="#wrap">查看地图(map)</a>
+                                <a class="x_store_action" t-att-href="'tel:%s' % store['phone']" t-out="'Call' if is_english else '拨打电话(call)'"/>
+                                <a class="x_store_action x_store_action_secondary" href="#wrap" t-out="'View Map' if is_english else '查看地图(map)'"/>
                             </div>
                         </div>
                     </article>

@@ -11,7 +11,12 @@ class WebsiteSaleStockSource(WebsiteSale):
         normalized_path = request.httprequest.path.rstrip("/")
         path_parts = normalized_path.strip("/").split("/")
         if path_parts[-1:] == ["shop"] and len(path_parts) <= 2:
-            return request.redirect("/product-categories")
+            language_prefix = ""
+            if request.lang and request.lang != request.website.default_lang_id:
+                language_prefix = request.lang.url_code
+            return request.redirect(
+                f"/{language_prefix}/product-categories" if language_prefix else "/product-categories"
+            )
         return super().shop(
             page=page,
             category=category,

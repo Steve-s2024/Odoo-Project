@@ -38,9 +38,6 @@
             "stock_subwarehouse_hierarchy/static/src/js/template_format_export_menu.js",
             "stock_subwarehouse_hierarchy/static/src/xml/template_format_export_menu.xml",
         ],
-        "web.assets_frontend": [
-            "stock_subwarehouse_hierarchy/static/src/js/no_prefix_language_selector.js",
-        ],
     },
     "installable": True,
     "application": False,
