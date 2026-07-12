@@ -171,6 +171,14 @@ class ProductTemplate(models.Model):
             return self.filtered(lambda product: product._get_shop_product_family() == "other")
         return self.filtered(lambda product: product._get_shop_product_family() == family)
 
+    @api.model
+    def _get_item_page_products(self, family):
+        products = self.sudo().search([
+            ("sale_ok", "=", True),
+            ("website_published", "=", True),
+        ], order="name, default_code, id")
+        return products._filter_shop_products_by_family(family)._get_shop_grouped_products()
+
     def _get_shop_group_siblings(self):
         self.ensure_one()
         normalized_name = " ".join((self.name or "").split())

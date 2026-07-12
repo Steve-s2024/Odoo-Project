@@ -214,7 +214,18 @@
                 </section>
                 <section class="x_custom_family_inner">
                     <div
-                        t-att-id="'oe_structure_%s_products_top' % builder_key"
+                        t-if="builder_key == 'ski_sale'"
+                        id="oe_structure_ski_sale_products_top"
+                        class="oe_structure oe_empty"
+                    />
+                    <div
+                        t-if="builder_key == 'snowboard'"
+                        id="oe_structure_snowboard_products_top"
+                        class="oe_structure oe_empty"
+                    />
+                    <div
+                        t-if="builder_key == 'other'"
+                        id="oe_structure_other_products_top"
                         class="oe_structure oe_empty"
                     />
                 </section>
@@ -261,12 +272,132 @@
                 </section>
                 <section class="x_custom_family_inner">
                     <div
-                        t-att-id="'oe_structure_%s_products_bottom' % builder_key"
+                        t-if="builder_key == 'ski_sale'"
+                        id="oe_structure_ski_sale_products_bottom"
+                        class="oe_structure oe_empty"
+                    />
+                    <div
+                        t-if="builder_key == 'snowboard'"
+                        id="oe_structure_snowboard_products_bottom"
+                        class="oe_structure oe_empty"
+                    />
+                    <div
+                        t-if="builder_key == 'other'"
+                        id="oe_structure_other_products_bottom"
                         class="oe_structure oe_empty"
                     />
                 </section>
             </main>
         </t>
+    </template>
+
+    <template id="item_pages_product_card_section" inherit_id="website.layout" name="Item Pages Product Cards">
+        <xpath expr="//div[@id='wrapwrap']/main/t[@t-out='0']" position="after">
+            <t t-set="x_item_page_slug" t-value="request.httprequest.path.rstrip('/').rsplit('/', 1)[-1]"/>
+            <t t-set="x_item_page_family" t-value="{
+                'ski-items': 'ski',
+                'snowboard-items': 'snowboard',
+                'other-items': 'other',
+            }.get(x_item_page_slug)"/>
+            <t t-if="x_item_page_family">
+                <t t-set="x_item_page_products" t-value="request.env['product.template']._get_item_page_products(x_item_page_family)"/>
+                <section class="x_item_product_cards">
+                    <style>
+                        .x_item_product_cards {
+                            background: #fff;
+                            color: #111;
+                            padding: 24px 0 64px;
+                        }
+                        .x_item_product_cards_inner {
+                            width: min(1180px, calc(100% - 32px));
+                            margin: 0 auto;
+                        }
+                        .x_item_product_cards_grid {
+                            display: grid;
+                            grid-template-columns: repeat(4, minmax(0, 1fr));
+                            gap: 30px 22px;
+                        }
+                        .x_item_product_card {
+                            color: #111;
+                            text-decoration: none;
+                        }
+                        .x_item_product_image {
+                            display: block;
+                            aspect-ratio: 4 / 5;
+                            background: #f5f5f5;
+                            overflow: hidden;
+                        }
+                        .x_item_product_image img {
+                            width: 100%;
+                            height: 100%;
+                            object-fit: cover;
+                            transition: transform 220ms ease;
+                        }
+                        .x_item_product_card:hover .x_item_product_image img {
+                            transform: scale(1.035);
+                        }
+                        .x_item_product_meta {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: flex-start;
+                            gap: 14px;
+                            padding-top: 14px;
+                        }
+                        .x_item_product_name {
+                            flex: 1 1 auto;
+                            margin: 0;
+                            font-size: .92rem;
+                            font-weight: 900;
+                            text-transform: uppercase;
+                        }
+                        .x_item_product_price {
+                            flex: 0 0 auto;
+                            font-weight: 900;
+                            text-align: right;
+                            white-space: nowrap;
+                        }
+                        .x_item_product_empty {
+                            color: #666;
+                            font-weight: 700;
+                            padding: 24px 0;
+                        }
+                        @media (max-width: 900px) {
+                            .x_item_product_cards_grid {
+                                grid-template-columns: repeat(2, minmax(0, 1fr));
+                            }
+                        }
+                        @media (max-width: 520px) {
+                            .x_item_product_cards_grid {
+                                grid-template-columns: minmax(0, 1fr);
+                            }
+                        }
+                    </style>
+                    <div class="x_item_product_cards_inner">
+                        <div t-if="x_item_page_products" class="x_item_product_cards_grid">
+                            <a
+                                t-foreach="x_item_page_products"
+                                t-as="product"
+                                class="x_item_product_card"
+                                t-att-href="product._get_product_url()"
+                            >
+                                <span class="x_item_product_image">
+                                    <img
+                                        t-att-src="'/web/image/product.template/%s/image_1024' % product.id"
+                                        t-att-alt="product.name"
+                                        loading="lazy"
+                                    />
+                                </span>
+                                <span class="x_item_product_meta">
+                                    <h2 class="x_item_product_name" t-out="product.name"/>
+                                    <span class="x_item_product_price">￥<t t-out="'%.2f' % product.list_price"/></span>
+                                </span>
+                            </a>
+                        </div>
+                        <div t-else="" class="x_item_product_empty">暂无产品</div>
+                    </div>
+                </section>
+            </t>
+        </xpath>
     </template>
 
     <template id="segmented_shop_page_hide_filters" inherit_id="website_sale.products" name="Segmented shop pages without filters">
