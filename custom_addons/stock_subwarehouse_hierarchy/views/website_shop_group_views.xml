@@ -212,7 +212,6 @@
                             if (!addToCart) {
                                 return;
                             }
-                            addToCart.classList.toggle("disabled", !isAvailable);
                             addToCart.classList.toggle("o_shop_unavailable_cta", !isAvailable);
                             addToCart.setAttribute("aria-disabled", isAvailable ? "false" : "true");
                             if (isAvailable) {
@@ -243,6 +242,13 @@
                                 refreshSelection(true);
                             }
                         });
+                        document.addEventListener("click", function (event) {
+                            const addToCart = getAddToCart();
+                            if (addToCart && addToCart.contains(event.target) && addToCart.classList.contains("o_shop_unavailable_cta")) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                            }
+                        }, true);
                         refreshSelection(false);
                         window.addEventListener("load", function () {
                             refreshSelection(false);
@@ -259,8 +265,27 @@
 
     <template id="product_page_disable_add_to_cart_when_shop_unavailable" inherit_id="website_sale.cta_wrapper" name="Disable add to cart when shop unavailable">
         <xpath expr="//a[@id='add_to_cart']" position="attributes">
-            <attribute name="t-attf-class">btn btn-primary js_check_product a-submit flex-grow-1 {{'disabled o_shop_unavailable_cta' if not product.sudo()._is_shop_available() else ''}}</attribute>
+            <attribute name="t-attf-class">btn btn-primary js_check_product a-submit flex-grow-1 {{'o_shop_unavailable_cta' if not product.sudo()._is_shop_available() else ''}}</attribute>
             <attribute name="t-att-aria-disabled">'true' if not product.sudo()._is_shop_available() else 'false'</attribute>
+        </xpath>
+        <xpath expr="//a[@id='add_to_cart']" position="after">
+            <script t-if="not product.sudo()._is_shop_available()">
+                <![CDATA[
+                (function () {
+                    const addToCart = document.querySelector("#add_to_cart");
+                    if (!addToCart) {
+                        return;
+                    }
+                    addToCart.textContent = "库存不足，无法加入购物车";
+                    addToCart.setAttribute("aria-disabled", "true");
+                    addToCart.setAttribute("disabled", "disabled");
+                    addToCart.addEventListener("click", function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }, true);
+                })();
+                ]]>
+            </script>
         </xpath>
     </template>
 
@@ -299,13 +324,12 @@
                     letter-spacing: .03em;
                     text-transform: uppercase;
                 }
-                #add_to_cart.disabled,
                 #add_to_cart.o_shop_unavailable_cta {
-                    border-color: #777;
-                    background: #777;
+                    border-color: #111;
+                    background: #111;
                     color: #fff !important;
                 }
-                #add_to_cart:not(.disabled):hover {
+                #add_to_cart:not(.o_shop_unavailable_cta):hover {
                     background: #333;
                     border-color: #333;
                     color: #fff !important;
@@ -314,6 +338,26 @@
                     display: none !important;
                 }
             </style>
+            <script>
+                <![CDATA[
+                (function () {
+                    function openDiscussion() {
+                        const discussionContent = document.querySelector("#o_product_page_reviews_content");
+                        const discussionTitle = document.querySelector("[data-bs-target='#o_product_page_reviews_content']");
+                        if (discussionContent) {
+                            discussionContent.classList.add("show");
+                        }
+                        if (discussionTitle) {
+                            discussionTitle.classList.remove("collapsed");
+                            discussionTitle.setAttribute("aria-expanded", "true");
+                        }
+                    }
+                    openDiscussion();
+                    window.addEventListener("load", openDiscussion);
+                    window.requestAnimationFrame(openDiscussion);
+                })();
+                ]]>
+            </script>
         </xpath>
     </template>
 
@@ -323,6 +367,16 @@
         </xpath>
         <xpath expr="//t[@t-foreach='product.valid_product_template_attribute_line_ids']" position="attributes">
             <attribute name="t-foreach">product._get_visible_website_attribute_lines()</attribute>
+        </xpath>
+    </template>
+
+    <template id="product_page_open_discussion_by_default" inherit_id="website_sale.product_comment" name="Open product discussion by default" active="True">
+        <xpath expr="//a[@data-bs-target='#o_product_page_reviews_content']" position="attributes">
+            <attribute name="class">o_product_page_reviews_title d-flex justify-content-between text-reset text-decoration-none</attribute>
+            <attribute name="aria-expanded">true</attribute>
+        </xpath>
+        <xpath expr="//div[@id='o_product_page_reviews_content']" position="attributes">
+            <attribute name="class">collapse show mt-3</attribute>
         </xpath>
     </template>
 </odoo>
