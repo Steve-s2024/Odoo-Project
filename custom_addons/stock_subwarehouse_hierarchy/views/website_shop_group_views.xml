@@ -175,24 +175,9 @@
                         font-weight: 900;
                         text-transform: uppercase;
                     }
-                    .x_custom_product_summary {
-                        margin-top: 6px;
-                        min-height: 1.4em;
-                        color: #777;
-                        font-size: .84rem;
-                    }
                     .x_custom_product_footer {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        gap: 10px;
                         margin-top: 10px;
                         font-weight: 900;
-                    }
-                    .x_custom_product_specs {
-                        color: #777;
-                        font-size: .78rem;
-                        font-weight: 800;
                     }
                     .x_custom_empty {
                         padding: 64px 0;
@@ -219,6 +204,18 @@
                         <h1 t-out="page_title"/>
                         <p t-out="page_subtitle"/>
                     </div>
+                </section>
+                <section class="x_custom_family_inner">
+                    <div
+                        t-if="page_path == '/snowboard-products'"
+                        id="oe_structure_snowboard_products_top"
+                        class="oe_structure oe_empty"
+                    />
+                    <div
+                        t-if="page_path == '/other-products'"
+                        id="oe_structure_other_products_top"
+                        class="oe_structure oe_empty"
+                    />
                 </section>
                 <section class="x_custom_family_inner">
                     <div class="x_custom_family_tools">
@@ -252,19 +249,26 @@
                             </span>
                             <span class="x_custom_product_meta">
                                 <h2 class="x_custom_product_name" t-out="product.name"/>
-                                <div class="x_custom_product_summary" t-out="product._get_shop_group_summary() or ''"/>
                                 <span class="x_custom_product_footer">
                                     <span>￥<t t-out="'%.2f' % product.list_price"/></span>
-                                    <span class="x_custom_product_specs">
-                                        <t t-out="product.x_shop_group_variant_count or 1"/>
-                                        <t t-out="' variants' if is_english else ' 个规格'"/>
-                                    </span>
                                 </span>
                             </span>
                         </a>
                     </div>
                     <div t-else="" class="x_custom_empty" t-out="'No products found.' if is_english else '没有找到产品。'"/>
                     <t t-call="website.pager"/>
+                </section>
+                <section class="x_custom_family_inner">
+                    <div
+                        t-if="page_path == '/snowboard-products'"
+                        id="oe_structure_snowboard_products_bottom"
+                        class="oe_structure oe_empty"
+                    />
+                    <div
+                        t-if="page_path == '/other-products'"
+                        id="oe_structure_other_products_bottom"
+                        class="oe_structure oe_empty"
+                    />
                 </section>
             </main>
         </t>
@@ -556,6 +560,25 @@
                 }
                 .x_shop_unavailable_button:disabled {
                     opacity: 1;
+                }
+                .o_wsale_product_page,
+                .o_wsale_product_page *,
+                #product_detail,
+                #product_detail *,
+                #product_details,
+                #product_details *,
+                #product_detail.css_not_available,
+                #product_detail .css_not_available,
+                #product_details.css_not_available,
+                #product_details .css_not_available {
+                    opacity: 1 !important;
+                    filter: none !important;
+                }
+                .o_wsale_product_page.css_not_available,
+                .o_wsale_product_page .css_not_available,
+                #product_detail.css_not_available,
+                #product_detail .css_not_available {
+                    pointer-events: auto !important;
                 }
                 #product_detail.css_not_available .css_quantity,
                 #product_detail .css_not_available.js_product .css_quantity {
