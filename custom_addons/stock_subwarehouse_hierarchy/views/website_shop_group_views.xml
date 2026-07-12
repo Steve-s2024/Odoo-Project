@@ -127,10 +127,7 @@
                     }
                     .o_shop_unavailable_cta {
                         pointer-events: none;
-                        opacity: .65;
-                    }
-                    .o_shop_group_variant_selector .alert {
-                        border-radius: 0;
+                        opacity: 1;
                     }
                 </style>
                 <div
@@ -176,17 +173,6 @@
                         t-att-data-quantity="variant_row['available_quantity']"
                     />
                 </div>
-                <div
-                    t-if="not current_shop_available"
-                    class="alert alert-warning py-2 mb-0 o_shop_current_variant_unavailable"
-                >
-                    当前规格库存不足，暂时无法加入购物车。
-                </div>
-                <div
-                    class="alert alert-warning py-2 mb-0 d-none o_shop_selected_variant_unavailable"
-                >
-                    该规格库存不足，暂时无法加入购物车。
-                </div>
                 <script>
                     <![CDATA[
                     (function () {
@@ -194,9 +180,16 @@
                         if (!root) {
                             return;
                         }
-                        const addToCart = document.querySelector("#add_to_cart");
-                        const selectedWarning = root.querySelector(".o_shop_selected_variant_unavailable");
-                        const currentWarning = root.querySelector(".o_shop_current_variant_unavailable");
+                        let defaultCartText = "";
+                        const unavailableCartText = "库存不足，无法加入购物车";
+
+                        function getAddToCart() {
+                            const addToCart = document.querySelector("#add_to_cart");
+                            if (addToCart && !defaultCartText && addToCart.textContent.trim() !== unavailableCartText) {
+                                defaultCartText = addToCart.textContent.trim();
+                            }
+                            return addToCart;
+                        }
 
                         function selectedValue(key) {
                             const input = root.querySelector(`input[data-option-key="${key}"]:checked`);
@@ -215,20 +208,26 @@
                         }
 
                         function setCartAvailability(isAvailable) {
+                            const addToCart = getAddToCart();
                             if (!addToCart) {
                                 return;
                             }
                             addToCart.classList.toggle("disabled", !isAvailable);
                             addToCart.classList.toggle("o_shop_unavailable_cta", !isAvailable);
                             addToCart.setAttribute("aria-disabled", isAvailable ? "false" : "true");
+                            if (isAvailable) {
+                                addToCart.removeAttribute("disabled");
+                                addToCart.textContent = defaultCartText || "加入购物车";
+                            } else {
+                                addToCart.setAttribute("disabled", "disabled");
+                                addToCart.textContent = unavailableCartText;
+                            }
                         }
 
                         function refreshSelection(redirect) {
                             const variant = findSelectedVariant();
                             if (!variant) {
                                 setCartAvailability(false);
-                                selectedWarning && selectedWarning.classList.remove("d-none");
-                                currentWarning && currentWarning.classList.add("d-none");
                                 return;
                             }
                             const isAvailable = variant.dataset.available === "1";
@@ -237,9 +236,6 @@
                                 return;
                             }
                             setCartAvailability(isAvailable);
-                            if (selectedWarning) {
-                                selectedWarning.classList.toggle("d-none", isAvailable);
-                            }
                         }
 
                         root.addEventListener("change", function (event) {
@@ -248,6 +244,12 @@
                             }
                         });
                         refreshSelection(false);
+                        window.addEventListener("load", function () {
+                            refreshSelection(false);
+                        });
+                        window.requestAnimationFrame(function () {
+                            refreshSelection(false);
+                        });
                     })();
                     ]]>
                 </script>
@@ -292,13 +294,21 @@
                     border-radius: 0;
                     border-color: #111;
                     background: #111;
+                    color: #fff !important;
                     font-weight: 900;
                     letter-spacing: .03em;
                     text-transform: uppercase;
                 }
+                #add_to_cart.disabled,
+                #add_to_cart.o_shop_unavailable_cta {
+                    border-color: #777;
+                    background: #777;
+                    color: #fff !important;
+                }
                 #add_to_cart:not(.disabled):hover {
                     background: #333;
                     border-color: #333;
+                    color: #fff !important;
                 }
                 #product_attributes_simple {
                     display: none !important;
