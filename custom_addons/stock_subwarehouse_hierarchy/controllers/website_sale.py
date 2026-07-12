@@ -2,10 +2,26 @@ from odoo import _
 from odoo.addons.website.controllers.main import QueryURL
 from odoo.addons.website_sale.controllers.main import WebsiteSale
 from odoo.exceptions import UserError
-from odoo.http import route
+from odoo.http import request, route
 
 
 class WebsiteSaleStockSource(WebsiteSale):
+    @route()
+    def shop(self, page=0, category=None, search="", min_price=0.0, max_price=0.0, tags="", **post):
+        normalized_path = request.httprequest.path.rstrip("/")
+        path_parts = normalized_path.strip("/").split("/")
+        if path_parts[-1:] == ["shop"] and len(path_parts) <= 2:
+            return request.redirect("/product-categories")
+        return super().shop(
+            page=page,
+            category=category,
+            search=search,
+            min_price=min_price,
+            max_price=max_price,
+            tags=tags,
+            **post,
+        )
+
     @route(
         ["/ski-products", "/ski-products/page/<int:page>"],
         type="http",

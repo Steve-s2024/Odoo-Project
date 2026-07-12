@@ -9,7 +9,7 @@ class WebsiteVideoUploadWizard(models.TransientModel):
     _description = "Website Video Upload"
 
     name = fields.Char(string="视频名称", required=True)
-    video_file = fields.Binary(string="视频文件", required=True, attachment=False)
+    video_file = fields.Binary(string="视频文件", required=True, attachment=True)
     filename = fields.Char(string="文件名")
     result_url = fields.Char(string="视频链接", readonly=True)
     embed_code = fields.Text(string="嵌入代码", readonly=True)
@@ -25,12 +25,14 @@ class WebsiteVideoUploadWizard(models.TransientModel):
             raise UserError(_("请上传 MP4、WebM 或 OGG 视频文件。"))
 
         mimetype = mimetypes.guess_type(self.filename)[0] or "video/mp4"
-        attachment = self.env["ir.attachment"].sudo().create({
+        attachment = self._get_uploaded_video_attachment()
+        attachment.write({
             "name": self.name or self.filename,
-            "datas": self.video_file,
-            "type": "binary",
             "mimetype": mimetype,
             "public": True,
+            "res_model": False,
+            "res_id": 0,
+            "res_field": False,
         })
         self.result_url = f"/web/content/{attachment.id}?download=false"
         self.embed_code = (
@@ -48,3 +50,22 @@ class WebsiteVideoUploadWizard(models.TransientModel):
             "res_id": self.id,
             "target": "new",
         }
+
+    def _get_uploaded_video_attachment(self):
+        self.ensure_one()
+        attachment = self.env["ir.attachment"].sudo().search(
+            [
+                ("res_model", "=", self._name),
+                ("res_id", "=", self.id),
+                ("res_field", "=", "video_file"),
+            ],
+            order="id desc",
+            limit=1,
+        )
+        if attachment:
+            return attachment
+        return self.env["ir.attachment"].sudo().create({
+            "name": self.name or self.filename,
+            "datas": self.video_file,
+            "type": "binary",
+        })
