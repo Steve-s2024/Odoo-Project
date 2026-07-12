@@ -35,7 +35,7 @@
             <style>
                 html.x_page_transition_ready body {
                     opacity: 1;
-                    transition: opacity 180ms ease, transform 180ms ease;
+                    transition: opacity 320ms ease, transform 320ms ease;
                 }
                 html.x_page_transition_entering body {
                     opacity: 0;

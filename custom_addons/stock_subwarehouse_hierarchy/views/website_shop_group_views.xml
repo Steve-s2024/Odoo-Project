@@ -300,17 +300,93 @@
                 'other-items': 'other',
             }.get(x_item_page_slug)"/>
             <t t-if="x_item_page_family">
+                <t t-set="x_item_page_title" t-value="{
+                    'ski-items': '双板产品(ski products)',
+                    'snowboard-items': '单板产品(snowboard products)',
+                    'other-items': '其他产品(other products)',
+                }.get(x_item_page_slug)"/>
+                <t t-set="x_item_page_subtitle" t-value="{
+                    'ski-items': '双板、雪鞋、雪杖与滑雪装备。',
+                    'snowboard-items': '单板、单板鞋与相关雪场装备。',
+                    'other-items': '护具、雪镜、手套、服装与更多配件。',
+                }.get(x_item_page_slug)"/>
+                <t t-set="x_item_page_search" t-value="(request.params.get('search') or '').strip()"/>
                 <t t-set="x_item_page_products" t-value="request.env['product.template']._get_item_page_products(x_item_page_family)"/>
+                <t
+                    t-if="x_item_page_search"
+                    t-set="x_item_page_products"
+                    t-value="x_item_page_products.filtered(lambda product: x_item_page_search.lower() in (product.name or '').lower() or x_item_page_search.lower() in (product.default_code or '').lower())"
+                />
                 <section class="x_item_product_cards">
                     <style>
                         .x_item_product_cards {
                             background: #fff;
                             color: #111;
-                            padding: 24px 0 64px;
+                            padding: 0 0 64px;
                         }
                         .x_item_product_cards_inner {
                             width: min(1180px, calc(100% - 32px));
                             margin: 0 auto;
+                        }
+                        .x_item_product_header {
+                            padding: 58px 0 32px;
+                            border-bottom: 1px solid #e7e7e7;
+                            margin-bottom: 30px;
+                        }
+                        .x_item_product_eyebrow {
+                            margin: 0 0 14px;
+                            font-weight: 900;
+                            letter-spacing: .08em;
+                            text-transform: uppercase;
+                            color: #777;
+                        }
+                        .x_item_product_header h1 {
+                            max-width: 860px;
+                            margin: 0;
+                            font-size: clamp(2.35rem, 6vw, 5.25rem);
+                            line-height: .95;
+                            font-weight: 950;
+                            letter-spacing: 0;
+                            text-transform: uppercase;
+                        }
+                        .x_item_product_header p {
+                            max-width: 720px;
+                            margin: 20px 0 0;
+                            color: #555;
+                            font-size: 1.06rem;
+                            line-height: 1.7;
+                        }
+                        .x_item_product_tools {
+                            display: flex;
+                            justify-content: space-between;
+                            gap: 18px;
+                            align-items: center;
+                            margin-top: 30px;
+                        }
+                        .x_item_product_search {
+                            display: flex;
+                            width: min(430px, 100%);
+                            border-bottom: 2px solid #111;
+                        }
+                        .x_item_product_search input {
+                            flex: 1;
+                            border: 0;
+                            outline: 0;
+                            min-height: 44px;
+                            font-weight: 800;
+                            background: transparent;
+                        }
+                        .x_item_product_search button {
+                            border: 0;
+                            background: #111;
+                            color: #fff;
+                            font-weight: 900;
+                            padding: 0 18px;
+                        }
+                        .x_item_product_count {
+                            color: #666;
+                            font-weight: 900;
+                            white-space: nowrap;
                         }
                         .x_item_product_cards_grid {
                             display: grid;
@@ -362,6 +438,13 @@
                             padding: 24px 0;
                         }
                         @media (max-width: 900px) {
+                            .x_item_product_tools {
+                                align-items: stretch;
+                                flex-direction: column;
+                            }
+                            .x_item_product_count {
+                                white-space: normal;
+                            }
                             .x_item_product_cards_grid {
                                 grid-template-columns: repeat(2, minmax(0, 1fr));
                             }
@@ -373,6 +456,26 @@
                         }
                     </style>
                     <div class="x_item_product_cards_inner">
+                        <header class="x_item_product_header">
+                            <p class="x_item_product_eyebrow">SUN PRODUCT COLLECTION</p>
+                            <h1 t-out="x_item_page_title"/>
+                            <p t-out="x_item_page_subtitle"/>
+                            <div class="x_item_product_tools">
+                                <form class="x_item_product_search" t-att-action="'/%s' % x_item_page_slug" method="get">
+                                    <input
+                                        name="search"
+                                        type="search"
+                                        t-att-value="x_item_page_search"
+                                        placeholder="搜索产品(search products)"
+                                    />
+                                    <button type="submit">搜索(search)</button>
+                                </form>
+                                <div class="x_item_product_count">
+                                    <t t-out="len(x_item_page_products)"/>
+                                    <t> 个产品(products)</t>
+                                </div>
+                            </div>
+                        </header>
                         <div t-if="x_item_page_products" class="x_item_product_cards_grid">
                             <a
                                 t-foreach="x_item_page_products"
