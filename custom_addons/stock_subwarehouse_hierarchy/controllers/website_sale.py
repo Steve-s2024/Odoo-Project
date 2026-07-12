@@ -32,13 +32,17 @@ class WebsiteSaleStockSource(WebsiteSale):
         post["x_shop_product_family"] = "ski"
         post["x_segmented_shop_page"] = True
         post["x_segmented_shop_path"] = "/ski-products"
-        return self.shop(
+        response = self.shop(
             page=page,
             search=search,
             min_price=min_price,
             max_price=max_price,
             tags=tags,
             **post,
+        )
+        return self._with_segmented_shop_template(
+            response,
+            "stock_subwarehouse_hierarchy.ski_products_page",
         )
 
     @route(
@@ -51,13 +55,17 @@ class WebsiteSaleStockSource(WebsiteSale):
         post["x_shop_product_family"] = "snowboard"
         post["x_segmented_shop_page"] = True
         post["x_segmented_shop_path"] = "/snowboard-products"
-        return self.shop(
+        response = self.shop(
             page=page,
             search=search,
             min_price=min_price,
             max_price=max_price,
             tags=tags,
             **post,
+        )
+        return self._with_segmented_shop_template(
+            response,
+            "stock_subwarehouse_hierarchy.snowboard_products_page",
         )
 
     @route(
@@ -70,7 +78,7 @@ class WebsiteSaleStockSource(WebsiteSale):
         post["x_shop_product_family"] = "other"
         post["x_segmented_shop_page"] = True
         post["x_segmented_shop_path"] = "/other-products"
-        return self.shop(
+        response = self.shop(
             page=page,
             search=search,
             min_price=min_price,
@@ -78,6 +86,16 @@ class WebsiteSaleStockSource(WebsiteSale):
             tags=tags,
             **post,
         )
+        return self._with_segmented_shop_template(
+            response,
+            "stock_subwarehouse_hierarchy.other_products_page",
+        )
+
+    def _with_segmented_shop_template(self, response, template):
+        if getattr(response, "template", None):
+            response.template = template
+            response.qcontext["response_template"] = template
+        return response
 
     def _shop_lookup_products(self, options, post, search, website):
         fuzzy_search_term, _product_count, search_result = super()._shop_lookup_products(

@@ -41,6 +41,45 @@
         <xpath expr="//button[hasclass('o_wsale_product_btn_primary')]" position="replace"/>
     </template>
 
+    <record id="ski_products_page" model="ir.ui.view">
+        <field name="name">Ski Products Page</field>
+        <field name="type">qweb</field>
+        <field name="key">stock_subwarehouse_hierarchy.ski_products_page</field>
+        <field name="inherit_id" ref="website_sale.products"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@id='products_grid']" position="attributes">
+                <attribute name="class" add="x_ski_products_page" separator=" "/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="snowboard_products_page" model="ir.ui.view">
+        <field name="name">Snowboard Products Page</field>
+        <field name="type">qweb</field>
+        <field name="key">stock_subwarehouse_hierarchy.snowboard_products_page</field>
+        <field name="inherit_id" ref="website_sale.products"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@id='products_grid']" position="attributes">
+                <attribute name="class" add="x_snowboard_products_page" separator=" "/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="other_products_page" model="ir.ui.view">
+        <field name="name">Other Products Page</field>
+        <field name="type">qweb</field>
+        <field name="key">stock_subwarehouse_hierarchy.other_products_page</field>
+        <field name="inherit_id" ref="website_sale.products"/>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@id='products_grid']" position="attributes">
+                <attribute name="class" add="x_other_products_page" separator=" "/>
+            </xpath>
+        </field>
+    </record>
+
     <template id="segmented_shop_page_hide_filters" inherit_id="website_sale.products" name="Segmented shop pages without filters">
         <xpath expr="//aside[@id='products_grid_before']" position="attributes">
             <attribute name="t-if">hasLeftColumn and not x_segmented_shop_page</attribute>
