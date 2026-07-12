@@ -2,6 +2,7 @@ from odoo import api, models
 
 
 DEFAULT_CHINESE_LANG = "zh_CN"
+DEFAULT_ENGLISH_LANG = "en_US"
 
 
 class ResLang(models.Model):
@@ -21,5 +22,9 @@ class ResLang(models.Model):
         users.write({"lang": DEFAULT_CHINESE_LANG})
 
         if "website" in self.env:
-            self.env["website"].sudo().search([]).write({"default_lang_id": lang.id})
+            english_lang = self.sudo()._activate_lang(DEFAULT_ENGLISH_LANG)
+            website_values = {"default_lang_id": lang.id}
+            if english_lang:
+                website_values["language_ids"] = [(6, 0, (lang | english_lang).ids)]
+            self.env["website"].sudo().search([]).write(website_values)
         return True

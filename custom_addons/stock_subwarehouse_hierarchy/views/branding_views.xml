@@ -25,4 +25,75 @@
             <span>SUN ERP</span>
         </xpath>
     </template>
+
+    <template id="sun_website_page_transitions" inherit_id="website.layout" name="SUN Website Page Transitions">
+        <xpath expr="//head" position="inside">
+            <style>
+                html.x_page_transition_ready body {
+                    opacity: 1;
+                    transition: opacity 180ms ease, transform 180ms ease;
+                }
+                html.x_page_transition_entering body {
+                    opacity: 0;
+                    transform: translateY(6px);
+                }
+                html.x_page_transition_leaving body {
+                    opacity: 0;
+                    transform: translateY(-4px);
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    html.x_page_transition_ready body,
+                    html.x_page_transition_entering body,
+                    html.x_page_transition_leaving body {
+                        opacity: 1;
+                        transform: none;
+                        transition: none;
+                    }
+                }
+            </style>
+        </xpath>
+        <xpath expr="//body" position="inside">
+            <script>
+                (function () {
+                    const root = document.documentElement;
+                    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+                        return;
+                    }
+                    root.classList.add("x_page_transition_entering");
+                    const enter = () => {
+                        root.classList.add("x_page_transition_ready");
+                        requestAnimationFrame(() => root.classList.remove("x_page_transition_entering"));
+                    };
+                    if (document.readyState === "loading") {
+                        document.addEventListener("DOMContentLoaded", enter, { once: true });
+                    } else {
+                        enter();
+                    }
+                    document.addEventListener("click", (event) => {
+                        const link = event.target.closest("a[href]");
+                        if (!link || event.defaultPrevented || event.button !== 0) {
+                            return;
+                        }
+                        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                            return;
+                        }
+                        if (link.target &amp;&amp; link.target !== "_self") {
+                            return;
+                        }
+                        const url = new URL(link.href, window.location.href);
+                        if (url.origin !== window.location.origin) {
+                            return;
+                        }
+                        if (url.hash &amp;&amp; url.pathname === window.location.pathname) {
+                            return;
+                        }
+                        root.classList.add("x_page_transition_leaving");
+                    });
+                    window.addEventListener("pageshow", () => {
+                        root.classList.remove("x_page_transition_leaving");
+                    });
+                })();
+            </script>
+        </xpath>
+    </template>
 </odoo>
