@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="stores_page" name="SUN Stores Page">
+        <t t-call="website.layout">
+            <t t-set="additional_title" t-value="'门店(stores)'"/>
+            <main id="wrap" class="x_stores_page">
+                <style>
+                    .x_stores_page {
+                        background: #fff;
+                        color: #111;
+                    }
+                    .x_stores_inner {
+                        width: min(1180px, calc(100% - 32px));
+                        margin: 0 auto;
+                    }
+                    .x_stores_hero {
+                        padding: 72px 0 40px;
+                        border-bottom: 1px solid #e7e7e7;
+                    }
+                    .x_stores_eyebrow {
+                        margin: 0 0 14px;
+                        font-weight: 900;
+                        letter-spacing: .08em;
+                        text-transform: uppercase;
+                        color: #777;
+                    }
+                    .x_stores_hero h1 {
+                        max-width: 860px;
+                        margin: 0;
+                        font-size: clamp(2.4rem, 6vw, 5.5rem);
+                        line-height: .95;
+                        font-weight: 950;
+                        letter-spacing: 0;
+                        text-transform: uppercase;
+                    }
+                    .x_stores_hero p {
+                        max-width: 720px;
+                        margin: 22px 0 0;
+                        color: #555;
+                        font-size: 1.08rem;
+                        line-height: 1.7;
+                    }
+                    .x_stores_tools {
+                        display: grid;
+                        grid-template-columns: repeat(3, minmax(0, 1fr));
+                        gap: 1px;
+                        margin: 32px 0 0;
+                        background: #ddd;
+                        border: 1px solid #ddd;
+                    }
+                    .x_stores_tool {
+                        background: #fff;
+                        padding: 22px;
+                    }
+                    .x_stores_tool strong {
+                        display: block;
+                        font-size: 1.1rem;
+                    }
+                    .x_stores_tool span {
+                        display: block;
+                        margin-top: 8px;
+                        color: #666;
+                        line-height: 1.55;
+                    }
+                    .x_stores_list {
+                        padding: 46px 0 70px;
+                    }
+                    .x_store_card {
+                        display: grid;
+                        grid-template-columns: minmax(0, 1fr) minmax(320px, .58fr);
+                        gap: 28px;
+                        padding: 30px 0;
+                        border-bottom: 1px solid #e7e7e7;
+                    }
+                    .x_store_card:first-child {
+                        border-top: 1px solid #e7e7e7;
+                    }
+                    .x_store_city {
+                        margin: 0 0 10px;
+                        font-weight: 900;
+                        color: #777;
+                    }
+                    .x_store_card h2 {
+                        margin: 0;
+                        font-size: clamp(1.55rem, 3vw, 2.5rem);
+                        font-weight: 950;
+                        letter-spacing: 0;
+                    }
+                    .x_store_en {
+                        margin: 8px 0 0;
+                        color: #555;
+                        font-weight: 700;
+                    }
+                    .x_store_detail {
+                        display: grid;
+                        gap: 14px;
+                        align-content: start;
+                    }
+                    .x_store_detail p {
+                        margin: 0;
+                    }
+                    .x_store_label {
+                        display: block;
+                        margin-bottom: 4px;
+                        color: #777;
+                        font-size: .8rem;
+                        font-weight: 900;
+                        letter-spacing: .06em;
+                        text-transform: uppercase;
+                    }
+                    .x_store_actions {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 10px;
+                        margin-top: 8px;
+                    }
+                    .x_store_action {
+                        display: inline-flex;
+                        align-items: center;
+                        min-height: 42px;
+                        padding: 0 16px;
+                        background: #111;
+                        color: #fff;
+                        text-decoration: none;
+                        font-weight: 900;
+                    }
+                    .x_store_action_secondary {
+                        background: #f2f2f2;
+                        color: #111;
+                    }
+                    @media (max-width: 840px) {
+                        .x_stores_tools,
+                        .x_store_card {
+                            grid-template-columns: 1fr;
+                        }
+                    }
+                </style>
+                <section class="x_stores_hero">
+                    <div class="x_stores_inner">
+                        <p class="x_stores_eyebrow">SUN STORE NETWORK</p>
+                        <h1>门店(stores)</h1>
+                        <p>
+                            查找思安奇线下经销商、体验店与雪场服务点。这里可以放每家门店的库存说明、提货方式、维修能力和联系方式。
+                        </p>
+                        <div class="x_stores_tools">
+                            <div class="x_stores_tool">
+                                <strong>试穿与尺码建议</strong>
+                                <span>到店完成雪鞋、头盔、护具等装备的尺寸确认。</span>
+                            </div>
+                            <div class="x_stores_tool">
+                                <strong>线上订单自提</strong>
+                                <span>支持指定门店提货，并在雪季前完成装备检查。</span>
+                            </div>
+                            <div class="x_stores_tool">
+                                <strong>售后与维修登记</strong>
+                                <span>门店可协助登记维修、保养、退换货与租赁归还。</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section class="x_stores_inner">
+                    <div id="oe_structure_stores_top" class="oe_structure oe_empty"/>
+                </section>
+                <section class="x_stores_inner x_stores_list">
+                    <article t-foreach="stores" t-as="store" class="x_store_card">
+                        <div>
+                            <p class="x_store_city" t-out="store['city']"/>
+                            <h2 t-out="store['name']"/>
+                            <p class="x_store_en" t-out="store['english_name']"/>
+                        </div>
+                        <div class="x_store_detail">
+                            <p>
+                                <span class="x_store_label">地址(address)</span>
+                                <t t-out="store['address']"/>
+                            </p>
+                            <p>
+                                <span class="x_store_label">营业时间(hours)</span>
+                                <t t-out="store['hours']"/>
+                            </p>
+                            <p>
+                                <span class="x_store_label">电话(phone)</span>
+                                <t t-out="store['phone']"/>
+                            </p>
+                            <p>
+                                <span class="x_store_label">服务(services)</span>
+                                <t t-out="store['services']"/>
+                            </p>
+                            <div class="x_store_actions">
+                                <a class="x_store_action" t-att-href="'tel:%s' % store['phone']">拨打电话(call)</a>
+                                <a class="x_store_action x_store_action_secondary" href="#wrap">查看地图(map)</a>
+                            </div>
+                        </div>
+                    </article>
+                </section>
+                <section class="x_stores_inner">
+                    <div id="oe_structure_stores_bottom" class="oe_structure oe_empty"/>
+                </section>
+            </main>
+        </t>
+    </template>
+</odoo>

@@ -30,6 +30,7 @@
         "views/sale_order_views.xml",
         "views/website_video_views.xml",
         "views/website_shop_group_views.xml",
+        "views/website_stores_views.xml",
     ],
     "assets": {
         "web.assets_backend": [

@@ -27,6 +27,10 @@
     </template>
 
     <template id="sun_website_page_transitions" inherit_id="website.layout" name="SUN Website Page Transitions">
+        <xpath expr="//meta[@name='generator']" position="before">
+            <t t-set="title" t-value="request.env['ir.http']._sun_format_website_title(title)"/>
+            <t t-set="default_title" t-value="request.env['ir.http']._sun_format_website_title(default_title)"/>
+        </xpath>
         <xpath expr="//head" position="inside">
             <style>
                 html.x_page_transition_ready body {
