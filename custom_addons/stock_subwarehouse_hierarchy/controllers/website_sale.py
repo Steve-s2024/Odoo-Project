@@ -65,7 +65,7 @@ class WebsiteSaleStockSource(WebsiteSale):
         )
 
     @route(
-        ["/snowboard-products", "/snowboard-products/page/<int:page>"],
+        ["/_deleted-snowboard-products", "/_deleted-snowboard-products/page/<int:page>"],
         type="http",
         auth="public",
         website=True,
@@ -73,7 +73,7 @@ class WebsiteSaleStockSource(WebsiteSale):
     def snowboard_products(self, page=0, search="", min_price=0.0, max_price=0.0, tags="", **post):
         return self._render_custom_product_family_page(
             family="snowboard",
-            path="/snowboard-products",
+            path="/_deleted-snowboard-products",
             builder_key="snowboard",
             page=page,
             search=search,
@@ -84,7 +84,7 @@ class WebsiteSaleStockSource(WebsiteSale):
         )
 
     @route(
-        ["/other-products", "/other-products/page/<int:page>"],
+        ["/_deleted-other-products", "/_deleted-other-products/page/<int:page>"],
         type="http",
         auth="public",
         website=True,
@@ -92,7 +92,7 @@ class WebsiteSaleStockSource(WebsiteSale):
     def other_products(self, page=0, search="", min_price=0.0, max_price=0.0, tags="", **post):
         return self._render_custom_product_family_page(
             family="other",
-            path="/other-products",
+            path="/_deleted-other-products",
             builder_key="other",
             page=page,
             search=search,

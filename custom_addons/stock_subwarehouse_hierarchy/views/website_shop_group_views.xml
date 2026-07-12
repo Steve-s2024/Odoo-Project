@@ -642,7 +642,7 @@
         <xpath expr="//t[@name='variant_info']" position="before">
             <t
                 t-set="shop_section_url"
-                t-value="{'ski': '/ski-products', 'snowboard': '/snowboard-products', 'other': '/other-products'}.get(product.sudo()._get_shop_product_family(), '/other-products')"
+                t-value="{'ski': '/ski-items', 'snowboard': '/snowboard-items', 'other': '/other-items'}.get(product.sudo()._get_shop_product_family(), '/other-items')"
             />
             <span class="d-none x_shop_product_section" t-att-data-shop-section-url="shop_section_url"/>
             <style>

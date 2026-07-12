@@ -199,3 +199,38 @@ class SaleOrderLine(models.Model):
         if self.x_source_location_id:
             values["x_source_location_id"] = self.x_source_location_id
         return values
+
+    def get_description_following_lines(self):
+        lines = super().get_description_following_lines()
+        if not self.product_custom_attribute_value_ids:
+            return lines
+
+        managed_custom_values = self.product_custom_attribute_value_ids.filtered(
+            lambda value: value.custom_product_template_attribute_value_id.attribute_id.x_apply_to_all_products
+        )
+        if not managed_custom_values:
+            return lines
+
+        hidden_display_lines = {
+            (value.display_name or "").strip()
+            for value in managed_custom_values
+            if value.display_name
+        }
+        hidden_attribute_names = {
+            value.custom_product_template_attribute_value_id.attribute_id.name
+            for value in managed_custom_values
+            if value.custom_product_template_attribute_value_id.attribute_id.name
+        }
+        filtered_lines = []
+        for line in lines:
+            clean_line = (line or "").strip()
+            if clean_line in hidden_display_lines:
+                continue
+            if any(
+                clean_line.startswith(f"{attribute_name}:")
+                or clean_line.startswith(f"{attribute_name}：")
+                for attribute_name in hidden_attribute_names
+            ):
+                continue
+            filtered_lines.append(line)
+        return filtered_lines
