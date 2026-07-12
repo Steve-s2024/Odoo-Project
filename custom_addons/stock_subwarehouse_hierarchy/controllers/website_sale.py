@@ -46,6 +46,25 @@ class WebsiteSaleStockSource(WebsiteSale):
         )
 
     @route(
+        ["/ski-products-sale", "/ski-products-sale/page/<int:page>"],
+        type="http",
+        auth="public",
+        website=True,
+    )
+    def ski_products_sale(self, page=0, search="", min_price=0.0, max_price=0.0, tags="", **post):
+        return self._render_custom_product_family_page(
+            family="ski",
+            path="/ski-products-sale",
+            builder_key="ski_sale",
+            page=page,
+            search=search,
+            zh_title="滑雪产品特卖",
+            en_title="Ski Products Sale",
+            zh_subtitle="双板、雪鞋、雪杖与滑雪装备精选",
+            en_subtitle="Selected skis, ski boots, poles, and alpine gear.",
+        )
+
+    @route(
         ["/snowboard-products", "/snowboard-products/page/<int:page>"],
         type="http",
         auth="public",
@@ -55,6 +74,7 @@ class WebsiteSaleStockSource(WebsiteSale):
         return self._render_custom_product_family_page(
             family="snowboard",
             path="/snowboard-products",
+            builder_key="snowboard",
             page=page,
             search=search,
             zh_title="单板产品",
@@ -73,6 +93,7 @@ class WebsiteSaleStockSource(WebsiteSale):
         return self._render_custom_product_family_page(
             family="other",
             path="/other-products",
+            builder_key="other",
             page=page,
             search=search,
             zh_title="其他产品",
@@ -85,6 +106,7 @@ class WebsiteSaleStockSource(WebsiteSale):
         self,
         family,
         path,
+        builder_key,
         page=0,
         search="",
         zh_title="",
@@ -122,6 +144,7 @@ class WebsiteSaleStockSource(WebsiteSale):
             "pager": pager,
             "search": search,
             "page_path": path,
+            "builder_key": builder_key,
             "page_title": en_title if is_english else zh_title,
             "page_subtitle": en_subtitle if is_english else zh_subtitle,
             "is_english": is_english,

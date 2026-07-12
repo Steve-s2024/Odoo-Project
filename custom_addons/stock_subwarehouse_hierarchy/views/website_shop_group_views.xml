@@ -160,24 +160,31 @@
                     .x_custom_product_image img {
                         width: 100%;
                         height: 100%;
-                        object-fit: contain;
+                        object-fit: cover;
                         transition: transform 220ms ease;
                     }
                     .x_custom_product_card:hover .x_custom_product_image img {
                         transform: scale(1.035);
                     }
                     .x_custom_product_meta {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-start;
+                        gap: 14px;
                         padding-top: 14px;
                     }
                     .x_custom_product_name {
+                        flex: 1 1 auto;
                         margin: 0;
                         font-size: .92rem;
                         font-weight: 900;
                         text-transform: uppercase;
                     }
                     .x_custom_product_footer {
-                        margin-top: 10px;
+                        flex: 0 0 auto;
                         font-weight: 900;
+                        text-align: right;
+                        white-space: nowrap;
                     }
                     .x_custom_empty {
                         padding: 64px 0;
@@ -207,13 +214,7 @@
                 </section>
                 <section class="x_custom_family_inner">
                     <div
-                        t-if="page_path == '/snowboard-products'"
-                        id="oe_structure_snowboard_products_top"
-                        class="oe_structure oe_empty"
-                    />
-                    <div
-                        t-if="page_path == '/other-products'"
-                        id="oe_structure_other_products_top"
+                        t-att-id="'oe_structure_%s_products_top' % builder_key"
                         class="oe_structure oe_empty"
                     />
                 </section>
@@ -260,13 +261,7 @@
                 </section>
                 <section class="x_custom_family_inner">
                     <div
-                        t-if="page_path == '/snowboard-products'"
-                        id="oe_structure_snowboard_products_bottom"
-                        class="oe_structure oe_empty"
-                    />
-                    <div
-                        t-if="page_path == '/other-products'"
-                        id="oe_structure_other_products_bottom"
+                        t-att-id="'oe_structure_%s_products_bottom' % builder_key"
                         class="oe_structure oe_empty"
                     />
                 </section>
