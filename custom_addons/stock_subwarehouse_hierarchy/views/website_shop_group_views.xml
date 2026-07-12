@@ -329,10 +329,39 @@
                     background: #111;
                     color: #fff !important;
                 }
+                #add_to_cart.disabled {
+                    opacity: 1 !important;
+                    border-color: #111 !important;
+                    background: #111 !important;
+                    color: #fff !important;
+                }
                 #add_to_cart:not(.o_shop_unavailable_cta):hover {
                     background: #333;
                     border-color: #333;
                     color: #fff !important;
+                }
+                #product_detail.css_not_available .css_quantity,
+                #product_detail .css_not_available.js_product .css_quantity {
+                    display: inline-flex !important;
+                }
+                #product_detail.css_not_available .oe_price,
+                #product_detail.css_not_available .oe_default_price,
+                #product_detail .css_not_available.js_product .oe_price,
+                #product_detail .css_not_available.js_product .oe_default_price {
+                    display: inline !important;
+                }
+                #product_detail .css_not_available_msg {
+                    display: none !important;
+                }
+                #product_detail .variant_attribute label.css_not_available,
+                #product_detail .variant_attribute .o_variant_pills.css_not_available,
+                #product_detail label.css_attribute_color.css_not_available,
+                #product_detail input.css_not_available,
+                #product_detail option.css_not_available {
+                    opacity: 1 !important;
+                }
+                #product_detail label.css_attribute_color.css_not_available:after {
+                    display: none !important;
                 }
                 #product_attributes_simple {
                     display: none !important;
@@ -341,6 +370,21 @@
             <script>
                 <![CDATA[
                 (function () {
+                    function clearOdooUnavailableDimming() {
+                        const productDetail = document.querySelector("#product_detail");
+                        if (productDetail) {
+                            productDetail.classList.remove("css_not_available");
+                        }
+                        document.querySelectorAll("#product_detail .css_not_available").forEach((element) => {
+                            element.classList.remove("css_not_available");
+                        });
+                        document.querySelectorAll("#add_to_cart.disabled:not(.o_shop_unavailable_cta), .o_we_buy_now.disabled").forEach((element) => {
+                            element.classList.remove("disabled");
+                            element.removeAttribute("disabled");
+                            element.setAttribute("aria-disabled", "false");
+                        });
+                    }
+
                     function openDiscussion() {
                         const discussionContent = document.querySelector("#o_product_page_reviews_content");
                         const discussionTitle = document.querySelector("[data-bs-target='#o_product_page_reviews_content']");
@@ -352,9 +396,28 @@
                             discussionTitle.setAttribute("aria-expanded", "true");
                         }
                     }
+                    clearOdooUnavailableDimming();
                     openDiscussion();
-                    window.addEventListener("load", openDiscussion);
-                    window.requestAnimationFrame(openDiscussion);
+                    window.addEventListener("load", function () {
+                        clearOdooUnavailableDimming();
+                        openDiscussion();
+                    });
+                    window.requestAnimationFrame(function () {
+                        clearOdooUnavailableDimming();
+                        openDiscussion();
+                    });
+                    window.setTimeout(clearOdooUnavailableDimming, 250);
+                    window.setTimeout(clearOdooUnavailableDimming, 1000);
+                    const productDetail = document.querySelector("#product_detail");
+                    if (productDetail && window.MutationObserver) {
+                        const observer = new MutationObserver(clearOdooUnavailableDimming);
+                        observer.observe(productDetail, {
+                            attributes: true,
+                            attributeFilter: ["class", "disabled", "aria-disabled"],
+                            childList: true,
+                            subtree: true,
+                        });
+                    }
                 })();
                 ]]>
             </script>
