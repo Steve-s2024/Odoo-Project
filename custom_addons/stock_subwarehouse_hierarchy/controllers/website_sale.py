@@ -15,7 +15,7 @@ class WebsiteSaleStockSource(WebsiteSale):
             if request.lang and request.lang != request.website.default_lang_id:
                 language_prefix = request.lang.url_code
             return request.redirect(
-                f"/{language_prefix}/product-categories" if language_prefix else "/product-categories"
+                f"/{language_prefix}/collections" if language_prefix == "en" else "/product-categories"
             )
         return super().shop(
             page=page,

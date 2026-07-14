@@ -302,9 +302,9 @@
             <t t-if="x_item_page_family">
                 <t t-set="x_item_page_is_english" t-value="request.lang and request.lang.code == 'en_US'"/>
                 <t t-set="x_item_page_title" t-value="{
-                    'ski-items': 'Ski Products' if x_item_page_is_english else '双板产品(ski products)',
-                    'snowboard-items': 'Snowboard Products' if x_item_page_is_english else '单板产品(snowboard products)',
-                    'other-items': 'Other Products' if x_item_page_is_english else '其他产品(other products)',
+                    'ski-items': 'Ski Products' if x_item_page_is_english else '双板商品(SKI PRODUCTS)',
+                    'snowboard-items': 'Snowboard Products' if x_item_page_is_english else '单板商品(SNOWBOARD PRODUCTS)',
+                    'other-items': 'Other Products' if x_item_page_is_english else '其他商品(OTHER PRODUCTS)',
                 }.get(x_item_page_slug)"/>
                 <t t-set="x_item_page_subtitle" t-value="{
                     'ski-items': 'Skis, ski boots, poles, and alpine gear.' if x_item_page_is_english else '双板、雪鞋、雪杖与滑雪装备。',
@@ -467,13 +467,13 @@
                                         name="search"
                                         type="search"
                                         t-att-value="x_item_page_search"
-                                        t-att-placeholder="'Search products' if x_item_page_is_english else '搜索产品(search products)'"
+                                        t-att-placeholder="'Search products' if x_item_page_is_english else '搜索产品'"
                                     />
-                                    <button type="submit" t-out="'Search' if x_item_page_is_english else '搜索(search)'"/>
+                                    <button type="submit" t-out="'Search' if x_item_page_is_english else '搜索'"/>
                                 </form>
                                 <div class="x_item_product_count">
                                     <t t-out="len(x_item_page_products)"/>
-                                    <t t-out="' products' if x_item_page_is_english else ' 个产品(products)'"/>
+                                    <t t-out="' products' if x_item_page_is_english else ' 个产品'"/>
                                 </div>
                             </div>
                         </header>

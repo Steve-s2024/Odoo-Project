@@ -2,7 +2,7 @@
 <odoo>
     <template id="stores_page" name="SUN Stores Page">
         <t t-call="website.layout">
-            <t t-set="additional_title" t-value="'Stores' if is_english else '门店(stores)'"/>
+            <t t-set="additional_title" t-value="'Stores' if is_english else '门店'"/>
             <main id="wrap" class="x_stores_page">
                 <style>
                     .x_stores_page {
@@ -138,7 +138,7 @@
                 <section class="x_stores_hero">
                     <div class="x_stores_inner">
                         <p class="x_stores_eyebrow" t-out="'SUN STORE NETWORK' if is_english else 'SUN 门店网络'"/>
-                        <h1 t-out="'Stores' if is_english else '门店(stores)'"/>
+                        <h1 t-out="'Stores' if is_english else '门店'"/>
                         <p t-if="is_english">
                             Find SUN distributors, experience stores, and resort service points. This page can show each store's stock notes, pickup options, repair capability, and contact details.
                         </p>
@@ -169,28 +169,27 @@
                         <div>
                             <p class="x_store_city" t-out="store['english_city'] if is_english else store['city']"/>
                             <h2 t-out="store['english_name'] if is_english else store['name']"/>
-                            <p class="x_store_en" t-out="store['name'] if is_english else store['english_name']"/>
                         </div>
                         <div class="x_store_detail">
                             <p>
-                                <span class="x_store_label" t-out="'Address' if is_english else '地址(address)'"/>
+                                <span class="x_store_label" t-out="'Address' if is_english else '地址'"/>
                                 <t t-out="store['english_address'] if is_english else store['address']"/>
                             </p>
                             <p>
-                                <span class="x_store_label" t-out="'Hours' if is_english else '营业时间(hours)'"/>
+                                <span class="x_store_label" t-out="'Hours' if is_english else '营业时间'"/>
                                 <t t-out="store['english_hours'] if is_english else store['hours']"/>
                             </p>
                             <p>
-                                <span class="x_store_label" t-out="'Phone' if is_english else '电话(phone)'"/>
+                                <span class="x_store_label" t-out="'Phone' if is_english else '电话'"/>
                                 <t t-out="store['phone']"/>
                             </p>
                             <p>
-                                <span class="x_store_label" t-out="'Services' if is_english else '服务(services)'"/>
+                                <span class="x_store_label" t-out="'Services' if is_english else '服务'"/>
                                 <t t-out="store['english_services'] if is_english else store['services']"/>
                             </p>
                             <div class="x_store_actions">
-                                <a class="x_store_action" t-att-href="'tel:%s' % store['phone']" t-out="'Call' if is_english else '拨打电话(call)'"/>
-                                <a class="x_store_action x_store_action_secondary" href="#wrap" t-out="'View Map' if is_english else '查看地图(map)'"/>
+                                <a class="x_store_action" t-att-href="'tel:%s' % store['phone']" t-out="'Call' if is_english else '拨打电话'"/>
+                                <a class="x_store_action x_store_action_secondary" href="#wrap" t-out="'View Map' if is_english else '查看地图'"/>
                             </div>
                         </div>
                     </article>
