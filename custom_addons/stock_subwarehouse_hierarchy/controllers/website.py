@@ -6,27 +6,9 @@ class StockSubwarehouseWebsite(http.Controller):
     @route("/collections", type="http", auth="public", website=True, sitemap=True)
     def collections(self, **kwargs):
         is_english = request.lang and request.lang.code == "en_US"
-        collections = [
-            {
-                "title": "Ski Products" if is_english else "双板商品",
-                "subtitle": "Skis, ski boots, poles, and alpine gear." if is_english else "双板、雪鞋、雪杖与滑雪装备。",
-                "url": "/en/ski-items" if is_english else "/ski-items",
-            },
-            {
-                "title": "Snowboard Products" if is_english else "单板商品",
-                "subtitle": "Snowboards, snowboard boots, and related mountain gear." if is_english else "单板、单板鞋与相关雪场装备。",
-                "url": "/en/snowboard-items" if is_english else "/snowboard-items",
-            },
-            {
-                "title": "Other Products" if is_english else "其他商品",
-                "subtitle": "Protection, goggles, gloves, apparel, and accessories." if is_english else "护具、雪镜、手套、服装与更多配件。",
-                "url": "/en/other-items" if is_english else "/other-items",
-            },
-        ]
         return request.render(
             "stock_subwarehouse_hierarchy.collections_page",
             {
-                "collections": collections,
                 "is_english": is_english,
                 "additional_title": "Collections" if is_english else "产品系列",
             },
