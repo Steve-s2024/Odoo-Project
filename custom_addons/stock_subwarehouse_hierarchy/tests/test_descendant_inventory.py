@@ -325,6 +325,7 @@ class TestDescendantInventoryTotals(TransactionCase):
         })
 
     def test_simulated_wechat_payment_confirms_stocked_website_order(self):
+        self.env["ir.config_parameter"].sudo().set_param("sale.automatic_invoice", "True")
         self.product_a.list_price = 120.0
         self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
         order, line = self._create_sale_order_line(self.product_a, 2.0)
@@ -345,10 +346,27 @@ class TestDescendantInventoryTotals(TransactionCase):
             "_send_order_confirmation_mail",
             side_effect=UserError("Simulated PDF/email failure"),
         ):
-            tx._post_process()
+            tx.with_context(skip_sale_auto_invoice_send=True)._post_process()
 
         self.assertEqual(tx.state, "done")
         self.assertEqual(order.state, "sale")
+        self.assertTrue(tx.payment_id)
+        self.assertEqual(tx.payment_id.state, "paid")
+        self.assertTrue(tx.invoice_ids)
+        self.assertTrue(tx.invoice_ids.filtered(lambda invoice: invoice.state == "posted"))
+        self.assertEqual(order.x_website_payment_state, "paid")
+        self.assertEqual(order.x_website_payment_reference, f"SIM-{tx.reference}")
+        self.assertEqual(order._get_website_payment_receipt(), tx.payment_id)
+        payment_action = order.action_view_website_payments()
+        self.assertEqual(payment_action["res_id"], tx.payment_id.id)
+        order._portal_ensure_token()
+        receipt_html = str(self.env["ir.ui.view"]._render_template(
+            "stock_subwarehouse_hierarchy.website_payment_receipt",
+            {"order": order},
+        ))
+        self.assertIn("支付收据", receipt_html)
+        self.assertIn(tx.payment_id.name, receipt_html)
+        self.assertIn(f"/shop/payment/receipt/{order.id}", receipt_html)
         self.assertEqual(line.x_source_location_id, self.bin_a)
         delivery_move = line.move_ids.filtered(lambda move: move.product_id == self.product_a)
         self.assertTrue(delivery_move)

@@ -13,6 +13,7 @@
         "website_sale",
         "spreadsheet_dashboard",
         "website",
+        "account_payment",
         "payment_wechatpay",
     ],
     "data": [
@@ -32,6 +33,7 @@
         "views/website_collections_views.xml",
         "views/website_shop_group_views.xml",
         "views/website_stores_views.xml",
+        "views/website_payment_receipt_views.xml",
         "data/website_public_access_data.xml",
     ],
     "assets": {

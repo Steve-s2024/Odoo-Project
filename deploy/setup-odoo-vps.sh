@@ -65,13 +65,24 @@ apt-get install -y \
     ufw \
     zlib1g-dev
 
-if apt-get install --simulate -y wkhtmltopdf >/dev/null 2>&1; then
-    echo "==> Installing wkhtmltopdf"
-    apt-get install -y wkhtmltopdf
-else
-    echo "==> wkhtmltopdf is not available from this Debian release; continuing without it"
-    echo "    Odoo will run, but PDF report rendering may be unavailable until wkhtmltopdf is installed separately."
+if ! command -v wkhtmltopdf >/dev/null 2>&1; then
+    echo "==> Installing wkhtmltopdf 0.12.6.1-3 with patched Qt"
+    WKHTML_ARCH="$(dpkg --print-architecture)"
+    case "$WKHTML_ARCH" in
+        amd64|arm64) ;;
+        *)
+            echo "Unsupported wkhtmltopdf architecture: $WKHTML_ARCH"
+            exit 1
+            ;;
+    esac
+    WKHTML_DEB="wkhtmltox_0.12.6.1-3.bookworm_${WKHTML_ARCH}.deb"
+    WKHTML_URL="https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/${WKHTML_DEB}"
+    curl --fail --location --retry 4 --output "/tmp/${WKHTML_DEB}" "$WKHTML_URL"
+    apt-get install -y "/tmp/${WKHTML_DEB}"
+    rm -f "/tmp/${WKHTML_DEB}"
 fi
+
+wkhtmltopdf --version
 
 if ! id "$ODOO_USER" >/dev/null 2>&1; then
     echo "==> Creating system user: $ODOO_USER"

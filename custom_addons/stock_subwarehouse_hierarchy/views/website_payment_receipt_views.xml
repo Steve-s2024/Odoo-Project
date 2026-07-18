@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="website_payment_receipt" name="Website Payment Receipt">
+        <t t-set="receipt_tx" t-value="order.get_portal_last_transaction()"/>
+        <section t-if="receipt_tx and receipt_tx.state == 'done'" class="card mt-3" id="website_payment_receipt">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">支付收据</h4>
+                <span class="badge text-bg-success">支付成功</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div class="text-muted small">订单号</div>
+                        <strong t-out="order.name"/>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="text-muted small">支付方式</div>
+                        <strong t-out="receipt_tx.provider_id.sudo().name"/>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="text-muted small">支付交易号</div>
+                        <strong t-out="receipt_tx.provider_reference or receipt_tx.reference"/>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="text-muted small">收据编号</div>
+                        <strong t-out="receipt_tx.payment_id.name if receipt_tx.payment_id else '正在生成'"/>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="text-muted small">支付时间</div>
+                        <strong t-field="receipt_tx.last_state_change"/>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="text-muted small">实付金额</div>
+                        <strong t-field="receipt_tx.amount" t-options="{'widget': 'monetary', 'display_currency': receipt_tx.currency_id}"/>
+                    </div>
+                </div>
+                <a
+                    t-if="receipt_tx.payment_id"
+                    class="btn btn-primary mt-4"
+                    t-attf-href="/shop/payment/receipt/#{order.id}?access_token=#{order.access_token}">
+                    <i class="fa fa-download me-2"/>下载支付收据
+                </a>
+                <p t-else="" class="text-muted mt-3 mb-0">财务凭证正在生成，请稍后刷新页面。</p>
+            </div>
+        </section>
+    </template>
+
+    <template id="website_sale_confirmation_receipt" inherit_id="website_sale.confirmation">
+        <xpath expr="//t[@t-call='website_sale.payment_confirmation_status']" position="after">
+            <t t-call="stock_subwarehouse_hierarchy.website_payment_receipt"/>
+        </xpath>
+    </template>
+</odoo>

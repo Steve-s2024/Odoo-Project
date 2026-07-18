@@ -33,6 +33,72 @@ class SaleOrder(models.Model):
         copy=False,
         readonly=True,
     )
+    x_website_payment_ids = fields.Many2many(
+        "account.payment",
+        string="网站收款",
+        compute="_compute_website_payment_details",
+    )
+    x_website_payment_count = fields.Integer(
+        string="网站收款数量",
+        compute="_compute_website_payment_details",
+    )
+    x_website_payment_state = fields.Selection(
+        [
+            ("unpaid", "未支付"),
+            ("pending", "支付处理中"),
+            ("paid", "已支付"),
+            ("error", "支付失败"),
+        ],
+        string="网站支付状态",
+        compute="_compute_website_payment_details",
+    )
+    x_website_payment_reference = fields.Char(
+        string="支付交易号",
+        compute="_compute_website_payment_details",
+    )
+
+    @api.depends(
+        "transaction_ids.state",
+        "transaction_ids.provider_reference",
+        "transaction_ids.payment_id",
+    )
+    def _compute_website_payment_details(self):
+        for order in self:
+            payments = order.transaction_ids.mapped("payment_id")
+            latest_tx = order.transaction_ids.sorted("id")[-1:]
+            order.x_website_payment_ids = payments
+            order.x_website_payment_count = len(payments)
+            order.x_website_payment_reference = (
+                latest_tx.provider_reference or latest_tx.reference
+            ) if latest_tx else False
+            if order.transaction_ids.filtered(lambda tx: tx.state == "done"):
+                order.x_website_payment_state = "paid"
+            elif order.transaction_ids.filtered(lambda tx: tx.state in ("draft", "pending", "authorized")):
+                order.x_website_payment_state = "pending"
+            elif order.transaction_ids:
+                order.x_website_payment_state = "error"
+            else:
+                order.x_website_payment_state = "unpaid"
+
+    def _get_website_payment_receipt(self):
+        self.ensure_one()
+        return self.transaction_ids.filtered(
+            lambda tx: tx.state == "done" and tx.payment_id
+        ).sorted("id")[-1:].payment_id
+
+    def action_view_website_payments(self):
+        self.ensure_one()
+        action = self.env["ir.actions.actions"]._for_xml_id("account.action_account_payments")
+        payments = self.x_website_payment_ids
+        if len(payments) == 1:
+            action.update({
+                "view_mode": "form",
+                "res_id": payments.id,
+                "views": [(False, "form")],
+            })
+        else:
+            action["domain"] = [("id", "in", payments.ids)]
+        return action
 
     @api.model
     def get_import_templates(self):
