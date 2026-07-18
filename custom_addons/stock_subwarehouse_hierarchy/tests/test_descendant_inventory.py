@@ -1,4 +1,5 @@
 from io import BytesIO
+from unittest.mock import patch
 
 from odoo import Command
 from odoo.exceptions import UserError
@@ -277,6 +278,74 @@ class TestDescendantInventoryTotals(TransactionCase):
 
         with self.assertRaises(UserError):
             second_order._prepare_website_stock_for_payment()
+
+    def _create_simulated_wechat_transaction(self, order, reference):
+        provider = self.env.ref("payment_wechatpay.payment_provider_wechatpay")
+        provider.write({
+            "state": "test",
+            "wechatpay_simulation_mode": True,
+        })
+        return self.env["payment.transaction"].create({
+            "provider_id": provider.id,
+            "payment_method_id": self.env.ref("payment_wechatpay.payment_method_wechatpay").id,
+            "reference": reference,
+            "amount": order.amount_total,
+            "currency_id": order.currency_id.id,
+            "partner_id": order.partner_id.id,
+            "operation": "online_redirect",
+            "sale_order_ids": [Command.set(order.ids)],
+        })
+
+    def test_simulated_wechat_payment_confirms_stocked_website_order(self):
+        self.product_a.list_price = 120.0
+        self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
+        order, line = self._create_sale_order_line(self.product_a, 2.0)
+        order.website_id = self.env["website"].get_current_website()
+        line.x_source_location_id = False
+        order._prepare_website_stock_for_payment()
+        tx = self._create_simulated_wechat_transaction(order, "WX-WEBSITE-SUCCESS")
+        tx._wechatpay_ensure_native_order()
+
+        tx._process("wechatpay", {
+            "reference": tx.reference,
+            "out_trade_no": tx.wechatpay_out_trade_no,
+            "transaction_id": f"SIM-{tx.reference}",
+            "trade_state": "SUCCESS",
+        })
+        with patch.object(
+            self.env.registry["sale.order"],
+            "_send_order_confirmation_mail",
+            side_effect=UserError("Simulated PDF/email failure"),
+        ):
+            tx._post_process()
+
+        self.assertEqual(tx.state, "done")
+        self.assertEqual(order.state, "sale")
+        self.assertEqual(line.x_source_location_id, self.bin_a)
+        delivery_move = line.move_ids.filtered(lambda move: move.product_id == self.product_a)
+        self.assertTrue(delivery_move)
+        self.assertEqual(delivery_move[:1].location_id, self.bin_a)
+
+    def test_simulated_wechat_payment_does_not_charge_after_stock_disappears(self):
+        self.product_a.list_price = 120.0
+        self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 2.0)
+        order, line = self._create_sale_order_line(self.product_a, 2.0)
+        line.x_source_location_id = False
+        order._prepare_website_stock_for_payment()
+        tx = self._create_simulated_wechat_transaction(order, "WX-WEBSITE-NO-STOCK")
+        tx._wechatpay_ensure_native_order()
+        self.StockQuant._update_available_quantity(self.product_a, self.bin_a, -2.0)
+
+        tx._process("wechatpay", {
+            "reference": tx.reference,
+            "out_trade_no": tx.wechatpay_out_trade_no,
+            "transaction_id": f"SIM-{tx.reference}",
+            "trade_state": "SUCCESS",
+        })
+
+        self.assertEqual(tx.state, "error")
+        self.assertEqual(order.state, "draft")
+        self.assertIn("库存复核失败", tx.state_message)
 
     def test_shop_groups_published_same_name_products_by_representative(self):
         product_1, product_2, product_3 = self.env["product.template"].create([
@@ -951,6 +1020,12 @@ class TestDescendantInventoryTotals(TransactionCase):
             "attribute_name": "测试属性2号",
             "value_name": "default",
         }).action_apply()
+        self.env["product.attribute"].search([
+            ("name", "=", "测试属性"),
+        ], limit=1).sequence = -100
+        self.env["product.attribute"].search([
+            ("name", "=", "测试属性2号"),
+        ], limit=1).sequence = -99
 
         result = self.env["product.template"].load(
             [

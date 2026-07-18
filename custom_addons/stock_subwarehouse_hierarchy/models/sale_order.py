@@ -1,13 +1,16 @@
 from io import BytesIO
+import logging
 from dateutil.relativedelta import relativedelta
 from urllib.parse import urlencode
 
 from odoo import _, api, fields, models
+from odoo.addons.base.models.ir_mail_server import MailDeliveryException
 from odoo.exceptions import UserError
 from odoo.tools import float_compare
 
 
 SALE_ORDER_IMPORT_TEMPLATE_ROUTE = "/stock_subwarehouse_hierarchy/import_template/sale_order.xlsx"
+_logger = logging.getLogger(__name__)
 
 
 class SaleOrder(models.Model):
@@ -402,4 +405,21 @@ class SaleOrder(models.Model):
 
     def action_confirm(self):
         self._check_source_inventory_availability()
-        return super().action_confirm()
+        website_orders = self.filtered(
+            lambda order: order.website_id and self.env.context.get("send_email")
+        )
+        regular_orders = self - website_orders
+        result = True
+        if regular_orders:
+            result = super(SaleOrder, regular_orders).action_confirm()
+        if website_orders:
+            result = super(SaleOrder, website_orders.with_context(send_email=False)).action_confirm()
+            try:
+                with self.env.cr.savepoint():
+                    website_orders._send_order_confirmation_mail()
+            except (UserError, MailDeliveryException):
+                _logger.exception(
+                    "Website orders %s were confirmed after payment, but their confirmation email failed.",
+                    website_orders.mapped("name"),
+                )
+        return result

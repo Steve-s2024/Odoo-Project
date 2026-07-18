@@ -36,6 +36,7 @@ class WeChatPayController(Controller):
             return request.redirect("/payment/status")
 
         tx._process("wechatpay", {
+            "reference": tx.reference,
             "out_trade_no": tx.wechatpay_out_trade_no,
             "transaction_id": f"SIM-{tx.reference}",
             "trade_state": "SUCCESS",

@@ -64,6 +64,15 @@ class TestWeChatPayProvider(TransactionCase):
         })
         self.assertEqual(tx.state, "pending")
 
+        tx._process("wechatpay", {
+            "reference": tx.reference,
+            "out_trade_no": tx.wechatpay_out_trade_no,
+            "transaction_id": f"SIM-{tx.reference}",
+            "trade_state": "SUCCESS",
+        })
+        self.assertEqual(tx.state, "done")
+        self.assertEqual(tx.provider_reference, f"SIM-{tx.reference}")
+
     def test_live_mode_requires_credentials(self):
         provider = self.env.ref("payment_wechatpay.payment_provider_wechatpay")
         with self.assertRaises(ValidationError):
