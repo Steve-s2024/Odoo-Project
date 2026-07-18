@@ -76,15 +76,25 @@ class PaymentTransaction(models.Model):
 
     def _get_wechatpay_qr_data_uri(self):
         self.ensure_one()
-        if not self.wechatpay_code_url:
+        if (
+            not self.wechatpay_code_url
+            or self.provider_id.sudo().wechatpay_simulation_mode
+        ):
             return None
-        barcode = self.env["ir.actions.report"].barcode(
-            barcode_type="QR",
-            value=self.wechatpay_code_url,
-            width=256,
-            height=256,
-            quiet=False,
-        )
+        try:
+            barcode = self.env["ir.actions.report"].barcode(
+                barcode_type="QR",
+                value=self.wechatpay_code_url,
+                width=256,
+                height=256,
+                quiet=False,
+            )
+        except Exception:  # ReportLab render backends vary between Linux distributions.
+            _logger.exception(
+                "Unable to render the WeChat Pay QR code for transaction %s.",
+                self.reference,
+            )
+            return None
         return f"data:image/png;base64,{base64.b64encode(barcode).decode()}"
 
     def _extract_amount_data(self, payment_data):

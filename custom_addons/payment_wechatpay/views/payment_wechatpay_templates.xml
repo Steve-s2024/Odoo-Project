@@ -17,12 +17,21 @@
             <t t-if="tx.provider_id.sudo().code == 'wechatpay' and tx.state == 'pending' and tx.wechatpay_code_url">
                 <div class="card order-1 order-md-3 flex-shrink-0">
                     <div class="card-body d-flex flex-column align-items-center justify-content-center">
-                        <img class="mb-2 border rounded" t-att-src="tx._get_wechatpay_qr_data_uri()" alt="微信支付二维码"/>
-                        <small class="text-center">打开微信扫一扫完成支付</small>
-                        <form t-if="tx.provider_id.sudo().wechatpay_simulation_mode" t-att-action="'/payment/wechatpay/simulate_success'" method="post" class="mt-3">
-                            <input type="hidden" name="reference" t-att-value="tx.reference"/>
-                            <button type="submit" class="btn btn-primary">模拟支付成功</button>
-                        </form>
+                        <t t-if="tx.provider_id.sudo().wechatpay_simulation_mode">
+                            <p class="text-center mb-2">当前为微信支付模拟模式，不会产生真实扣款。</p>
+                            <form t-att-action="'/payment/wechatpay/simulate_success'" method="post" class="mt-2">
+                                <input type="hidden" name="reference" t-att-value="tx.reference"/>
+                                <button type="submit" class="btn btn-primary">模拟支付成功</button>
+                            </form>
+                        </t>
+                        <t t-else="">
+                            <t t-set="wechatpay_qr_data_uri" t-value="tx._get_wechatpay_qr_data_uri()"/>
+                            <img t-if="wechatpay_qr_data_uri" class="mb-2 border rounded" t-att-src="wechatpay_qr_data_uri" alt="微信支付二维码"/>
+                            <small t-if="wechatpay_qr_data_uri" class="text-center">打开微信扫一扫完成支付</small>
+                            <div t-else="" class="alert alert-warning mb-0" role="alert">
+                                二维码暂时无法显示。请联系商家或稍后重试；订单尚未扣款。
+                            </div>
+                        </t>
                     </div>
                 </div>
             </t>

@@ -32,6 +32,7 @@
         "views/website_collections_views.xml",
         "views/website_shop_group_views.xml",
         "views/website_stores_views.xml",
+        "data/website_public_access_data.xml",
     ],
     "assets": {
         "web.assets_backend": [

@@ -17,3 +17,4 @@ from . import stock_quant
 from . import stock_rule
 from . import stock_warehouse
 from . import stock_subwarehouse_inventory_total
+from . import website_page

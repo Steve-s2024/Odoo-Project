@@ -76,6 +76,34 @@ class TestDescendantInventoryTotals(TransactionCase):
 
         self.assertEqual(user.action_id.id, dashboard.id)
 
+    def test_website_pages_and_menus_are_made_public(self):
+        view = self.env["ir.ui.view"].create({
+            "name": "Private website page test",
+            "type": "qweb",
+            "key": "stock_subwarehouse_hierarchy.private_website_page_test",
+            "arch": "<t t-call='website.layout'><main>Public access test</main></t>",
+            "visibility": "connected",
+        })
+        page = self.env["website.page"].create({
+            "name": "Private website page test",
+            "url": "/private-website-page-test",
+            "view_id": view.id,
+            "is_published": False,
+        })
+        menu = self.env["website.menu"].create({
+            "name": "Private website page test",
+            "url": page.url,
+            "page_id": page.id,
+            "group_ids": [Command.set([self.env.ref("base.group_user").id])],
+        })
+
+        self.env["website.page"].action_make_all_pages_public()
+
+        self.assertTrue(page.website_published)
+        self.assertFalse(page.visibility)
+        self.assertFalse(page.group_ids)
+        self.assertFalse(menu.group_ids)
+
     def test_apply_sun_logo_updates_company_logo(self):
         expected_logo = self.env["res.company"]._get_sun_logo_binary()
 
