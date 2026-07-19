@@ -1,5 +1,6 @@
 from io import BytesIO
 import logging
+from calendar import timegm
 from dateutil.relativedelta import relativedelta
 from urllib.parse import urlencode
 
@@ -33,6 +34,14 @@ class SaleOrder(models.Model):
         copy=False,
         readonly=True,
     )
+    x_website_stock_reserved_until = fields.Datetime(
+        string="网站库存保留至",
+        compute="_compute_website_stock_reservation_expiry",
+    )
+    x_website_stock_reservation_expiry_epoch = fields.Integer(
+        string="网站库存保留到期时间戳",
+        compute="_compute_website_stock_reservation_expiry",
+    )
     x_website_payment_ids = fields.Many2many(
         "account.payment",
         string="网站收款",
@@ -56,6 +65,20 @@ class SaleOrder(models.Model):
         string="支付交易号",
         compute="_compute_website_payment_details",
     )
+
+    @api.depends("order_line.x_website_stock_reserved_until")
+    def _compute_website_stock_reservation_expiry(self):
+        for order in self:
+            expiries = [
+                expiry
+                for expiry in order.order_line.mapped("x_website_stock_reserved_until")
+                if expiry
+            ]
+            expiry = max(expiries) if expiries else False
+            order.x_website_stock_reserved_until = expiry
+            order.x_website_stock_reservation_expiry_epoch = (
+                timegm(expiry.timetuple()) * 1000 if expiry else 0
+            )
 
     @api.depends(
         "transaction_ids.state",
@@ -99,6 +122,26 @@ class SaleOrder(models.Model):
         else:
             action["domain"] = [("id", "in", payments.ids)]
         return action
+
+    def action_refund_website_payment(self):
+        self.ensure_one()
+        payment = self._get_website_payment_receipt()
+        if not payment:
+            raise UserError(_("该网站订单没有可退款的已完成支付。"))
+        transaction = payment.payment_transaction_id
+        if transaction.provider_code != "wechatpay":
+            raise UserError(_("该网站订单的支付方式暂不支持从此处退款。"))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("微信退款"),
+            "res_model": "stock.subwarehouse.website.payment.refund.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_order_id": self.id,
+                "default_transaction_id": transaction.id,
+            },
+        }
 
     @api.model
     def get_import_templates(self):

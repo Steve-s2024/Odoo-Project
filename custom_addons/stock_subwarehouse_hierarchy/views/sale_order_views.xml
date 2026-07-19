@@ -15,6 +15,14 @@
                     groups="account.group_account_invoice">
                     <field name="x_website_payment_count" widget="statinfo" string="网站收款"/>
                 </button>
+                <button
+                    name="action_refund_website_payment"
+                    type="object"
+                    string="微信退款"
+                    class="oe_stat_button"
+                    icon="fa-undo"
+                    invisible="x_website_payment_state != 'paid' or x_website_payment_count != 1"
+                    groups="account.group_account_invoice"/>
             </xpath>
             <xpath expr="//sheet//field[@name='user_id']" position="after">
                 <field name="x_platform"/>
@@ -23,6 +31,7 @@
                 <field name="x_finance_remark"/>
                 <field name="x_website_payment_state" readonly="1" invisible="not website_id"/>
                 <field name="x_website_payment_reference" readonly="1" invisible="not website_id"/>
+                <field name="x_website_stock_reserved_until" readonly="1" invisible="not website_id or state not in ['draft', 'sent']"/>
             </xpath>
             <xpath expr="//field[@name='order_line']//form//field[@name='product_id']" position="after">
                 <field name="x_product_default_code" readonly="1"/>

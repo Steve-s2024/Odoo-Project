@@ -304,6 +304,8 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(line.x_source_location_id, self.bin_b)
         self.assertTrue(line.x_website_stock_reserved_until)
         self.assertTrue(order.x_website_stock_reserved_at)
+        self.assertEqual(order.x_website_stock_reserved_until, line.x_website_stock_reserved_until)
+        self.assertGreater(order.x_website_stock_reservation_expiry_epoch, 0)
 
     def test_website_payment_hold_blocks_second_quotation(self):
         self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
@@ -377,6 +379,25 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertIn("支付收据", receipt_html)
         self.assertIn(tx.payment_id.name, receipt_html)
         self.assertIn(f"/shop/payment/receipt/{order.id}", receipt_html)
+        report_html, _report_type = self.env["ir.actions.report"]._render_qweb_html(
+            "stock_subwarehouse_hierarchy.action_report_website_payment_receipt",
+            tx.payment_id.ids,
+        )
+        report_html = report_html.decode()
+        self.assertIn(order.name, report_html)
+        self.assertIn(self.product_a.display_name, report_html)
+        self.assertIn("not a tax invoice", report_html)
+
+        refund_wizard = self.env["stock.subwarehouse.website.payment.refund.wizard"].create({
+            "order_id": order.id,
+            "transaction_id": tx.id,
+            "amount_to_refund": tx.amount,
+        })
+        refund_wizard.action_submit_refund()
+        refund_tx = tx.child_transaction_ids.filtered(lambda child: child.operation == "refund")
+        self.assertEqual(refund_tx.state, "done")
+        self.assertTrue(refund_tx.wechatpay_out_refund_no)
+        self.assertTrue(refund_tx.provider_reference.startswith("SIM-"))
         self.assertEqual(line.x_source_location_id, self.bin_a)
         delivery_move = line.move_ids.filtered(lambda move: move.product_id == self.product_a)
         self.assertTrue(delivery_move)

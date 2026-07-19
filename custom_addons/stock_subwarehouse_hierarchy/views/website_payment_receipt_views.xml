@@ -1,46 +1,104 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <record id="action_report_website_payment_receipt" model="ir.actions.report">
+        <field name="name">网站支付收据</field>
+        <field name="model">account.payment</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">stock_subwarehouse_hierarchy.report_website_payment_receipt</field>
+        <field name="report_file">stock_subwarehouse_hierarchy.report_website_payment_receipt</field>
+    </record>
+
+    <template id="report_website_payment_receipt">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="payment">
+                <t t-set="tx" t-value="payment.payment_transaction_id"/>
+                <t t-set="order" t-value="tx.sale_order_ids[:1]"/>
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div class="d-flex justify-content-between align-items-start mb-4">
+                            <div>
+                                <h2 class="mb-1">支付收据</h2>
+                                <p class="text-muted mb-0">Payment Receipt</p>
+                            </div>
+                            <div class="text-end">
+                                <strong t-out="payment.name"/>
+                                <div class="text-muted" t-field="payment.date"/>
+                            </div>
+                        </div>
+                        <div class="row mb-4">
+                            <div class="col-6">
+                                <strong>客户</strong>
+                                <div t-out="payment.partner_id.name"/>
+                                <div t-if="payment.partner_id.email" t-out="payment.partner_id.email"/>
+                                <div t-if="payment.partner_id.phone" t-out="payment.partner_id.phone"/>
+                            </div>
+                            <div class="col-6 text-end">
+                                <strong>支付信息</strong>
+                                <div>订单号：<span t-out="order.name if order else '-'"/></div>
+                                <div>支付方式：<span t-out="tx.provider_id.name if tx else '-'"/></div>
+                                <div>微信交易号：<span t-out="tx.provider_reference if tx else '-'"/></div>
+                            </div>
+                        </div>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>商品</th>
+                                    <th class="text-end">数量</th>
+                                    <th class="text-end">单价</th>
+                                    <th class="text-end">金额</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="order">
+                                    <tr t-foreach="order.order_line" t-as="line" t-if="not line.display_type">
+                                        <td t-out="line.name"/>
+                                        <td class="text-end" t-out="line.product_uom_qty"/>
+                                        <td class="text-end"><span t-field="line.price_unit" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></td>
+                                        <td class="text-end"><span t-field="line.price_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>实收金额</strong></td>
+                                    <td class="text-end"><strong t-field="payment.amount" t-options="{'widget': 'monetary', 'display_currency': payment.currency_id}"/></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <div class="mt-4 pt-3 border-top text-muted small">
+                            本收据用于证明支付已完成，不作为增值税发票使用。<br/>
+                            This receipt confirms payment only and is not a tax invoice.
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
     <template id="website_payment_receipt" name="Website Payment Receipt">
-        <t t-set="receipt_tx" t-value="order.get_portal_last_transaction()"/>
-        <section t-if="receipt_tx and receipt_tx.state == 'done'" class="card mt-3" id="website_payment_receipt">
+        <t t-set="receipt_payment" t-value="order._get_website_payment_receipt()"/>
+        <t t-set="receipt_tx" t-value="receipt_payment.payment_transaction_id if receipt_payment else False"/>
+        <section t-if="receipt_payment" class="card mt-3" id="website_payment_receipt">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h4 class="mb-0">支付收据</h4>
+                <div>
+                    <h4 class="mb-0">支付收据</h4>
+                    <small class="text-muted">Payment Receipt</small>
+                </div>
                 <span class="badge text-bg-success">支付成功</span>
             </div>
             <div class="card-body">
                 <div class="row g-3">
-                    <div class="col-sm-6">
-                        <div class="text-muted small">订单号</div>
-                        <strong t-out="order.name"/>
-                    </div>
-                    <div class="col-sm-6">
-                        <div class="text-muted small">支付方式</div>
-                        <strong t-out="receipt_tx.provider_id.sudo().name"/>
-                    </div>
-                    <div class="col-sm-6">
-                        <div class="text-muted small">支付交易号</div>
-                        <strong t-out="receipt_tx.provider_reference or receipt_tx.reference"/>
-                    </div>
-                    <div class="col-sm-6">
-                        <div class="text-muted small">收据编号</div>
-                        <strong t-out="receipt_tx.payment_id.name if receipt_tx.payment_id else '正在生成'"/>
-                    </div>
-                    <div class="col-sm-6">
-                        <div class="text-muted small">支付时间</div>
-                        <strong t-field="receipt_tx.last_state_change"/>
-                    </div>
-                    <div class="col-sm-6">
-                        <div class="text-muted small">实付金额</div>
-                        <strong t-field="receipt_tx.amount" t-options="{'widget': 'monetary', 'display_currency': receipt_tx.currency_id}"/>
-                    </div>
+                    <div class="col-sm-6"><span class="text-muted small d-block">订单号</span><strong t-out="order.name"/></div>
+                    <div class="col-sm-6"><span class="text-muted small d-block">收据编号</span><strong t-out="receipt_payment.name"/></div>
+                    <div class="col-sm-6"><span class="text-muted small d-block">支付方式</span><strong t-out="receipt_tx.provider_id.name if receipt_tx else '-'"/></div>
+                    <div class="col-sm-6"><span class="text-muted small d-block">微信交易号</span><strong t-out="receipt_tx.provider_reference if receipt_tx else '-'"/></div>
+                    <div class="col-sm-6"><span class="text-muted small d-block">支付时间</span><strong t-field="receipt_payment.date"/></div>
+                    <div class="col-sm-6"><span class="text-muted small d-block">实付金额</span><strong t-field="receipt_payment.amount" t-options="{'widget': 'monetary', 'display_currency': receipt_payment.currency_id}"/></div>
                 </div>
-                <a
-                    t-if="receipt_tx.payment_id"
-                    class="btn btn-primary mt-4"
-                    t-attf-href="/shop/payment/receipt/#{order.id}?access_token=#{order.access_token}">
-                    <i class="fa fa-download me-2"/>下载支付收据
+                <a class="btn btn-primary mt-4" t-attf-href="/shop/payment/receipt/#{order.id}?access_token=#{order.access_token}">
+                    <i class="fa fa-download me-2"/>下载支付收据 PDF
                 </a>
-                <p t-else="" class="text-muted mt-3 mb-0">财务凭证正在生成，请稍后刷新页面。</p>
+                <p class="text-muted small mt-3 mb-0">支付收据不作为增值税发票使用。</p>
             </div>
         </section>
     </template>
@@ -48,6 +106,44 @@
     <template id="website_sale_confirmation_receipt" inherit_id="website_sale.confirmation">
         <xpath expr="//t[@t-call='website_sale.payment_confirmation_status']" position="after">
             <t t-call="stock_subwarehouse_hierarchy.website_payment_receipt"/>
+        </xpath>
+    </template>
+
+    <template id="website_sale_payment_stock_hold" inherit_id="website_sale.payment">
+        <xpath expr="//div[@id='payment_method']" position="before">
+            <t t-if="website_sale_order.x_website_stock_reservation_expiry_epoch">
+                <section class="alert alert-info d-flex align-items-center justify-content-between gap-3" id="x_website_stock_hold" t-att-data-expiry-epoch="website_sale_order.x_website_stock_reservation_expiry_epoch">
+                    <div>
+                        <strong>库存已为您保留</strong>
+                        <span class="ms-2 text-muted">请在 <strong class="x_stock_hold_timer">15:00</strong> 内完成支付。</span>
+                    </div>
+                    <a class="btn btn-outline-secondary btn-sm" href="/shop/payment">刷新库存保留</a>
+                </section>
+                <script type="text/javascript">
+                    <![CDATA[
+                    (function () {
+                        const hold = document.getElementById("x_website_stock_hold");
+                        if (!hold) return;
+                        const expiry = Number(hold.dataset.expiryEpoch || 0);
+                        const timer = hold.querySelector(".x_stock_hold_timer");
+                        const refresh = function () {
+                            const seconds = Math.max(0, Math.ceil((expiry - Date.now()) / 1000));
+                            const minutes = Math.floor(seconds / 60);
+                            const remainder = String(seconds % 60).padStart(2, "0");
+                            timer.textContent = `${minutes}:${remainder}`;
+                            if (!seconds) {
+                                hold.classList.remove("alert-info");
+                                hold.classList.add("alert-warning");
+                                timer.textContent = "已到期，请刷新库存保留";
+                                return;
+                            }
+                            window.setTimeout(refresh, 1000);
+                        };
+                        refresh();
+                    })();
+                    ]]>
+                </script>
+            </t>
         </xpath>
     </template>
 </odoo>

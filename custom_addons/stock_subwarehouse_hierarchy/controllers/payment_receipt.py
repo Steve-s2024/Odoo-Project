@@ -19,7 +19,7 @@ class WebsitePaymentReceipt(CustomerPortal):
             raise NotFound()
 
         pdf, _report_type = request.env["ir.actions.report"].sudo()._render_qweb_pdf(
-            "account.action_report_payment_receipt",
+            "stock_subwarehouse_hierarchy.action_report_website_payment_receipt",
             res_ids=payment.ids,
         )
         filename = f"payment-receipt-{payment.name}.pdf"

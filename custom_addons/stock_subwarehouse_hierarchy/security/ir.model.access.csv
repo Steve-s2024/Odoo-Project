@@ -4,3 +4,4 @@ access_product_attribute_remove_wizard,stock.subwarehouse.product.attribute.remo
 access_website_video_upload_wizard,stock.subwarehouse.website.video.upload.wizard,model_stock_subwarehouse_website_video_upload_wizard,base.group_user,1,1,1,1
 access_product_template_custom_attribute_value,product.template.custom.attribute.value,model_product_template_custom_attribute_value,base.group_user,1,1,1,1
 access_stock_subwarehouse_inventory_total,stock.subwarehouse.inventory.total,model_stock_subwarehouse_inventory_total,stock.group_stock_user,1,1,1,1
+access_website_payment_refund_wizard,stock.subwarehouse.website.payment.refund.wizard,model_stock_subwarehouse_website_payment_refund_wizard,account.group_account_invoice,1,1,1,1

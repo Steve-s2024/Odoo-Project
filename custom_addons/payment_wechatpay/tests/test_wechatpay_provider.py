@@ -11,6 +11,7 @@ class TestWeChatPayProvider(TransactionCase):
         self.assertEqual(provider.code, "wechatpay")
         self.assertIn("wechatpay", provider._get_default_payment_method_codes())
         self.assertEqual(provider._get_supported_currencies().mapped("name"), ["CNY"])
+        self.assertEqual(provider.support_refund, "partial")
 
     def test_qr_data_uri_uses_code_url(self):
         provider = self.env.ref("payment_wechatpay.payment_provider_wechatpay")

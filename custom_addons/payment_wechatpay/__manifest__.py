@@ -3,7 +3,7 @@
     "version": "19.0.1.0.0",
     "category": "Accounting/Payment Providers",
     "summary": "Accept WeChat Pay Native QR payments in Odoo.",
-    "depends": ["payment"],
+    "depends": ["payment", "account_payment"],
     "data": [
         "views/payment_wechatpay_templates.xml",
         "views/payment_provider_views.xml",

@@ -58,7 +58,7 @@ class PaymentProvider(models.Model):
         self.filtered(lambda p: p.code == "wechatpay").update({
             "support_express_checkout": False,
             "support_manual_capture": None,
-            "support_refund": "none",
+            "support_refund": "partial",
             "support_tokenization": False,
         })
 

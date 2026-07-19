@@ -83,3 +83,41 @@ class WeChatPayController(Controller):
             return request.make_json_response({"code": "FAIL", "message": "失败"}, status=500)
 
         return request.make_json_response({"code": "SUCCESS", "message": "成功"})
+
+    @route(const.REFUND_NOTIFY_ROUTE, type="http", auth="public", methods=["POST"], csrf=False)
+    def wechatpay_refund_notify(self, **kwargs):
+        body = request.httprequest.get_data(as_text=True)
+        headers = request.httprequest.headers
+        serial_no = headers.get("Wechatpay-Serial")
+        timestamp = headers.get("Wechatpay-Timestamp")
+        nonce = headers.get("Wechatpay-Nonce")
+        signature = headers.get("Wechatpay-Signature")
+
+        try:
+            notification = json.loads(body)
+            provider = request.env["payment.provider"].sudo().search([
+                ("code", "=", "wechatpay"),
+                ("state", "in", ["enabled", "test"]),
+                ("wechatpay_platform_serial_no", "=", serial_no),
+            ], limit=1)
+            if not provider:
+                raise ValidationError(_("找不到匹配的微信支付提供商。"))
+            provider._wechatpay_verify_notification_signature(
+                timestamp, nonce, body, signature, serial_no
+            )
+            refund_data = provider._wechatpay_decrypt_notification_resource(notification["resource"])
+            tx = request.env["payment.transaction"].sudo().search([
+                ("provider_code", "=", "wechatpay"),
+                ("operation", "=", "refund"),
+                ("wechatpay_out_refund_no", "=", refund_data.get("out_refund_no")),
+            ], limit=1)
+            if not tx:
+                raise ValidationError(_("找不到对应的 Odoo 微信退款交易。"))
+            tx._process("wechatpay", refund_data)
+            if tx.state == "done" and not tx.is_post_processed:
+                tx._post_process()
+        except Exception:
+            _logger.exception("微信支付退款回调处理失败。")
+            return request.make_json_response({"code": "FAIL", "message": "失败"}, status=500)
+
+        return request.make_json_response({"code": "SUCCESS", "message": "成功"})

@@ -15,6 +15,7 @@ class PaymentTransaction(models.Model):
 
     wechatpay_code_url = fields.Char(string="微信支付二维码链接", readonly=True)
     wechatpay_out_trade_no = fields.Char(string="微信支付商户订单号", readonly=True, copy=False)
+    wechatpay_out_refund_no = fields.Char(string="微信支付商户退款单号", readonly=True, copy=False)
 
     def _get_specific_rendering_values(self, processing_values):
         if self.provider_code != "wechatpay":
@@ -100,11 +101,36 @@ class PaymentTransaction(models.Model):
     def _extract_amount_data(self, payment_data):
         if self.provider_code != "wechatpay":
             return super()._extract_amount_data(payment_data)
-        return None
+        amount_data = payment_data.get("amount")
+        if not amount_data:
+            return None
+        amount_key = "refund" if self.operation == "refund" else "total"
+        amount = amount_data.get(amount_key)
+        currency_code = amount_data.get("currency")
+        if amount is None or not currency_code:
+            return None
+        return {
+            # Odoo negates refund callback amounts during validation because refund
+            # transactions are stored as negative amounts internally.
+            "amount": amount / 100,
+            "currency_code": currency_code,
+            "precision_digits": 2,
+        }
 
     def _apply_updates(self, payment_data):
         if self.provider_code != "wechatpay":
             return super()._apply_updates(payment_data)
+
+        if self.operation == "refund":
+            self.provider_reference = payment_data.get("refund_id") or payment_data.get("out_refund_no")
+            refund_status = payment_data.get("refund_status") or payment_data.get("status")
+            if refund_status == "SUCCESS":
+                self._set_done()
+            elif refund_status in ("CLOSED", "ABNORMAL"):
+                self._set_error(_("微信支付退款未成功：%s") % refund_status)
+            else:
+                self._set_pending()
+            return
 
         self.provider_reference = payment_data.get("transaction_id") or payment_data.get("out_trade_no")
         trade_state = payment_data.get("trade_state")
@@ -115,3 +141,52 @@ class PaymentTransaction(models.Model):
             self._set_canceled()
         else:
             self._set_pending()
+
+    def _send_refund_request(self):
+        if self.provider_code != "wechatpay":
+            return super()._send_refund_request()
+
+        self.ensure_one()
+        source_tx = self.source_transaction_id
+        if not source_tx or not source_tx.provider_reference:
+            raise ValidationError(_("找不到原微信支付交易号，无法发起退款。"))
+
+        out_refund_no = self.wechatpay_out_refund_no or f"ODOOREF{self.id}"
+        self.wechatpay_out_refund_no = out_refund_no
+        if self.provider_id.sudo().wechatpay_simulation_mode:
+            self._process("wechatpay", {
+                "out_refund_no": out_refund_no,
+                "refund_id": f"SIM-{out_refund_no}",
+                "refund_status": "SUCCESS",
+                "amount": {
+                    "refund": int(round(-self.amount * 100)),
+                    "currency": self.currency_id.name,
+                },
+            })
+            self._post_process()
+            return
+
+        payload = {
+            "transaction_id": source_tx.provider_reference,
+            "out_refund_no": out_refund_no,
+            "reason": f"Odoo refund {source_tx.reference}"[:80],
+            "notify_url": f"{self.provider_id.get_base_url().rstrip('/')}{const.REFUND_NOTIFY_ROUTE}",
+            "amount": {
+                "refund": int(round(-self.amount * 100)),
+                "total": int(round(source_tx.amount * 100)),
+                "currency": self.currency_id.name,
+            },
+        }
+        response = self.provider_id._send_api_request(
+            "POST",
+            const.REFUND_ENDPOINT,
+            data=json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+            reference=self.reference,
+        )
+        self._process("wechatpay", {
+            **response,
+            "out_refund_no": out_refund_no,
+            "refund_status": response.get("status"),
+        })
+        if self.state == "done":
+            self._post_process()
