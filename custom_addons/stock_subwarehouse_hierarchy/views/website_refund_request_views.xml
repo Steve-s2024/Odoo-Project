@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_website_refund_request_tree" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.website.refund.request.list</field>
+        <field name="model">stock.subwarehouse.website.refund.request</field>
+        <field name="arch" type="xml">
+            <list create="0" delete="0">
+                <field name="name"/>
+                <field name="order_id"/>
+                <field name="partner_id"/>
+                <field name="amount_total" widget="monetary"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state"/>
+                <field name="create_date"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_website_refund_request_form" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.website.refund.request.form</field>
+        <field name="model">stock.subwarehouse.website.refund.request</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_submit_wechat_refund" type="object" string="通过并提交微信退款" class="btn-primary" invisible="state != 'requested'"/>
+                    <button name="action_reject" type="object" string="拒绝" invisible="state != 'requested'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="requested,processing,refunded,failed,rejected"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="order_id"/>
+                        <field name="partner_id"/>
+                        <field name="source_transaction_id"/>
+                        <field name="refund_transaction_id"/>
+                        <field name="currency_id" invisible="1"/>
+                        <field name="amount_total" widget="monetary"/>
+                    </group>
+                    <field name="line_ids" readonly="1">
+                        <list create="0" delete="0">
+                            <field name="sale_line_id"/>
+                            <field name="quantity"/>
+                            <field name="amount" widget="monetary"/>
+                            <field name="currency_id" column_invisible="True"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_website_refund_requests" model="ir.actions.act_window">
+        <field name="name">网站退款申请</field>
+        <field name="res_model">stock.subwarehouse.website.refund.request</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

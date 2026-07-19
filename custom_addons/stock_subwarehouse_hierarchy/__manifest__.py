@@ -35,6 +35,7 @@
         "views/website_stores_views.xml",
         "views/website_payment_receipt_views.xml",
         "views/website_payment_refund_views.xml",
+        "views/website_refund_request_views.xml",
         "views/website_purchase_history_views.xml",
         "data/website_public_access_data.xml",
     ],

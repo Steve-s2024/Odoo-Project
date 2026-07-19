@@ -43,7 +43,7 @@
                                 <div class="x_purchase_meta"><span t-field="order.date_order"/></div>
                             </div>
                             <div><span class="x_purchase_status" t-out="purchase_status(order, is_english)"/></div>
-                            <div class="x_purchase_amount" t-field="order.amount_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/>
+                            <div class="x_purchase_amount"><span t-field="order.amount_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
                             <div class="x_purchase_arrow" aria-hidden="true">&#8594;</div>
                         </a>
                     </t>
@@ -91,27 +91,72 @@
                                 <div t-foreach="order.order_line" t-as="line" t-if="not line.display_type" class="x_purchase_line">
                                     <div class="x_purchase_line_name" t-out="line.name"/>
                                     <div class="x_purchase_line_qty"><t t-out="line.product_uom_qty"/> × <span t-field="line.price_unit" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
-                                    <div class="x_purchase_line_total" t-field="line.price_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/>
+                                    <div class="x_purchase_line_total"><span t-field="line.price_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
                                 </div>
                             </div>
                         </section>
                         <aside class="x_purchase_summary">
                             <dl>
-                                <dt t-out="'Order date' if is_english else '下单时间'"/><dd t-field="order.date_order"/>
+                                <dt t-out="'Order date' if is_english else '下单时间'"/><dd><span t-field="order.date_order"/></dd>
                                 <dt t-out="'Customer' if is_english else '客户'"/><dd t-out="order.partner_id.name"/>
                                 <dt t-out="'Payment status' if is_english else '支付状态'"/><dd t-out="order.x_website_payment_state"/>
                                 <dt t-out="'Payment reference' if is_english else '支付交易号'"/><dd t-out="order.x_website_payment_reference or '-'"/>
                             </dl>
                             <dl class="x_purchase_total">
-                                <dt t-out="'Total paid' if is_english else '订单总额'"/><dd t-field="order.amount_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/>
+                                <dt t-out="'Total paid' if is_english else '订单总额'"/><dd><span t-field="order.amount_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></dd>
                             </dl>
                             <t t-if="order._get_website_payment_receipt()">
                                 <a class="btn btn-dark x_purchase_receipt" t-attf-href="/shop/payment/receipt/#{order.id}?access_token=#{order.access_token}">
                                     <t t-out="'Download payment receipt' if is_english else '下载支付收据'"/>
                                 </a>
                             </t>
+                            <a class="btn btn-outline-dark x_purchase_receipt" t-attf-href="/refund-item/#{order.id}">
+                                <t t-out="'Request a refund' if is_english else '申请退款'"/>
+                            </a>
                         </aside>
                     </div>
+                    <section class="mt-5" t-if="refund_requests or refund_transactions">
+                        <h2 class="h4 mb-3" t-out="'Refund history' if is_english else '退款记录'"/>
+                        <div class="x_purchase_lines">
+                            <div t-foreach="refund_requests" t-as="refund_request" class="x_purchase_line">
+                                <div class="x_purchase_line_name"><t t-out="refund_request.name"/></div>
+                                <div class="x_purchase_line_qty"><t t-out="refund_request.state"/></div>
+                                <div class="x_purchase_line_total"><span t-field="refund_request.amount_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
+                            </div>
+                        </div>
+                    </section>
+                </section>
+            </main>
+        </t>
+    </template>
+
+    <template id="refund_item_page" name="SUN Refund Item Page">
+        <t t-call="website.layout">
+            <main id="wrap" class="x_purchase_page">
+                <style>
+                    .x_refund_form { padding: 52px 0 76px; max-width: 860px; }
+                    .x_refund_form h1 { margin: 24px 0 8px; font-size: clamp(2rem, 4vw, 3.5rem); font-weight: 900; }
+                    .x_refund_form p { color: #666; }
+                    .x_refund_table { margin-top: 28px; border-top: 2px solid #111; }
+                    .x_refund_row { display: grid; grid-template-columns: minmax(0, 1fr) 110px 120px; gap: 18px; padding: 18px 0; border-bottom: 1px solid #dedede; align-items: center; }
+                    .x_refund_row input { width: 100%; padding: 9px; border: 1px solid #aaa; }
+                    .x_refund_submit { margin-top: 26px; min-height: 46px; padding: 0 22px; font-weight: 900; }
+                </style>
+                <section class="x_purchase_inner x_refund_form">
+                    <a class="x_purchase_back" t-attf-href="/purchase-detail/#{order.id}">&#8592; <t t-out="'Purchase details' if is_english else '购买详情'"/></a>
+                    <h1 t-out="'Request a refund' if is_english else '申请退款'"/>
+                    <p t-out="'Select the purchased items and quantities you want reviewed for refund. Refunds are processed after approval.' if is_english else '选择需要申请退款的商品与数量。审核通过后，将通过微信支付原路退款。'"/>
+                    <form t-attf-action="/refund-item/#{order.id}/submit" method="post">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <div class="x_refund_table">
+                            <div t-foreach="order.order_line" t-as="line" t-if="not line.display_type" class="x_refund_row">
+                                <div><strong t-out="line.name"/><small class="d-block text-muted"><t t-out="'Purchased quantity: ' if is_english else '购买数量：'"/><t t-out="line.product_uom_qty"/></small></div>
+                                <div><span t-field="line.price_unit" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
+                                <input type="number" min="0" t-att-max="line.product_uom_qty" step="0.01" value="0" t-attf-name="quantity_#{line.id}" aria-label="Refund quantity"/>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-dark x_refund_submit" t-out="'Submit refund request' if is_english else '提交退款申请'"/>
+                    </form>
                 </section>
             </main>
         </t>

@@ -65,6 +65,17 @@ class SaleOrder(models.Model):
         string="支付交易号",
         compute="_compute_website_payment_details",
     )
+    x_website_refund_request_ids = fields.One2many(
+        "stock.subwarehouse.website.refund.request", "order_id", string="网站退款申请"
+    )
+    x_website_refund_request_count = fields.Integer(
+        compute="_compute_website_refund_request_count", string="退款申请数量"
+    )
+
+    @api.depends("x_website_refund_request_ids")
+    def _compute_website_refund_request_count(self):
+        for order in self:
+            order.x_website_refund_request_count = len(order.x_website_refund_request_ids)
 
     @api.depends("order_line.x_website_stock_reserved_until")
     def _compute_website_stock_reservation_expiry(self):
@@ -121,6 +132,14 @@ class SaleOrder(models.Model):
             })
         else:
             action["domain"] = [("id", "in", payments.ids)]
+        return action
+
+    def action_view_website_refund_requests(self):
+        self.ensure_one()
+        action = self.env["ir.actions.actions"]._for_xml_id(
+            "stock_subwarehouse_hierarchy.action_website_refund_requests"
+        )
+        action["domain"] = [("order_id", "=", self.id)]
         return action
 
     def action_refund_website_payment(self):

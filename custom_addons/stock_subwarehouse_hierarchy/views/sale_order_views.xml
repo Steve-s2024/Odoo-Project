@@ -23,6 +23,9 @@
                     icon="fa-undo"
                     invisible="x_website_payment_state != 'paid' or x_website_payment_count != 1"
                     groups="account.group_account_invoice"/>
+                <button name="action_view_website_refund_requests" type="object" class="oe_stat_button" icon="fa-undo" invisible="x_website_refund_request_count == 0" groups="account.group_account_invoice">
+                    <field name="x_website_refund_request_count" widget="statinfo" string="退款申请"/>
+                </button>
             </xpath>
             <xpath expr="//sheet//field[@name='user_id']" position="after">
                 <field name="x_platform"/>
