@@ -40,7 +40,7 @@
                         <a t-foreach="orders" t-as="order" t-attf-href="/purchase-detail/#{order.id}" class="x_purchase_item">
                             <div>
                                 <div class="x_purchase_number" t-out="order.name"/>
-                                <div class="x_purchase_meta"><t t-field="order.date_order"/></div>
+                                <div class="x_purchase_meta"><span t-field="order.date_order"/></div>
                             </div>
                             <div><span class="x_purchase_status" t-out="purchase_status(order, is_english)"/></div>
                             <div class="x_purchase_amount" t-field="order.amount_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/>
