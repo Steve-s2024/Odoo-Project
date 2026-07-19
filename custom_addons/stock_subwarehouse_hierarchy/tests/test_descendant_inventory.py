@@ -5,6 +5,8 @@ from odoo import Command
 from odoo.exceptions import UserError
 from odoo.tests import TransactionCase, tagged
 
+from odoo.addons.stock_subwarehouse_hierarchy.controllers.website import _amap_search_url
+
 
 @tagged("post_install", "-at_install")
 class TestDescendantInventoryTotals(TransactionCase):
@@ -65,6 +67,14 @@ class TestDescendantInventoryTotals(TransactionCase):
                 ("location_id.usage", "=", "internal"),
             ]).mapped("location_id").ids,
         )
+
+    def test_store_map_url_opens_amap_search(self):
+        map_url = _amap_search_url("SUN Beijing Flagship Store Test Address")
+
+        self.assertTrue(map_url.startswith("https://uri.amap.com/search?"))
+        self.assertIn("keyword=SUN+Beijing+Flagship+Store+Test+Address", map_url)
+        self.assertIn("view=map", map_url)
+        self.assertIn("callnative=1", map_url)
 
     def test_webclient_bootstrap_uses_dashboard_home_instead_of_discuss(self):
         user = self.env.user.sudo()

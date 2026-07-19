@@ -189,7 +189,11 @@
                             </p>
                             <div class="x_store_actions">
                                 <a class="x_store_action" t-att-href="'tel:%s' % store['phone']" t-out="'Call' if is_english else '拨打电话'"/>
-                                <a class="x_store_action x_store_action_secondary" href="#wrap" t-out="'View Map' if is_english else '查看地图'"/>
+                                <a class="x_store_action x_store_action_secondary"
+                                   t-att-href="store['map_url']"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   t-out="'View Map' if is_english else '查看地图'"/>
                             </div>
                         </div>
                     </article>

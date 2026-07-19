@@ -1,5 +1,16 @@
+from urllib.parse import urlencode
+
 from odoo import http
 from odoo.http import request, route
+
+
+def _amap_search_url(keyword):
+    return "https://uri.amap.com/search?%s" % urlencode({
+        "keyword": keyword,
+        "view": "map",
+        "src": "sun-odoo",
+        "callnative": 1,
+    })
 
 
 class StockSubwarehouseWebsite(http.Controller):
@@ -58,6 +69,13 @@ class StockSubwarehouseWebsite(http.Controller):
             },
         ]
         is_english = request.lang and request.lang.code == "en_US"
+        for store in stores:
+            store["map_url"] = _amap_search_url(
+                "%s %s" % (
+                    store["english_name"] if is_english else store["name"],
+                    store["english_address"] if is_english else store["address"],
+                )
+            )
         return request.render(
             "stock_subwarehouse_hierarchy.stores_page",
             {
