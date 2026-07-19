@@ -14,7 +14,7 @@
             <main id="wrap" class="x_purchase_page">
                 <style>
                     .x_purchase_page { background: #fff; color: #111; min-height: 68vh; }
-                    .x_purchase_inner { width: min(1120px, calc(100% - 96px)); margin: 0 auto; }
+                    .x_purchase_inner { box-sizing: border-box; width: 100%; margin: 0; padding-left: clamp(24px, 6vw, 96px); padding-right: clamp(24px, 6vw, 96px); }
                     .x_purchase_header { padding: 68px 0 30px; border-bottom: 1px solid #dedede; }
                     .x_purchase_header h1 { margin: 0; font-size: clamp(2.2rem, 5vw, 4rem); font-weight: 900; letter-spacing: 0; }
                     .x_purchase_header p { margin: 12px 0 0; color: #666; }
@@ -27,7 +27,7 @@
                     .x_purchase_amount { font-weight: 900; text-align: right; }
                     .x_purchase_arrow { font-size: 1.35rem; }
                     .x_purchase_empty { padding: 52px 0; color: #666; text-align: center; }
-                    @media (max-width: 680px) { .x_purchase_inner { width: min(1120px, calc(100% - 32px)); } .x_purchase_item { grid-template-columns: 1fr auto; } .x_purchase_status, .x_purchase_amount { text-align: left; } }
+                    @media (max-width: 680px) { .x_purchase_inner { padding-left: 16px; padding-right: 16px; } .x_purchase_item { grid-template-columns: 1fr auto; } .x_purchase_status, .x_purchase_amount { text-align: left; } }
                 </style>
                 <section class="x_purchase_header">
                     <div class="x_purchase_inner">
@@ -36,6 +36,7 @@
                     </div>
                 </section>
                 <section class="x_purchase_inner x_purchase_list">
+                    <div id="oe_structure_purchase_history_top" class="oe_structure oe_empty"/>
                     <t t-if="orders">
                         <a t-foreach="orders" t-as="order" t-attf-href="/purchase-detail/#{order.id}" class="x_purchase_item">
                             <div>
@@ -48,6 +49,7 @@
                         </a>
                     </t>
                     <p t-else="" class="x_purchase_empty" t-out="'There are no purchases yet.' if is_english else '暂无购买记录。'"/>
+                    <div id="oe_structure_purchase_history_bottom" class="oe_structure oe_empty"/>
                 </section>
             </main>
         </t>
