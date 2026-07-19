@@ -45,6 +45,15 @@ class WebsitePurchaseHistory(CustomerPortal):
             return "Processing" if is_english else "处理中"
         return "Completed" if is_english else "已完成"
 
+    @staticmethod
+    def _customer_line_name(line):
+        """Do not expose an internal SKU if older order lines contain it in their label."""
+        name = line.name or line.product_id.name or ""
+        code = line.product_id.default_code
+        if code:
+            name = name.replace(f"[{code}]", "").replace(code, "")
+        return name.strip(" -") or line.product_id.name
+
     def _get_customer_order(self, order_id):
         orders = request.env["sale.order"].sudo().search(
             [("id", "=", order_id), *self._purchase_domain()], limit=1
@@ -102,6 +111,7 @@ class WebsitePurchaseHistory(CustomerPortal):
             ),
             "is_english": is_english,
             "purchase_status": self._purchase_status(order, is_english),
+            "customer_line_name": self._customer_line_name,
             "additional_title": "Purchase Details" if is_english else "购买详情",
         })
 

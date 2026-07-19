@@ -14,7 +14,7 @@
             <main id="wrap" class="x_purchase_page">
                 <style>
                     .x_purchase_page { background: #fff; color: #111; min-height: 68vh; }
-                    .x_purchase_inner { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }
+                    .x_purchase_inner { width: min(1120px, calc(100% - 96px)); margin: 0 auto; }
                     .x_purchase_header { padding: 68px 0 30px; border-bottom: 1px solid #dedede; }
                     .x_purchase_header h1 { margin: 0; font-size: clamp(2.2rem, 5vw, 4rem); font-weight: 900; letter-spacing: 0; }
                     .x_purchase_header p { margin: 12px 0 0; color: #666; }
@@ -27,7 +27,7 @@
                     .x_purchase_amount { font-weight: 900; text-align: right; }
                     .x_purchase_arrow { font-size: 1.35rem; }
                     .x_purchase_empty { padding: 52px 0; color: #666; text-align: center; }
-                    @media (max-width: 680px) { .x_purchase_item { grid-template-columns: 1fr auto; } .x_purchase_status, .x_purchase_amount { text-align: left; } }
+                    @media (max-width: 680px) { .x_purchase_inner { width: min(1120px, calc(100% - 32px)); } .x_purchase_item { grid-template-columns: 1fr auto; } .x_purchase_status, .x_purchase_amount { text-align: left; } }
                 </style>
                 <section class="x_purchase_header">
                     <div class="x_purchase_inner">
@@ -76,6 +76,7 @@
                     @media (max-width: 760px) { .x_purchase_detail_head, .x_purchase_grid { display: block; } .x_purchase_summary { margin-top: 28px; } }
                 </style>
                 <section class="x_purchase_inner x_purchase_detail">
+                    <div id="oe_structure_purchase_detail_top" class="oe_structure oe_empty"/>
                     <a class="x_purchase_back" href="/purchase-history">&#8592; <t t-out="'Purchase History' if is_english else '购买记录'"/></a>
                     <div class="x_purchase_detail_head">
                         <div>
@@ -89,7 +90,7 @@
                             <h2 class="h4 mb-3" t-out="'Items' if is_english else '商品明细'"/>
                             <div class="x_purchase_lines">
                                 <div t-foreach="order.order_line" t-as="line" t-if="not line.display_type" class="x_purchase_line">
-                                    <div class="x_purchase_line_name" t-out="line.name"/>
+                                    <div class="x_purchase_line_name" t-out="customer_line_name(line)"/>
                                     <div class="x_purchase_line_qty"><t t-out="line.product_uom_qty"/> × <span t-field="line.price_unit" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
                                     <div class="x_purchase_line_total"><span t-field="line.price_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
                                 </div>
@@ -125,6 +126,7 @@
                             </div>
                         </div>
                     </section>
+                    <div id="oe_structure_purchase_detail_bottom" class="oe_structure oe_empty"/>
                 </section>
             </main>
         </t>
@@ -143,6 +145,7 @@
                     .x_refund_submit { margin-top: 26px; min-height: 46px; padding: 0 22px; font-weight: 900; }
                 </style>
                 <section class="x_purchase_inner x_refund_form">
+                    <div id="oe_structure_refund_item_top" class="oe_structure oe_empty"/>
                     <a class="x_purchase_back" t-attf-href="/purchase-detail/#{order.id}">&#8592; <t t-out="'Purchase details' if is_english else '购买详情'"/></a>
                     <h1 t-out="'Request a refund' if is_english else '申请退款'"/>
                     <p t-out="'Select the purchased items and quantities you want reviewed for refund. Refunds are processed after approval.' if is_english else '选择需要申请退款的商品与数量。审核通过后，将通过微信支付原路退款。'"/>
@@ -150,13 +153,14 @@
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                         <div class="x_refund_table">
                             <div t-foreach="order.order_line" t-as="line" t-if="not line.display_type" class="x_refund_row">
-                                <div><strong t-out="line.name"/><small class="d-block text-muted"><t t-out="'Purchased quantity: ' if is_english else '购买数量：'"/><t t-out="line.product_uom_qty"/></small></div>
+                                <div><strong t-out="line.product_id.name"/><small class="d-block text-muted"><t t-out="'Purchased quantity: ' if is_english else '购买数量：'"/><t t-out="line.product_uom_qty"/></small></div>
                                 <div><span t-field="line.price_unit" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
                                 <input type="number" min="0" t-att-max="line.product_uom_qty" step="0.01" value="0" t-attf-name="quantity_#{line.id}" aria-label="Refund quantity"/>
                             </div>
                         </div>
                         <button type="submit" class="btn btn-dark x_refund_submit" t-out="'Submit refund request' if is_english else '提交退款申请'"/>
                     </form>
+                    <div id="oe_structure_refund_item_bottom" class="oe_structure oe_empty"/>
                 </section>
             </main>
         </t>

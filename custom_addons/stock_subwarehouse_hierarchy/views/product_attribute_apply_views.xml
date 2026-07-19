@@ -198,4 +198,22 @@
             </xpath>
         </field>
     </record>
+
+    <record id="product_template_form_images_visible" model="ir.ui.view">
+        <field name="name">product.template.form.images.visible</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_only_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='general_information']" position="after">
+                <page name="product_images" string="产品图片">
+                    <group string="主图">
+                        <field name="image_1920" widget="image" class="oe_avatar" options="{'preview_image': 'image_128'}"/>
+                    </group>
+                    <group string="图片库">
+                        <field name="product_template_image_ids" widget="x2_many_media_viewer" mode="kanban" nolabel="1" context="{'default_name': name}" options="{'convert_to_webp': True}"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
 </odoo>

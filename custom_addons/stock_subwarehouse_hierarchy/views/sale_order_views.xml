@@ -36,6 +36,20 @@
                 <field name="x_website_payment_reference" readonly="1" invisible="not website_id"/>
                 <field name="x_website_stock_reserved_until" readonly="1" invisible="not website_id or state not in ['draft', 'sent']"/>
             </xpath>
+            <xpath expr="//page[@name='order_lines']" position="after">
+                <page name="website_refunds" string="退款申请" invisible="not x_website_refund_request_ids">
+                    <field name="x_website_refund_request_ids" readonly="1">
+                        <list create="0" delete="0">
+                            <field name="create_date"/>
+                            <field name="partner_id"/>
+                            <field name="amount_total" widget="monetary"/>
+                            <field name="currency_id" column_invisible="True"/>
+                            <field name="state"/>
+                            <field name="refund_transaction_id"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
             <xpath expr="//field[@name='order_line']//form//field[@name='product_id']" position="after">
                 <field name="x_product_default_code" readonly="1"/>
                 <field name="x_import_product_name"/>
