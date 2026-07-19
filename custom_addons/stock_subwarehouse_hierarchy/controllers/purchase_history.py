@@ -73,12 +73,12 @@ class WebsitePurchaseHistory(CustomerPortal):
             "additional_title": "Purchase History" if is_english else "购买记录",
         })
 
-    @route("/purchase-detail", type="http", auth="public", website=True, sitemap=False)
+    @route(["/purchase-detail", "/purchase-details"], type="http", auth="public", website=True, sitemap=False)
     def purchase_detail_without_id(self, **kwargs):
         return request.redirect("/")
 
     @route(
-        "/purchase-detail/<int:order_id>",
+        ["/purchase-detail/<int:order_id>", "/purchase-details/<int:order_id>"],
         type="http",
         auth="public",
         website=True,
