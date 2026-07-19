@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="purchase_history_user_menu" inherit_id="portal.user_dropdown" name="Purchase History Link">
+        <xpath expr="//div[@id='o_logout_divider']" position="before">
+            <a href="/purchase-history" role="menuitem" class="dropdown-item ps-3">
+                <i class="fa fa-fw fa-history me-1 small text-primary-emphasis"/>
+                <t t-out="'Purchase History' if request.lang.code == 'en_US' else '购买记录'"/>
+            </a>
+        </xpath>
+    </template>
+
+    <template id="purchase_history_page" name="SUN Purchase History">
+        <t t-call="website.layout">
+            <main id="wrap" class="x_purchase_page">
+                <style>
+                    .x_purchase_page { background: #fff; color: #111; min-height: 68vh; }
+                    .x_purchase_inner { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }
+                    .x_purchase_header { padding: 68px 0 30px; border-bottom: 1px solid #dedede; }
+                    .x_purchase_header h1 { margin: 0; font-size: clamp(2.2rem, 5vw, 4rem); font-weight: 900; letter-spacing: 0; }
+                    .x_purchase_header p { margin: 12px 0 0; color: #666; }
+                    .x_purchase_list { padding: 24px 0 72px; }
+                    .x_purchase_item { display: grid; grid-template-columns: 1.2fr .9fr .8fr auto; gap: 18px; align-items: center; padding: 22px 0; border-bottom: 1px solid #e5e5e5; color: inherit; text-decoration: none; }
+                    .x_purchase_item:hover { background: #f7f7f7; margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
+                    .x_purchase_number { font-weight: 900; font-size: 1.08rem; }
+                    .x_purchase_meta { color: #666; font-size: .92rem; margin-top: 5px; }
+                    .x_purchase_status { display: inline-block; padding: 5px 9px; background: #f0f0f0; font-size: .82rem; font-weight: 800; }
+                    .x_purchase_amount { font-weight: 900; text-align: right; }
+                    .x_purchase_arrow { font-size: 1.35rem; }
+                    .x_purchase_empty { padding: 52px 0; color: #666; text-align: center; }
+                    @media (max-width: 680px) { .x_purchase_item { grid-template-columns: 1fr auto; } .x_purchase_status, .x_purchase_amount { text-align: left; } }
+                </style>
+                <section class="x_purchase_header">
+                    <div class="x_purchase_inner">
+                        <h1 t-out="'Purchase History' if is_english else '购买记录'"/>
+                        <p t-out="'Review payment, processing, and completed orders.' if is_english else '查看待支付、处理中和已完成的订单。'"/>
+                    </div>
+                </section>
+                <section class="x_purchase_inner x_purchase_list">
+                    <t t-if="orders">
+                        <a t-foreach="orders" t-as="order" t-attf-href="/purchase-detail/#{order.id}" class="x_purchase_item">
+                            <div>
+                                <div class="x_purchase_number" t-out="order.name"/>
+                                <div class="x_purchase_meta"><t t-field="order.date_order"/></div>
+                            </div>
+                            <div><span class="x_purchase_status" t-out="purchase_status(order, is_english)"/></div>
+                            <div class="x_purchase_amount" t-field="order.amount_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/>
+                            <div class="x_purchase_arrow" aria-hidden="true">&#8594;</div>
+                        </a>
+                    </t>
+                    <p t-else="" class="x_purchase_empty" t-out="'There are no purchases yet.' if is_english else '暂无购买记录。'"/>
+                </section>
+            </main>
+        </t>
+    </template>
+
+    <template id="purchase_detail_page" name="SUN Purchase Detail">
+        <t t-call="website.layout">
+            <main id="wrap" class="x_purchase_page">
+                <style>
+                    .x_purchase_detail { padding: 52px 0 76px; }
+                    .x_purchase_back { color: #555; text-decoration: none; font-weight: 800; }
+                    .x_purchase_detail_head { display: flex; justify-content: space-between; gap: 24px; align-items: end; margin: 28px 0 30px; padding-bottom: 24px; border-bottom: 2px solid #111; }
+                    .x_purchase_detail_head h1 { margin: 0; font-size: clamp(2rem, 4vw, 3.5rem); font-weight: 900; letter-spacing: 0; }
+                    .x_purchase_grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(260px, .7fr); gap: 36px; }
+                    .x_purchase_lines { border-top: 1px solid #dedede; }
+                    .x_purchase_line { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 20px; padding: 18px 0; border-bottom: 1px solid #dedede; align-items: center; }
+                    .x_purchase_line_name { font-weight: 800; }
+                    .x_purchase_line_qty { color: #666; white-space: nowrap; }
+                    .x_purchase_line_total { font-weight: 900; white-space: nowrap; text-align: right; }
+                    .x_purchase_summary { border: 1px solid #dedede; padding: 22px; align-self: start; }
+                    .x_purchase_summary dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 14px; }
+                    .x_purchase_summary dt { color: #666; font-weight: 600; }
+                    .x_purchase_summary dd { margin: 0; text-align: right; font-weight: 800; }
+                    .x_purchase_total { border-top: 1px solid #dedede; margin-top: 18px; padding-top: 18px; font-size: 1.15rem; }
+                    .x_purchase_receipt { margin-top: 20px; width: 100%; }
+                    @media (max-width: 760px) { .x_purchase_detail_head, .x_purchase_grid { display: block; } .x_purchase_summary { margin-top: 28px; } }
+                </style>
+                <section class="x_purchase_inner x_purchase_detail">
+                    <a class="x_purchase_back" href="/purchase-history">&#8592; <t t-out="'Purchase History' if is_english else '购买记录'"/></a>
+                    <div class="x_purchase_detail_head">
+                        <div>
+                            <p class="text-muted mb-2" t-out="'Order' if is_english else '订单'"/>
+                            <h1 t-out="order.name"/>
+                        </div>
+                        <span class="x_purchase_status" t-out="purchase_status"/>
+                    </div>
+                    <div class="x_purchase_grid">
+                        <section>
+                            <h2 class="h4 mb-3" t-out="'Items' if is_english else '商品明细'"/>
+                            <div class="x_purchase_lines">
+                                <div t-foreach="order.order_line" t-as="line" t-if="not line.display_type" class="x_purchase_line">
+                                    <div class="x_purchase_line_name" t-out="line.name"/>
+                                    <div class="x_purchase_line_qty"><t t-out="line.product_uom_qty"/> × <span t-field="line.price_unit" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
+                                    <div class="x_purchase_line_total" t-field="line.price_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/>
+                                </div>
+                            </div>
+                        </section>
+                        <aside class="x_purchase_summary">
+                            <dl>
+                                <dt t-out="'Order date' if is_english else '下单时间'"/><dd t-field="order.date_order"/>
+                                <dt t-out="'Customer' if is_english else '客户'"/><dd t-out="order.partner_id.name"/>
+                                <dt t-out="'Payment status' if is_english else '支付状态'"/><dd t-out="order.x_website_payment_state"/>
+                                <dt t-out="'Payment reference' if is_english else '支付交易号'"/><dd t-out="order.x_website_payment_reference or '-'"/>
+                            </dl>
+                            <dl class="x_purchase_total">
+                                <dt t-out="'Total paid' if is_english else '订单总额'"/><dd t-field="order.amount_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/>
+                            </dl>
+                            <t t-if="order._get_website_payment_receipt()">
+                                <a class="btn btn-dark x_purchase_receipt" t-attf-href="/shop/payment/receipt/#{order.id}?access_token=#{order.access_token}">
+                                    <t t-out="'Download payment receipt' if is_english else '下载支付收据'"/>
+                                </a>
+                            </t>
+                        </aside>
+                    </div>
+                </section>
+            </main>
+        </t>
+    </template>
+</odoo>
