@@ -201,12 +201,30 @@ class SaleOrder(models.Model):
                 chinese_pricelist = order.x_website_chinese_pricelist_id
                 if chinese_pricelist and order.pricelist_id != chinese_pricelist:
                     order.pricelist_id = chinese_pricelist
+                # The price recomputation hook checks this flag to decide whether
+                # it must enforce USD mapping values.
+                order.x_website_checkout_language = target_language
                 order._recompute_prices()
                 for line in order.order_line.filtered(
                     lambda line: not line.display_type and not line.is_delivery and line.product_id
                 ):
                     line.name = line.product_id.with_context(lang="zh_CN").get_product_multiline_description_sale()
             order.x_website_checkout_language = target_language
+
+    def _recompute_prices(self):
+        """Keep code-mapped USD prices after Odoo refreshes a website cart."""
+        super()._recompute_prices()
+        for order in self.filtered(
+            lambda order: order.website_id and order.x_website_checkout_language == "en_US"
+        ):
+            for line in order.order_line.filtered(
+                lambda line: not line.display_type and not line.is_delivery and line.product_id
+            ):
+                template = line.product_id.product_tmpl_id
+                line.write({
+                    "name": template._get_website_display_name(True),
+                    "price_unit": template.x_website_usd_price,
+                })
 
     def action_view_website_payments(self):
         self.ensure_one()
@@ -639,3 +657,31 @@ class SaleOrder(models.Model):
                     website_orders.mapped("name"),
                 )
         return result
+
+
+class SaleOrderLine(models.Model):
+    _inherit = "sale.order.line"
+
+    @api.depends("product_id.display_name", "order_id.x_website_checkout_language")
+    def _compute_name_short(self):
+        super()._compute_name_short()
+        for line in self.filtered(
+            lambda line: (
+                line.order_id.website_id
+                and line.order_id.x_website_checkout_language == "en_US"
+                and line.product_id
+                and not line.is_delivery
+            )
+        ):
+            line.name_short = line.product_id.product_tmpl_id._get_website_display_name(True)
+
+    def _get_line_header(self):
+        self.ensure_one()
+        if (
+            self.order_id.website_id
+            and self.order_id.x_website_checkout_language == "en_US"
+            and self.product_id
+            and not self.is_delivery
+        ):
+            return self.product_id.product_tmpl_id._get_website_display_name(True)
+        return super()._get_line_header()

@@ -1697,6 +1697,13 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(line.price_unit, 545.0)
         self.assertEqual(delivery_line.name, "Standard delivery")
         self.assertEqual(delivery_line.price_unit, 25.0)
+        self.assertEqual(line._get_line_header(), "Test Ski Boots 100 flex")
+        self.assertEqual(line.name_short, "Test Ski Boots 100 flex")
+
+        order._recompute_prices()
+
+        self.assertEqual(line.price_unit, 545.0)
+        self.assertEqual(line._get_line_header(), "Test Ski Boots 100 flex")
 
         order._apply_website_checkout_language(False)
 
