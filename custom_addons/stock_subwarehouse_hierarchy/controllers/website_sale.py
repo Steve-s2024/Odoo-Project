@@ -2,19 +2,40 @@ import json
 
 from odoo import _
 from odoo.addons.website.controllers.main import QueryURL
+from odoo.addons.website_sale.controllers.cart import Cart
 from odoo.addons.website_sale.controllers.main import WebsiteSale
 from odoo.exceptions import UserError
 from odoo.http import request, route
 
 
-class WebsiteSaleStockSource(WebsiteSale):
+class WebsiteCheckoutLanguageMixin:
     @staticmethod
     def _is_english_checkout():
         return bool(request.lang and request.lang.code == "en_US")
 
     def _sync_website_checkout_language(self):
-        if order := request.cart:
+        order = request.cart
+        if not order and (last_order_id := request.session.get("sale_last_order_id")):
+            order = request.env["sale.order"].sudo().browse(last_order_id).exists()
+        # Do not rewrite a completed financial order merely because its confirmation
+        # page is viewed in another language. Draft carts remain fully switchable.
+        if order and order.state == "draft":
             order.sudo()._apply_website_checkout_language(self._is_english_checkout())
+
+
+class WebsiteCartStockSource(WebsiteCheckoutLanguageMixin, Cart):
+    @route()
+    def cart(self, id=None, access_token=None, revive_method="", **post):
+        self._sync_website_checkout_language()
+        return super().cart(
+            id=id,
+            access_token=access_token,
+            revive_method=revive_method,
+            **post,
+        )
+
+
+class WebsiteSaleStockSource(WebsiteCheckoutLanguageMixin, WebsiteSale):
 
     @route()
     def shop_checkout(self, try_skip_step=None, **query_params):
@@ -79,6 +100,11 @@ class WebsiteSaleStockSource(WebsiteSale):
     def shop_payment(self, **post):
         self._sync_website_checkout_language()
         return super().shop_payment(**post)
+
+    @route()
+    def shop_payment_confirmation(self, **post):
+        self._sync_website_checkout_language()
+        return super().shop_payment_confirmation(**post)
 
     @route()
     def shop(self, page=0, category=None, search="", min_price=0.0, max_price=0.0, tags="", **post):

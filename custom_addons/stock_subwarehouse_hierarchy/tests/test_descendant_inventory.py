@@ -1690,6 +1690,13 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertIn("中文测试雪鞋", line.name)
         self.assertEqual(line.price_unit, 3999.0)
 
+        order._apply_website_checkout_language(True)
+
+        self.assertEqual(order.x_website_checkout_language, "en_US")
+        self.assertEqual(order.currency_id, self.env.ref("base.USD"))
+        self.assertEqual(line.name, "Test Ski Boots 100 flex")
+        self.assertEqual(line.price_unit, 545.0)
+
     def test_website_checkout_country_language_rules(self):
         SaleOrder = self.env["sale.order"]
         china = self.env.ref("base.cn")
