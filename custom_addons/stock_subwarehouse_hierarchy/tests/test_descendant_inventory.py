@@ -1595,13 +1595,21 @@ class TestDescendantInventoryTotals(TransactionCase):
             "name": "\u6d4b\u8bd5\u5355\u677f\u978b",
             "is_storable": True,
             "list_price": 599.0,
+            "x_website_mapping_flex": "6",
+        })
+        second_product = self.env["product.template"].create({
+            "name": "\u6d4b\u8bd5\u5355\u677f\u978b",
+            "is_storable": True,
+            "list_price": 699.0,
+            "x_website_mapping_flex": "9",
         })
         workbook = Workbook()
         worksheet = workbook.active
         worksheet.append(["SUN International Price List"])
         worksheet.append([])
-        worksheet.append(["\u5e8f\u53f7", "\u540d\u79f0", "PRODUCT", "RETAIL PRICE (USD)"])
-        worksheet.append([1, "\u6d4b\u8bd5\u5355\u677f\u978b", "Test Snowboard Boots", 470])
+        worksheet.append(["\u5e8f\u53f7", "\u540d\u79f0", "flex", "PRODUCT", "RETAIL PRICE (USD)"])
+        worksheet.append([1, "\u6d4b\u8bd5\u5355\u677f\u978b", 6, "Test Snowboard Boots 6 flex", 470])
+        worksheet.append([2, "\u6d4b\u8bd5\u5355\u677f\u978b", 9, "Test Snowboard Boots 9 flex", 550])
         content = BytesIO()
         workbook.save(content)
 
@@ -1613,12 +1621,17 @@ class TestDescendantInventoryTotals(TransactionCase):
         })
         action = wizard.action_import_mapping()
 
-        self.assertEqual(product.x_website_english_name, "Test Snowboard Boots")
+        self.assertEqual(product.x_website_english_name, "Test Snowboard Boots 6 flex")
         self.assertEqual(product.x_website_usd_price, 470.0)
-        self.assertEqual(product._get_website_display_name(True), "Test Snowboard Boots")
+        self.assertEqual(product._get_website_display_name(True), "Test Snowboard Boots 6 flex")
         self.assertEqual(product._get_website_display_price_label(True), "$470.00")
         self.assertEqual(product._get_website_display_name(False), "\u6d4b\u8bd5\u5355\u677f\u978b")
         self.assertEqual(product._get_website_display_price_label(False), "\uffe5599.00")
+        self.assertEqual(second_product.x_website_english_name, "Test Snowboard Boots 9 flex")
+        self.assertEqual(second_product.x_website_usd_price, 550.0)
+        self.assertEqual(product._get_english_shop_variant_value("color", "\u9ed1\u767d"), "Black / White")
+        self.assertEqual(product._get_english_shop_variant_value("size", "\u901a\u7801"), "One size")
+        self.assertEqual(product._get_english_shop_variant_value("flex", "\u786c\u5ea6100"), "100 flex")
         self.assertEqual(action["params"]["type"], "success")
 
     def test_currency_symbols_use_yuan(self):

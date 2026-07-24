@@ -82,6 +82,12 @@ class ProductTemplate(models.Model):
         copy=True,
         index=True,
     )
+    x_website_mapping_flex = fields.Char(
+        string="英文映射硬度",
+        help="用于匹配国际价格表的 flex 值。留空时会使用产品现有的硬度属性或编码解码结果。",
+        copy=True,
+        index=True,
+    )
     x_website_usd_price = fields.Float(
         string="英文网站价格 (USD)",
         digits="Product Price",
@@ -156,6 +162,19 @@ class ProductTemplate(models.Model):
             return f"${self.x_website_usd_price:,.2f}" if self.x_website_usd_price else "Price on request"
         return f"￥{self.list_price:,.2f}"
 
+    @staticmethod
+    def _normalize_website_mapping_flex(value):
+        normalized = "".join(str(value or "").split()).casefold()
+        for marker in ("硬度", "flex"):
+            normalized = normalized.replace(marker, "")
+        if normalized in {"", "000", "\u65e0", "none", "noflex", "n/a", "notapplicable", "\u672a\u8bc6\u522b", "\u9ed8\u8ba4"}:
+            return ""
+        return normalized
+
+    def _get_website_mapping_flex(self):
+        self.ensure_one()
+        return self.x_website_mapping_flex or self._get_shop_variant_display_values().get("flex") or ""
+
     def _get_shop_grouped_products(self):
         ProductTemplate = self.env["product.template"]
         representative_ids = []
@@ -214,26 +233,26 @@ class ProductTemplate(models.Model):
             ("website_published", "=", True),
         ], order="default_code, id")
 
-    def _get_shop_group_variant_rows(self):
+    def _get_shop_group_variant_rows(self, is_english=False):
         self.ensure_one()
         rows = []
         for sibling in self._get_shop_group_siblings():
             available_quantity = sibling._get_shop_available_quantity()
             rows.append({
                 "product": sibling,
-                "values": sibling._get_shop_variant_display_values(),
+                "values": sibling._get_shop_variant_display_values(is_english=is_english),
                 "available_quantity": available_quantity,
                 "is_available": sibling._is_shop_available(),
             })
         return rows
 
-    def _get_shop_group_variant_option_groups(self):
+    def _get_shop_group_variant_option_groups(self, is_english=False):
         self.ensure_one()
-        rows = self._get_shop_group_variant_rows()
+        rows = self._get_shop_group_variant_rows(is_english=is_english)
         option_specs = [
-            ("color", "颜色"),
-            ("size", "尺码"),
-            ("flex", "硬度"),
+            ("color", "Color" if is_english else "颜色"),
+            ("size", "Size" if is_english else "尺码"),
+            ("flex", "Flex" if is_english else "硬度"),
         ]
         groups = []
         for key, label in option_specs:
@@ -364,20 +383,65 @@ class ProductTemplate(models.Model):
             return decoded_value
         return custom_value
 
-    def _get_shop_variant_display_values(self):
+    @staticmethod
+    def _get_english_shop_variant_value(key, value):
+        value = str(value or "").strip()
+        if not value:
+            return "Not specified"
+        if key == "color":
+            color_names = {
+                "\u9ed1": "Black", "\u767d": "White", "\u7ea2": "Red", "\u84dd": "Blue",
+                "\u7eff": "Green", "\u7070": "Gray", "\u7d2b": "Purple", "\u7c89": "Pink",
+                "\u9ec4": "Yellow", "\u6a59": "Orange", "\u68d5": "Brown", "\u91d1": "Gold",
+                "\u94f6": "Silver",
+            }
+            if value in {"\u672a\u8bc6\u522b", "\u9ed8\u8ba4"}:
+                return "Not specified"
+            translated = [color_names.get(character, character) for character in value]
+            return " / ".join(translated)
+        if key == "size":
+            if value in {"\u901a\u7801", "One size"}:
+                return "One size"
+            if value in {"\u672a\u8bc6\u522b", "\u9ed8\u8ba4"}:
+                return "Not specified"
+            return value
+        if key == "flex":
+            normalized = ProductTemplate._normalize_website_mapping_flex(value)
+            if normalized in {"", "000", "\u65e0"}:
+                return "No flex"
+            if normalized in {"\u672a\u8bc6\u522b", "\u9ed8\u8ba4"}:
+                return "Not specified"
+            return f"{normalized} flex"
+        if key == "audience":
+            return {
+                "\u6210\u4eba": "Adult",
+                "\u513f\u7ae5/\u9752\u5c11\u5e74": "Kids / Youth",
+                "\u5b69\u5b50": "Kids",
+                "\u672a\u8bc6\u522b": "Not specified",
+            }.get(value, value)
+        return value
+
+    def _get_shop_variant_display_values(self, is_english=False):
         self.ensure_one()
         decoded_values = self._decode_shop_variant_values_from_default_code()
         color = self._get_custom_attribute_value(["颜色", "颜色分类", "colour", "color"])
         size = self._get_custom_attribute_value(["尺码", "尺寸", "size"])
         flex = self._get_custom_attribute_value(["硬度", "款型", "flex"])
         audience = self._get_custom_attribute_value(["成人儿童", "成人/儿童", "适用人群", "人群", "kids/adult", "kid/adult"])
-        return {
+        values = {
             "default_code": self.default_code or "",
             "color": self._shop_variant_value_or_decoded(color, decoded_values["color"]),
             "size": self._shop_variant_value_or_decoded(size, decoded_values["size"]),
             "flex": self._shop_variant_value_or_decoded(flex, decoded_values["flex"]),
             "audience": self._shop_variant_value_or_decoded(audience, decoded_values["audience"]),
         }
+        if is_english:
+            values.update({
+                key: self._get_english_shop_variant_value(key, value)
+                for key, value in values.items()
+                if key != "default_code"
+            })
+        return values
 
     def _get_shop_group_summary(self):
         self.ensure_one()
@@ -638,6 +702,7 @@ class ProductTemplate(models.Model):
         columns = [
             ("name", "\u4ea7\u54c1\u540d\u79f0"),
             ("x_website_english_name", "\u82f1\u6587\u7f51\u7ad9\u540d\u79f0"),
+            ("x_website_mapping_flex", "\u82f1\u6587\u6620\u5c04\u786c\u5ea6"),
             ("x_website_usd_price", "\u82f1\u6587\u7f51\u7ad9\u4ef7\u683c (USD)"),
             ("default_code", "\u5185\u90e8\u7f16\u53f7"),
             ("type", "\u4ea7\u54c1\u7c7b\u578b"),
@@ -680,6 +745,7 @@ class ProductTemplate(models.Model):
         sample_row = [
             "\u793a\u4f8b\u4ea7\u54c1",
             "Sample Product",
+            "100",
             99.0,
             "EXAMPLE-001",
             "consu",

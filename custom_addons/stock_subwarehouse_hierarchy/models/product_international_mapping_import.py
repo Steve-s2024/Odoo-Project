@@ -16,6 +16,13 @@ class ProductInternationalMappingImportWizard(models.TransientModel):
     def _normalized_name(value):
         return "".join(str(value or "").split()).casefold()
 
+    @staticmethod
+    def _normalized_flex(value):
+        normalized = ProductInternationalMappingImportWizard._normalized_name(value).replace(
+            "\u786c\u5ea6", ""
+        ).replace("flex", "")
+        return "" if normalized in {"", "000", "\u65e0", "none", "noflex", "n/a", "notapplicable", "\u672a\u8bc6\u522b", "\u9ed8\u8ba4"} else normalized
+
     def action_import_mapping(self):
         self.ensure_one()
         try:
@@ -41,7 +48,11 @@ class ProductInternationalMappingImportWizard(models.TransientModel):
                 for index, value in enumerate(row)
                 if value not in (None, "")
             }
-            if "\u540d\u79f0" in normalized_cells and "product" in normalized_cells:
+            if (
+                "\u540d\u79f0" in normalized_cells
+                and "flex" in normalized_cells
+                and "product" in normalized_cells
+            ):
                 header_row = row_number
                 headers = normalized_cells
                 break
@@ -49,7 +60,7 @@ class ProductInternationalMappingImportWizard(models.TransientModel):
                 break
 
         if header_row is None:
-            raise UserError(_("\u672a\u627e\u5230\u4ef7\u683c\u8868\u6807\u9898\u884c\u3002\u6587\u4ef6\u5fc5\u987b\u5305\u542b\u201c\u540d\u79f0\u201d\u3001\u201cPRODUCT\u201d\u548c\u201cRETAIL PRICE (USD)\u201d\u5217\u3002"))
+            raise UserError(_("\u672a\u627e\u5230\u4ef7\u683c\u8868\u6807\u9898\u884c\u3002\u6587\u4ef6\u5fc5\u987b\u5305\u542b\u201c\u540d\u79f0\u201d\u3001\u201cflex\u201d\u3001\u201cPRODUCT\u201d\u548c\u201cRETAIL PRICE (USD)\u201d\u5217\u3002"))
 
         price_index = next(
             (index for name, index in headers.items() if "retailprice" in name and "usd" in name),
@@ -59,25 +70,32 @@ class ProductInternationalMappingImportWizard(models.TransientModel):
             raise UserError(_("\u672a\u627e\u5230\u201cRETAIL PRICE (USD)\u201d\u4ef7\u683c\u5217\u3002"))
 
         name_index = headers["\u540d\u79f0"]
+        flex_index = headers["flex"]
         english_name_index = headers["product"]
         Product = self.env["product.template"]
-        products_by_name = {}
+        products_by_key = {}
         for product in Product.search([]):
-            normalized_name = self._normalized_name(product.name)
-            products_by_name[normalized_name] = products_by_name.get(normalized_name, Product) | product
+            key = (
+                self._normalized_name(product.name),
+                self._normalized_flex(product._get_website_mapping_flex()),
+            )
+            products_by_key[key] = products_by_key.get(key, Product) | product
 
         updated_products = Product
         unmatched_names = []
         for row in worksheet.iter_rows(min_row=header_row + 1, values_only=True):
             chinese_name = row[name_index] if len(row) > name_index else False
+            flex = row[flex_index] if len(row) > flex_index else False
             english_name = row[english_name_index] if len(row) > english_name_index else False
             price = row[price_index] if len(row) > price_index else False
-            normalized_name = self._normalized_name(chinese_name)
-            if not normalized_name:
+            mapping_key = (self._normalized_name(chinese_name), self._normalized_flex(flex))
+            if not mapping_key[0]:
                 continue
-            products = products_by_name.get(normalized_name, Product)
+            products = products_by_key.get(mapping_key, Product)
             if not products:
-                unmatched_names.append(str(chinese_name).strip())
+                unmatched_names.append(
+                    "%s / %s" % (str(chinese_name).strip(), str(flex or "").strip())
+                )
                 continue
             try:
                 usd_price = float(price)
@@ -85,6 +103,7 @@ class ProductInternationalMappingImportWizard(models.TransientModel):
                 raise UserError(_("\u4ea7\u54c1\u201c%s\u201d\u7684\u7f8e\u5143\u4ef7\u683c\u4e0d\u662f\u6709\u6548\u6570\u5b57\u3002") % chinese_name)
             products.write({
                 "x_website_english_name": str(english_name or "").strip(),
+                "x_website_mapping_flex": str(flex or "").strip(),
                 "x_website_usd_price": usd_price,
             })
             updated_products |= products

@@ -559,10 +559,11 @@
 
     <template id="product_page_shop_group_siblings" inherit_id="website_sale.product" name="Same-name shop variants">
         <xpath expr="//t[@name='variant_info']" position="after">
+            <t t-set="is_english" t-value="request.lang and request.lang.code == 'en_US'"/>
             <t t-set="shop_group_siblings" t-value="product.sudo()._get_shop_group_siblings()"/>
-            <t t-set="shop_group_variant_rows" t-value="product.sudo()._get_shop_group_variant_rows()"/>
-            <t t-set="shop_group_option_groups" t-value="product.sudo()._get_shop_group_variant_option_groups()"/>
-            <t t-set="current_variant_values" t-value="product.sudo()._get_shop_variant_display_values()"/>
+            <t t-set="shop_group_variant_rows" t-value="product.sudo()._get_shop_group_variant_rows(is_english=is_english)"/>
+            <t t-set="shop_group_option_groups" t-value="product.sudo()._get_shop_group_variant_option_groups(is_english=is_english)"/>
+            <t t-set="current_variant_values" t-value="product.sudo()._get_shop_variant_display_values(is_english=is_english)"/>
             <t t-set="current_shop_available" t-value="product.sudo()._is_shop_available()"/>
             <div
                 t-if="len(shop_group_siblings) &gt; 1"
@@ -722,6 +723,7 @@
     <template id="product_page_replace_add_to_cart_button" inherit_id="website_sale.cta_wrapper" name="Custom stock-aware add to cart button">
         <xpath expr="//a[@id='add_to_cart']" position="replace">
             <t t-set="current_shop_available" t-value="product.sudo()._is_shop_available()"/>
+            <t t-set="is_english" t-value="request.lang and request.lang.code == 'en_US'"/>
             <button
                 type="button"
                 t-attf-class="btn btn-primary flex-grow-1 x_shop_add_to_cart_button {{'' if current_shop_available else 'd-none'}}"
@@ -730,14 +732,14 @@
                 t-att-data-show-quantity="is_view_active('website_sale.product_quantity')"
             >
                 <i class="fa fa-shopping-cart me-2"/>
-                加入购物车
+                <t t-out="'Add to cart' if is_english else '加入购物车'"/>
             </button>
             <button
                 type="button"
                 disabled="disabled"
                 t-attf-class="btn btn-primary flex-grow-1 x_shop_unavailable_button {{'d-none' if current_shop_available else ''}}"
             >
-                库存不足，无法加入购物车
+                <t t-out="'Out of stock' if is_english else '库存不足，无法加入购物车'"/>
             </button>
         </xpath>
     </template>
