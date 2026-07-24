@@ -1,3 +1,5 @@
+import json
+
 from odoo import _
 from odoo.addons.website.controllers.main import QueryURL
 from odoo.addons.website_sale.controllers.main import WebsiteSale
@@ -6,6 +8,78 @@ from odoo.http import request, route
 
 
 class WebsiteSaleStockSource(WebsiteSale):
+    @staticmethod
+    def _is_english_checkout():
+        return bool(request.lang and request.lang.code == "en_US")
+
+    def _sync_website_checkout_language(self):
+        if order := request.cart:
+            order.sudo()._apply_website_checkout_language(self._is_english_checkout())
+
+    @route()
+    def shop_checkout(self, try_skip_step=None, **query_params):
+        self._sync_website_checkout_language()
+        return super().shop_checkout(try_skip_step=try_skip_step, **query_params)
+
+    @route()
+    def shop_address(
+        self, partner_id=None, address_type="billing", use_delivery_as_billing=None, **query_params
+    ):
+        self._sync_website_checkout_language()
+        return super().shop_address(
+            partner_id=partner_id,
+            address_type=address_type,
+            use_delivery_as_billing=use_delivery_as_billing,
+            **query_params,
+        )
+
+    def _prepare_address_form_values(self, *args, order_sudo=False, **kwargs):
+        values = super()._prepare_address_form_values(*args, order_sudo=order_sudo, **kwargs)
+        if not order_sudo:
+            return values
+        is_english = self._is_english_checkout()
+        SaleOrder = request.env["sale.order"]
+        values["countries"] = values["countries"].filtered(
+            lambda country: SaleOrder._is_website_checkout_country_allowed(country, is_english)
+        )
+        values["x_website_checkout_is_english"] = is_english
+        values["x_website_destination_warning"] = SaleOrder._website_checkout_country_message(is_english)
+        return values
+
+    @route()
+    def shop_address_submit(
+        self,
+        partner_id=None,
+        address_type="billing",
+        use_delivery_as_billing=None,
+        callback=None,
+        **form_data,
+    ):
+        country_id = form_data.get("country_id")
+        if country_id:
+            country = request.env["res.country"].sudo().browse(int(country_id)).exists()
+            if country and not request.env["sale.order"]._is_website_checkout_country_allowed(
+                country, self._is_english_checkout()
+            ):
+                return json.dumps({
+                    "invalid_fields": ["country_id"],
+                    "messages": [request.env["sale.order"]._website_checkout_country_message(
+                        self._is_english_checkout()
+                    )],
+                })
+        return super().shop_address_submit(
+            partner_id=partner_id,
+            address_type=address_type,
+            use_delivery_as_billing=use_delivery_as_billing,
+            callback=callback,
+            **form_data,
+        )
+
+    @route()
+    def shop_payment(self, **post):
+        self._sync_website_checkout_language()
+        return super().shop_payment(**post)
+
     @route()
     def shop(self, page=0, category=None, search="", min_price=0.0, max_price=0.0, tags="", **post):
         normalized_path = request.httprequest.path.rstrip("/")
@@ -215,6 +289,13 @@ class WebsiteSaleStockSource(WebsiteSale):
 
     def _get_shop_payment_errors(self, order):
         errors = super()._get_shop_payment_errors(order)
+        if order and order._has_deliverable_products():
+            country = order.partner_shipping_id.country_id or order.partner_invoice_id.country_id
+            if not order._is_website_checkout_country_allowed(country, self._is_english_checkout()):
+                errors.append((
+                    _("Delivery destination is not available"),
+                    order._website_checkout_country_message(self._is_english_checkout()),
+                ))
         if order and order.state in ("draft", "sent"):
             try:
                 order.sudo()._prepare_website_stock_for_payment()

@@ -56,4 +56,29 @@
             </div>
         </xpath>
     </template>
+
+    <template id="checkout_address_country_language_filter" inherit_id="website_sale.address_form_fields" name="Language-specific checkout countries">
+        <xpath expr="//div[@id='div_country']" position="after">
+            <div t-if="x_website_destination_warning" class="col-12 mb-2">
+                <div class="alert alert-info mb-0" role="alert">
+                    <t t-out="x_website_destination_warning"/>
+                </div>
+            </div>
+        </xpath>
+    </template>
+
+    <template id="checkout_address_country_language_lock" inherit_id="website_sale.address_card" name="Lock incompatible checkout addresses">
+        <xpath expr="//div[@name='address_card']" position="attributes">
+            <attribute name="t-attf-class">card o_address_card position-relative h-100 #{selected and 'bg-400 border border-primary'} #{contact.country_id and not request.env['sale.order']._is_website_checkout_country_allowed(contact.country_id, request.lang and request.lang.code == 'en_US') and 'opacity-50 pe-none' or ''}</attribute>
+        </xpath>
+        <xpath expr="//div[@name='address_card']/div[1]" position="inside">
+            <div
+                t-if="contact.country_id and not request.env['sale.order']._is_website_checkout_country_allowed(contact.country_id, request.lang and request.lang.code == 'en_US')"
+                class="alert alert-warning mt-3 mb-0 small"
+                role="alert"
+            >
+                <t t-out="request.env['sale.order']._website_checkout_country_message(request.lang and request.lang.code == 'en_US')"/>
+            </div>
+        </xpath>
+    </template>
 </odoo>

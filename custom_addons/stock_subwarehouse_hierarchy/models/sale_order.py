@@ -29,6 +29,17 @@ class SaleOrder(models.Model):
         string="性质",
     )
     x_finance_remark = fields.Char(string="备注")
+    x_website_checkout_language = fields.Selection(
+        [("zh_CN", "中文"), ("en_US", "English")],
+        string="网站结账语言",
+        copy=False,
+    )
+    x_website_chinese_pricelist_id = fields.Many2one(
+        "product.pricelist",
+        string="中文网站价目表",
+        copy=False,
+        readonly=True,
+    )
     x_website_stock_reserved_at = fields.Datetime(
         string="Website Stock Reserved At",
         copy=False,
@@ -119,6 +130,78 @@ class SaleOrder(models.Model):
         return self.transaction_ids.filtered(
             lambda tx: tx.state == "done" and tx.payment_id
         ).sorted("id")[-1:].payment_id
+
+    @api.model
+    def _is_website_checkout_country_allowed(self, country, is_english):
+        chinese_region_codes = {"CN", "HK", "MO", "TW"}
+        country_code = (country.code or "").upper()
+        return bool(country_code) and (
+            country_code not in chinese_region_codes if is_english else country_code in chinese_region_codes
+        )
+
+    @api.model
+    def _website_checkout_country_message(self, is_english):
+        return (
+            _("Please switch the website language to Chinese; this delivery country or region is not supported.")
+            if is_english
+            else _("请更换网站语言至英文，否则不支持此收货国家/地域。")
+        )
+
+    def _get_website_usd_pricelist(self):
+        self.ensure_one()
+        usd = self.env.ref("base.USD")
+        if usd.symbol != "$" or usd.position != "before" or not usd.active:
+            usd.write({"symbol": "$", "position": "before", "active": True})
+        pricelist = self.env["product.pricelist"].sudo().search([
+            ("website_id", "=", self.website_id.id),
+            ("name", "=", "SUN Website USD Checkout"),
+        ], limit=1)
+        if not pricelist:
+            pricelist = self.env["product.pricelist"].sudo().create({
+                "name": "SUN Website USD Checkout",
+                "currency_id": usd.id,
+                "company_id": self.company_id.id,
+                "website_id": self.website_id.id,
+                "selectable": False,
+            })
+        elif pricelist.currency_id != usd or pricelist.selectable:
+            pricelist.write({"currency_id": usd.id, "selectable": False})
+        return pricelist
+
+    def _apply_website_checkout_language(self, is_english):
+        for order in self.filtered("website_id"):
+            target_language = "en_US" if is_english else "zh_CN"
+            if is_english:
+                missing_mappings = order.order_line.filtered(
+                    lambda line: (
+                        not line.display_type
+                        and line.product_id
+                        and not line.product_id.product_tmpl_id.x_website_code_mapping_id
+                    )
+                )
+                if missing_mappings:
+                    raise UserError(_(
+                        "以下产品没有英文网站编号价格规则，无法使用英文结账：%s"
+                    ) % ", ".join(missing_mappings.mapped("product_id.display_name")))
+                if not order.x_website_chinese_pricelist_id:
+                    order.x_website_chinese_pricelist_id = order.pricelist_id
+                usd_pricelist = order._get_website_usd_pricelist()
+                if order.pricelist_id != usd_pricelist:
+                    order.pricelist_id = usd_pricelist
+                for line in order.order_line.filtered(lambda line: not line.display_type and line.product_id):
+                    template = line.product_id.product_tmpl_id
+                    line.write({
+                        "name": template._get_website_display_name(True),
+                        "price_unit": template.x_website_usd_price,
+                    })
+            else:
+                chinese_pricelist = order.x_website_chinese_pricelist_id
+                if chinese_pricelist and order.pricelist_id != chinese_pricelist:
+                    order.pricelist_id = chinese_pricelist
+                order._recompute_prices()
+                for line in order.order_line.filtered(lambda line: not line.display_type and line.product_id):
+                    line.name = line.product_id.with_context(lang="zh_CN").get_product_multiline_description_sale()
+            order.x_website_checkout_language = target_language
 
     def action_view_website_payments(self):
         self.ensure_one()

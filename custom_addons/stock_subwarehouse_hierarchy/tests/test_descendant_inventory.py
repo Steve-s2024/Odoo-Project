@@ -1646,6 +1646,60 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(product._get_english_shop_variant_value("flex", "\u786c\u5ea6100"), "100 flex")
         self.assertEqual(action["params"]["type"], "success")
 
+    def test_website_checkout_language_uses_mapped_usd_price_and_name(self):
+        website = self.env["website"].get_current_website()
+        product = self.env["product.product"].create({
+            "name": "中文测试雪鞋",
+            "default_code": "012307S2-MA100-H001220",
+            "is_storable": True,
+            "list_price": 3999.0,
+        })
+        mapping = self.env["stock.subwarehouse.product.website.code.mapping"].create({
+            "product_code_pattern": "******S2-**100-*******",
+            "english_name": "Test Ski Boots 100 flex",
+            "usd_price": 545.0,
+        })
+        product.product_tmpl_id.write({
+            "x_website_code_mapping_id": mapping.id,
+            "x_website_english_name": mapping.english_name,
+            "x_website_usd_price": mapping.usd_price,
+        })
+        order = self.env["sale.order"].create({
+            "partner_id": self.customer.id,
+            "website_id": website.id,
+        })
+        line = self.env["sale.order.line"].create({
+            "order_id": order.id,
+            "product_id": product.id,
+            "product_uom_qty": 1.0,
+        })
+        chinese_currency = order.currency_id
+
+        order._apply_website_checkout_language(True)
+
+        self.assertEqual(order.x_website_checkout_language, "en_US")
+        self.assertEqual(order.currency_id, self.env.ref("base.USD"))
+        self.assertEqual(order.currency_id.symbol, "$")
+        self.assertEqual(line.name, "Test Ski Boots 100 flex")
+        self.assertEqual(line.price_unit, 545.0)
+
+        order._apply_website_checkout_language(False)
+
+        self.assertEqual(order.x_website_checkout_language, "zh_CN")
+        self.assertEqual(order.currency_id, chinese_currency)
+        self.assertIn("中文测试雪鞋", line.name)
+        self.assertEqual(line.price_unit, 3999.0)
+
+    def test_website_checkout_country_language_rules(self):
+        SaleOrder = self.env["sale.order"]
+        china = self.env.ref("base.cn")
+        united_states = self.env.ref("base.us")
+
+        self.assertTrue(SaleOrder._is_website_checkout_country_allowed(china, False))
+        self.assertFalse(SaleOrder._is_website_checkout_country_allowed(china, True))
+        self.assertFalse(SaleOrder._is_website_checkout_country_allowed(united_states, False))
+        self.assertTrue(SaleOrder._is_website_checkout_country_allowed(united_states, True))
+
     def test_currency_symbols_use_yuan(self):
         usd = self.env.ref("base.USD")
         cny = self.env.ref("base.CNY")
