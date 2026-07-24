@@ -255,14 +255,14 @@
                             <span class="x_custom_product_image">
                                 <img
                                     t-att-src="'/web/image/product.template/%s/image_1024' % product.id"
-                                    t-att-alt="product.name"
+                                    t-att-alt="product._get_website_display_name(is_english)"
                                     loading="lazy"
                                 />
                             </span>
                             <span class="x_custom_product_meta">
-                                <h2 class="x_custom_product_name" t-out="product.name"/>
+                                <h2 class="x_custom_product_name" t-out="product._get_website_display_name(is_english)"/>
                                 <span class="x_custom_product_footer">
-                                    <span>￥<t t-out="'%.2f' % product.list_price"/></span>
+                                    <span t-out="product._get_website_display_price_label(is_english)"/>
                                 </span>
                             </span>
                         </a>
@@ -487,13 +487,13 @@
                                 <span class="x_item_product_image">
                                     <img
                                         t-att-src="'/web/image/product.template/%s/image_1024' % product.id"
-                                        t-att-alt="product.name"
+                                        t-att-alt="product._get_website_display_name(x_item_page_is_english)"
                                         loading="lazy"
                                     />
                                 </span>
                                 <span class="x_item_product_meta">
-                                    <h2 class="x_item_product_name" t-out="product.name"/>
-                                    <span class="x_item_product_price">￥<t t-out="'%.2f' % product.list_price"/></span>
+                                    <h2 class="x_item_product_name" t-out="product._get_website_display_name(x_item_page_is_english)"/>
+                                    <span class="x_item_product_price" t-out="product._get_website_display_price_label(x_item_page_is_english)"/>
                                 </span>
                             </a>
                         </div>

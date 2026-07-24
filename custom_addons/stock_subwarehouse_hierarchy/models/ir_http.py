@@ -13,7 +13,7 @@ class IrHttp(models.AbstractModel):
         if raw_path == "/en/product-categories" and request.httprequest.method != "POST":
             werkzeug.exceptions.abort(request.redirect("/en/collections"))
         if path.rstrip("/") == "/shop" and request.httprequest.method != "POST":
-            werkzeug.exceptions.abort(request.redirect("/product-categories"))
+            werkzeug.exceptions.abort(request.redirect("/collections"))
         return super()._match(path)
 
     @classmethod

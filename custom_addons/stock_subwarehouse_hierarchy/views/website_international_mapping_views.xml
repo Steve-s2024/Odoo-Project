@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="products_item_international_mapping" inherit_id="website_sale.products_item" name="Localized Product Tile Name and Price">
+        <xpath expr="//span[@t-field='product.name']" position="replace">
+            <span t-out="product._get_website_display_name(request.lang and request.lang.code == 'en_US')"/>
+        </xpath>
+        <xpath expr="//div[hasclass('product_price')]" position="replace">
+            <div class="product_price" aria-label="Price information">
+                <span
+                    class="mb-0 fw-bold"
+                    aria-label="Sale price"
+                    t-out="product._get_website_display_price_label(request.lang and request.lang.code == 'en_US')"
+                />
+            </div>
+        </xpath>
+    </template>
+
+    <template id="product_title_international_mapping" inherit_id="website_sale.product_title" name="Localized Product Detail Name">
+        <xpath expr="//h1[@t-field='product.name']" position="replace">
+            <h1
+                t-attf-class="h3 {{'mb-3' if not product.description_ecommerce and not is_view_active('website_sale.product_comment') else ''}}"
+                t-out="product._get_website_display_name(request.lang and request.lang.code == 'en_US')"
+            />
+        </xpath>
+    </template>
+
+    <template id="product_price_international_mapping" inherit_id="website_sale.product_price" name="Localized Product Detail Price">
+        <xpath expr="//div[@name='product_price_container']" position="replace">
+            <div
+                name="product_price_container"
+                class="css_editable_mode_hidden d-flex align-items-baseline justify-content-end gap-2 flex-wrap h5 mb-0 text-wrap"
+            >
+                <t t-if="request.lang and request.lang.code == 'en_US'">
+                    <span
+                        class="oe_price"
+                        style="white-space: nowrap;"
+                        t-out="product._get_website_display_price_label(True)"
+                    />
+                </t>
+                <t t-else="">
+                    <span
+                        class="oe_price"
+                        style="white-space: nowrap;"
+                        t-out="combination_info['price']"
+                        t-options="{'widget': 'monetary', 'display_currency': website.currency_id}"
+                    />
+                    <span
+                        t-attf-class="text-muted oe_default_price mb-0 h6 {{'' if combination_info['has_discounted_price'] else 'd-none'}}"
+                        style="text-decoration: line-through; white-space: nowrap;"
+                        t-out="combination_info['list_price']"
+                        t-options="{'widget': 'monetary', 'display_currency': website.currency_id}"
+                        name="product_list_price"
+                    />
+                    <t t-if="is_view_active('website_sale.tax_indication')" t-call="website_sale.tax_indication"/>
+                </t>
+            </div>
+        </xpath>
+    </template>
+</odoo>

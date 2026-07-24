@@ -76,6 +76,18 @@ class ProductTemplate(models.Model):
         string="同名网店规格数",
         compute="_compute_x_shop_group_variant_count",
     )
+    x_website_english_name = fields.Char(
+        string="英文网站名称",
+        help="面向英文网站访客显示的产品名称，不会改变中文ERP产品名称或库存编码。",
+        copy=True,
+        index=True,
+    )
+    x_website_usd_price = fields.Float(
+        string="英文网站价格 (USD)",
+        digits="Product Price",
+        help="面向英文网站访客显示的美元零售价。该字段不会改变中文销售价格。",
+        copy=True,
+    )
 
     # Unique import-only columns. They avoid repeated one2many field paths, which
     # Odoo can pair incorrectly during spreadsheet imports.
@@ -131,6 +143,18 @@ class ProductTemplate(models.Model):
     def _normalize_shop_group_name(self):
         self.ensure_one()
         return " ".join((self.name or "").split()).casefold()
+
+    def _get_website_display_name(self, is_english=False):
+        self.ensure_one()
+        if is_english and self.x_website_english_name:
+            return self.x_website_english_name
+        return self.name
+
+    def _get_website_display_price_label(self, is_english=False):
+        self.ensure_one()
+        if is_english:
+            return f"${self.x_website_usd_price:,.2f}" if self.x_website_usd_price else "Price on request"
+        return f"￥{self.list_price:,.2f}"
 
     def _get_shop_grouped_products(self):
         ProductTemplate = self.env["product.template"]
@@ -613,6 +637,8 @@ class ProductTemplate(models.Model):
     def _get_dynamic_product_import_columns(self):
         columns = [
             ("name", "\u4ea7\u54c1\u540d\u79f0"),
+            ("x_website_english_name", "\u82f1\u6587\u7f51\u7ad9\u540d\u79f0"),
+            ("x_website_usd_price", "\u82f1\u6587\u7f51\u7ad9\u4ef7\u683c (USD)"),
             ("default_code", "\u5185\u90e8\u7f16\u53f7"),
             ("type", "\u4ea7\u54c1\u7c7b\u578b"),
             ("x_material_type", "\u7269\u6599\u7c7b\u578b"),
@@ -653,6 +679,8 @@ class ProductTemplate(models.Model):
 
         sample_row = [
             "\u793a\u4f8b\u4ea7\u54c1",
+            "Sample Product",
+            99.0,
             "EXAMPLE-001",
             "consu",
             "finished",

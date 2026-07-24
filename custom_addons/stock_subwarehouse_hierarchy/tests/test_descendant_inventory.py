@@ -1,3 +1,4 @@
+import base64
 from io import BytesIO
 from unittest.mock import patch
 
@@ -1586,6 +1587,39 @@ class TestDescendantInventoryTotals(TransactionCase):
 
         self.assertFalse(product.taxes_id)
         self.assertFalse(product.supplier_taxes_id)
+
+    def test_international_product_mapping_import_updates_website_fields(self):
+        from openpyxl import Workbook
+
+        product = self.env["product.template"].create({
+            "name": "\u6d4b\u8bd5\u5355\u677f\u978b",
+            "is_storable": True,
+            "list_price": 599.0,
+        })
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.append(["SUN International Price List"])
+        worksheet.append([])
+        worksheet.append(["\u5e8f\u53f7", "\u540d\u79f0", "PRODUCT", "RETAIL PRICE (USD)"])
+        worksheet.append([1, "\u6d4b\u8bd5\u5355\u677f\u978b", "Test Snowboard Boots", 470])
+        content = BytesIO()
+        workbook.save(content)
+
+        wizard = self.env[
+            "stock.subwarehouse.product.international.mapping.import.wizard"
+        ].create({
+            "import_file": base64.b64encode(content.getvalue()),
+            "import_filename": "international_price_list.xlsx",
+        })
+        action = wizard.action_import_mapping()
+
+        self.assertEqual(product.x_website_english_name, "Test Snowboard Boots")
+        self.assertEqual(product.x_website_usd_price, 470.0)
+        self.assertEqual(product._get_website_display_name(True), "Test Snowboard Boots")
+        self.assertEqual(product._get_website_display_price_label(True), "$470.00")
+        self.assertEqual(product._get_website_display_name(False), "\u6d4b\u8bd5\u5355\u677f\u978b")
+        self.assertEqual(product._get_website_display_price_label(False), "\uffe5599.00")
+        self.assertEqual(action["params"]["type"], "success")
 
     def test_currency_symbols_use_yuan(self):
         usd = self.env.ref("base.USD")
