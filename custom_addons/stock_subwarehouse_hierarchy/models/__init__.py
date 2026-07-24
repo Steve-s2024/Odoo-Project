@@ -3,6 +3,7 @@ from . import mrp_production
 from . import payment_transaction
 from . import ir_http
 from . import product_template
+from . import product_website_code_mapping
 from . import product_international_mapping_import
 from . import product_template_attribute_line
 from . import res_company

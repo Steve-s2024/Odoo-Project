@@ -11,7 +11,7 @@
                         <field name="import_filename" invisible="1"/>
                     </group>
                     <div class="text-muted">
-                        &#25903;&#25345;&#24403;&#21069; SUN &#22269;&#38469;&#20215;&#26684;&#34920;&#65306;&#20197;&#8220;&#21517;&#31216; + flex&#8221;&#21305;&#37197;&#20013;&#25991;&#20135;&#21697;&#65292;&#23548;&#20837;&#8220;PRODUCT&#8221;&#21644;&#8220;RETAIL PRICE (USD)&#8221;&#12290;&#26410;&#21305;&#37197;&#30340;&#20135;&#21697;&#19981;&#20250;&#34987;&#26356;&#25913;&#12290;
+                        &#20351;&#29992;&#8220;product_code_pattern&#8221;&#19982;&#20135;&#21697;&#20869;&#37096;&#32534;&#21495;&#20005;&#26684;&#21305;&#37197;&#12290;&#27599;&#20010; * &#20165;&#34920;&#31034; 1 &#20010;&#20219;&#24847;&#23383;&#31526;&#12290;&#23548;&#20837;&#8220;&#33521;&#25991;&#21517;&#31216;&#65288;&#25110; PRODUCT&#65289;&#8221;&#21644;&#8220;USD &#20215;&#26684;&#65288;&#25110; RETAIL PRICE (USD)&#65289;&#8221;&#65292;&#31354;&#30333;&#27169;&#24335;&#20250;&#34987;&#24573;&#30053;&#12290;
                     </div>
                 </sheet>
                 <footer>
@@ -31,6 +31,50 @@
         <field name="binding_view_types">list,form</field>
     </record>
 
+    <record id="view_product_website_code_mapping_list" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.product.website.code.mapping.list</field>
+        <field name="model">stock.subwarehouse.product.website.code.mapping</field>
+        <field name="arch" type="xml">
+            <list string="英文网站编号价格规则">
+                <field name="product_code_pattern"/>
+                <field name="english_name"/>
+                <field name="usd_price"/>
+                <field name="specificity" optional="hide"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_product_website_code_mapping_form" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.product.website.code.mapping.form</field>
+        <field name="model">stock.subwarehouse.product.website.code.mapping</field>
+        <field name="arch" type="xml">
+            <form string="英文网站编号价格规则">
+                <header>
+                    <button name="action_apply_to_products" type="object" string="应用到匹配产品" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="product_code_pattern"/>
+                        <field name="english_name"/>
+                        <field name="usd_price"/>
+                        <field name="active"/>
+                        <field name="specificity" readonly="1"/>
+                    </group>
+                    <div class="text-muted">
+                        &#27599;&#20010; * &#20165;&#34920;&#31034; 1 &#20010;&#20219;&#24847;&#23383;&#31526;&#12290;&#20363;&#22914; ******S2-**100-******* &#21482;&#21305;&#37197;&#20855;&#26377;&#30456;&#21516;&#23383;&#31526;&#38271;&#24230;&#30340;&#20135;&#21697;&#20869;&#37096;&#32534;&#21495;&#12290;
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_product_website_code_mapping" model="ir.actions.act_window">
+        <field name="name">英文网站编号价格规则</field>
+        <field name="res_model">stock.subwarehouse.product.website.code.mapping</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
     <record id="product_template_list_international_mapping_fields" model="ir.ui.view">
         <field name="name">product.template.list.international.mapping.fields</field>
         <field name="model">product.template</field>
@@ -38,7 +82,7 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='name']" position="after">
                 <field name="x_website_english_name" string="&#33521;&#25991;&#32593;&#31449;&#21517;&#31216;" optional="show"/>
-                <field name="x_website_mapping_flex" string="&#33521;&#25991;&#26144;&#23556;&#30828;&#24230;" optional="show"/>
+                <field name="x_website_code_mapping_id" string="&#33521;&#25991;&#32593;&#31449;&#32534;&#21495;&#35268;&#21017;" optional="show"/>
                 <field name="x_website_usd_price" string="&#33521;&#25991;&#32593;&#31449;&#20215;&#26684; (USD)" optional="show"/>
             </xpath>
             <xpath expr="//list" position="inside">
@@ -47,6 +91,12 @@
                         name="%(action_import_product_international_mapping)d"
                         type="action"
                         string="&#23548;&#20837;&#33521;&#25991;&#21517;&#31216;&#19982;&#32654;&#20803;&#20215;&#26684;"
+                        class="btn-secondary"
+                        display="always"/>
+                    <button
+                        name="%(action_product_website_code_mapping)d"
+                        type="action"
+                        string="&#31649;&#29702;&#32534;&#21495;&#20215;&#26684;&#35268;&#21017;"
                         class="btn-secondary"
                         display="always"/>
                 </header>
@@ -64,7 +114,7 @@
                     <group string="&#20013;&#33521;&#20135;&#21697;&#26144;&#23556;">
                         <field name="name" string="&#20013;&#25991;&#20135;&#21697;&#21517;&#31216;"/>
                         <field name="x_website_english_name"/>
-                        <field name="x_website_mapping_flex"/>
+                        <field name="x_website_code_mapping_id"/>
                         <field name="x_website_usd_price"/>
                     </group>
                 </page>

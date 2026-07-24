@@ -82,6 +82,13 @@ class ProductTemplate(models.Model):
         copy=True,
         index=True,
     )
+    x_website_code_mapping_id = fields.Many2one(
+        "stock.subwarehouse.product.website.code.mapping",
+        string="英文网站编号规则",
+        readonly=True,
+        copy=False,
+        ondelete="set null",
+    )
     x_website_mapping_flex = fields.Char(
         string="英文映射硬度",
         help="用于匹配国际价格表的 flex 值。留空时会使用产品现有的硬度属性或编码解码结果。",

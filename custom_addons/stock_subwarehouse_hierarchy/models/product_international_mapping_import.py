@@ -9,26 +9,23 @@ class ProductInternationalMappingImportWizard(models.TransientModel):
     _name = "stock.subwarehouse.product.international.mapping.import.wizard"
     _description = "Import Product International Mapping"
 
-    import_file = fields.Binary(string="\u4ef7\u683c\u8868\u6587\u4ef6", required=True)
-    import_filename = fields.Char(string="\u6587\u4ef6\u540d")
+    import_file = fields.Binary(string="价格表文件", required=True)
+    import_filename = fields.Char(string="文件名")
 
     @staticmethod
-    def _normalized_name(value):
-        return "".join(str(value or "").split()).casefold()
+    def _normalized_header(value):
+        return "".join(str(value or "").split()).replace("（", "(").replace("）", ")").casefold()
 
-    @staticmethod
-    def _normalized_flex(value):
-        normalized = ProductInternationalMappingImportWizard._normalized_name(value).replace(
-            "\u786c\u5ea6", ""
-        ).replace("flex", "")
-        return "" if normalized in {"", "000", "\u65e0", "none", "noflex", "n/a", "notapplicable", "\u672a\u8bc6\u522b", "\u9ed8\u8ba4"} else normalized
+    @classmethod
+    def _find_header_index(cls, headers, candidates):
+        return next((headers[candidate] for candidate in candidates if candidate in headers), None)
 
     def action_import_mapping(self):
         self.ensure_one()
         try:
             from openpyxl import load_workbook
         except ImportError as error:
-            raise UserError(_("\u5bfc\u5165\u4ef7\u683c\u8868\u9700\u8981\u5b89\u88c5 openpyxl\u3002")) from error
+            raise UserError(_("导入价格表需要安装 openpyxl。")) from error
 
         try:
             workbook = load_workbook(
@@ -37,89 +34,87 @@ class ProductInternationalMappingImportWizard(models.TransientModel):
                 data_only=True,
             )
         except Exception as error:
-            raise UserError(_("\u65e0\u6cd5\u8bfb\u53d6Excel\u4ef7\u683c\u8868\uff0c\u8bf7\u4e0a\u4f20 .xlsx \u6587\u4ef6\u3002")) from error
+            raise UserError(_("无法读取 Excel 价格表，请上传 .xlsx 文件。")) from error
 
-        worksheet = workbook.active
+        worksheet = next(
+            (
+                sheet for sheet in workbook.worksheets
+                if any(
+                    self._normalized_header(cell.value) == "product_code_pattern"
+                    for row in sheet.iter_rows(max_row=10)
+                    for cell in row
+                )
+            ),
+            workbook.active,
+        )
         header_row = None
         headers = {}
         for row_number, row in enumerate(worksheet.iter_rows(values_only=True), start=1):
             normalized_cells = {
-                self._normalized_name(value): index
+                self._normalized_header(value): index
                 for index, value in enumerate(row)
                 if value not in (None, "")
             }
-            if (
-                "\u540d\u79f0" in normalized_cells
-                and "flex" in normalized_cells
-                and "product" in normalized_cells
-            ):
+            if "product_code_pattern" in normalized_cells:
                 header_row = row_number
                 headers = normalized_cells
                 break
-            if row_number >= 10:
+            if row_number >= 12:
                 break
 
-        if header_row is None:
-            raise UserError(_("\u672a\u627e\u5230\u4ef7\u683c\u8868\u6807\u9898\u884c\u3002\u6587\u4ef6\u5fc5\u987b\u5305\u542b\u201c\u540d\u79f0\u201d\u3001\u201cflex\u201d\u3001\u201cPRODUCT\u201d\u548c\u201cRETAIL PRICE (USD)\u201d\u5217\u3002"))
+        pattern_index = self._find_header_index(headers, ("product_code_pattern",))
+        english_name_index = self._find_header_index(headers, ("英文名称", "product", "englishname"))
+        price_index = self._find_header_index(headers, ("usd价格", "usdprice", "retailprice(usd)", "retailpriceusd"))
+        if header_row is None or pattern_index is None or english_name_index is None or price_index is None:
+            raise UserError(_(
+                "未找到国际价格映射标题行。文件必须包含“product_code_pattern”、“英文名称（或 PRODUCT）”及“USD 价格（或 RETAIL PRICE (USD)）”列。"
+            ))
 
-        price_index = next(
-            (index for name, index in headers.items() if "retailprice" in name and "usd" in name),
-            None,
-        )
-        if price_index is None:
-            raise UserError(_("\u672a\u627e\u5230\u201cRETAIL PRICE (USD)\u201d\u4ef7\u683c\u5217\u3002"))
-
-        name_index = headers["\u540d\u79f0"]
-        flex_index = headers["flex"]
-        english_name_index = headers["product"]
-        Product = self.env["product.template"]
-        products_by_key = {}
-        for product in Product.search([]):
-            key = (
-                self._normalized_name(product.name),
-                self._normalized_flex(product._get_website_mapping_flex()),
-            )
-            products_by_key[key] = products_by_key.get(key, Product) | product
-
-        updated_products = Product
-        unmatched_names = []
-        for row in worksheet.iter_rows(min_row=header_row + 1, values_only=True):
-            chinese_name = row[name_index] if len(row) > name_index else False
-            flex = row[flex_index] if len(row) > flex_index else False
-            english_name = row[english_name_index] if len(row) > english_name_index else False
+        mappings_by_pattern = {}
+        for row_number, row in enumerate(worksheet.iter_rows(min_row=header_row + 1, values_only=True), start=header_row + 1):
+            pattern = str(row[pattern_index] or "").strip() if len(row) > pattern_index else ""
+            if not pattern:
+                continue
+            english_name = str(row[english_name_index] or "").strip() if len(row) > english_name_index else ""
             price = row[price_index] if len(row) > price_index else False
-            mapping_key = (self._normalized_name(chinese_name), self._normalized_flex(flex))
-            if not mapping_key[0]:
-                continue
-            products = products_by_key.get(mapping_key, Product)
-            if not products:
-                unmatched_names.append(
-                    "%s / %s" % (str(chinese_name).strip(), str(flex or "").strip())
-                )
-                continue
+            if not english_name:
+                raise UserError(_("第 %s 行的英文名称为空。") % row_number)
             try:
                 usd_price = float(price)
             except (TypeError, ValueError):
-                raise UserError(_("\u4ea7\u54c1\u201c%s\u201d\u7684\u7f8e\u5143\u4ef7\u683c\u4e0d\u662f\u6709\u6548\u6570\u5b57\u3002") % chinese_name)
-            products.write({
-                "x_website_english_name": str(english_name or "").strip(),
-                "x_website_mapping_flex": str(flex or "").strip(),
-                "x_website_usd_price": usd_price,
-            })
-            updated_products |= products
+                raise UserError(_("第 %s 行的美元价格不是有效数字。") % row_number)
+            values = {"english_name": english_name, "usd_price": usd_price}
+            existing_values = mappings_by_pattern.get(pattern)
+            if existing_values and existing_values != values:
+                raise UserError(_("产品编号模式“%s”在文件中存在冲突的英文名称或美元价格。") % pattern)
+            mappings_by_pattern[pattern] = values
 
-        message = _("\u5df2\u66f4\u65b0 %s \u4e2a\u4ea7\u54c1\u7684\u82f1\u6587\u540d\u79f0\u548c\u7f8e\u5143\u4ef7\u683c\u3002") % len(updated_products)
-        if unmatched_names:
-            message += "\n" + _("\u672a\u5339\u914d %s \u4e2a\u4e2d\u6587\u540d\u79f0\uff1a%s") % (
-                len(unmatched_names), ", ".join(unmatched_names[:12]),
-            )
+        if not mappings_by_pattern:
+            raise UserError(_("文件中没有可导入的产品编号模式。空白模式不会参与自动映射。"))
+
+        Mapping = self.env["stock.subwarehouse.product.website.code.mapping"]
+        created_count = 0
+        updated_count = 0
+        for pattern, values in mappings_by_pattern.items():
+            mapping = Mapping.search([("product_code_pattern", "=", pattern)], limit=1)
+            if mapping:
+                mapping.write({**values, "active": True})
+                updated_count += 1
+            else:
+                Mapping.create({"product_code_pattern": pattern, **values})
+                created_count += 1
+
+        applied_count = Mapping.action_apply_to_products()
+        message = _(
+            "已导入 %s 条产品编号模式（新增 %s 条、更新 %s 条），并更新 %s 个匹配产品的英文名称和美元价格。"
+        ) % (len(mappings_by_pattern), created_count, updated_count, applied_count)
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
             "params": {
-                "title": _("\u82f1\u6587\u540d\u79f0\u4e0e\u7f8e\u5143\u4ef7\u683c\u5bfc\u5165\u5b8c\u6210"),
+                "title": _("国际网站编号价格映射导入完成"),
                 "message": message,
-                "type": "warning" if unmatched_names else "success",
-                "sticky": bool(unmatched_names),
+                "type": "success",
+                "sticky": False,
             },
         }

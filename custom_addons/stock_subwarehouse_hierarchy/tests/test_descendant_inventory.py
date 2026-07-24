@@ -1592,24 +1592,32 @@ class TestDescendantInventoryTotals(TransactionCase):
         from openpyxl import Workbook
 
         product = self.env["product.template"].create({
-            "name": "\u6d4b\u8bd5\u5355\u677f\u978b",
+            "name": "\u6d4b\u8bd5\u53cc\u677f\u978b",
             "is_storable": True,
             "list_price": 599.0,
-            "x_website_mapping_flex": "6",
+            "default_code": "012307S2-MA100-H001220",
         })
         second_product = self.env["product.template"].create({
-            "name": "\u6d4b\u8bd5\u5355\u677f\u978b",
+            "name": "\u6d4b\u8bd5\u53cc\u677f\u978b",
             "is_storable": True,
             "list_price": 699.0,
-            "x_website_mapping_flex": "9",
+            "default_code": "012307S2-MA120-H001220",
+        })
+        unmatched_product = self.env["product.template"].create({
+            "name": "\u672a\u5339\u914d\u4ea7\u54c1",
+            "is_storable": True,
+            "default_code": "012307S2-MA100-H0012200",
         })
         workbook = Workbook()
         worksheet = workbook.active
-        worksheet.append(["SUN International Price List"])
+        worksheet.title = "Pattern Review"
+        worksheet.append(["SUN International Pattern Mapping"])
         worksheet.append([])
-        worksheet.append(["\u5e8f\u53f7", "\u540d\u79f0", "flex", "PRODUCT", "RETAIL PRICE (USD)"])
-        worksheet.append([1, "\u6d4b\u8bd5\u5355\u677f\u978b", 6, "Test Snowboard Boots 6 flex", 470])
-        worksheet.append([2, "\u6d4b\u8bd5\u5355\u677f\u978b", 9, "Test Snowboard Boots 9 flex", 550])
+        worksheet.append(["\u5e8f\u53f7", "\u4e2d\u6587\u540d\u79f0", "\u82f1\u6587\u540d\u79f0", "USD \u4ef7\u683c", "product_code_pattern"])
+        worksheet.append([1, "\u53cc\u677f\u978b", "Generic Ski Boots 100 flex", 545, "******S2-**100-*******"])
+        worksheet.append([2, "\u53cc\u677f\u978b", "Ski Boots 100 flex", 595, "******S2-MA100-*******"])
+        worksheet.append([3, "\u53cc\u677f\u978b", "Ski Boots 120 flex", 650, "******S2-**120-*******"])
+        worksheet.append([4, "\u7a7a\u767d\u6a21\u5f0f", "Ignored", 1, ""])
         content = BytesIO()
         workbook.save(content)
 
@@ -1621,14 +1629,18 @@ class TestDescendantInventoryTotals(TransactionCase):
         })
         action = wizard.action_import_mapping()
 
-        self.assertEqual(product.x_website_english_name, "Test Snowboard Boots 6 flex")
-        self.assertEqual(product.x_website_usd_price, 470.0)
-        self.assertEqual(product._get_website_display_name(True), "Test Snowboard Boots 6 flex")
-        self.assertEqual(product._get_website_display_price_label(True), "$470.00")
-        self.assertEqual(product._get_website_display_name(False), "\u6d4b\u8bd5\u5355\u677f\u978b")
+        self.assertEqual(product.x_website_english_name, "Ski Boots 100 flex")
+        self.assertEqual(product.x_website_usd_price, 595.0)
+        self.assertEqual(product._get_website_display_name(True), "Ski Boots 100 flex")
+        self.assertEqual(product._get_website_display_price_label(True), "$595.00")
+        self.assertEqual(product._get_website_display_name(False), "\u6d4b\u8bd5\u53cc\u677f\u978b")
         self.assertEqual(product._get_website_display_price_label(False), "\uffe5599.00")
-        self.assertEqual(second_product.x_website_english_name, "Test Snowboard Boots 9 flex")
-        self.assertEqual(second_product.x_website_usd_price, 550.0)
+        self.assertEqual(second_product.x_website_english_name, "Ski Boots 120 flex")
+        self.assertEqual(second_product.x_website_usd_price, 650.0)
+        self.assertFalse(unmatched_product.x_website_code_mapping_id)
+        self.assertFalse(self.env["stock.subwarehouse.product.website.code.mapping"].find_matching_mapping(
+            unmatched_product.default_code
+        ))
         self.assertEqual(product._get_english_shop_variant_value("color", "\u9ed1\u767d"), "Black / White")
         self.assertEqual(product._get_english_shop_variant_value("size", "\u901a\u7801"), "One size")
         self.assertEqual(product._get_english_shop_variant_value("flex", "\u786c\u5ea6100"), "100 flex")
