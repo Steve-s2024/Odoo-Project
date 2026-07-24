@@ -1673,6 +1673,19 @@ class TestDescendantInventoryTotals(TransactionCase):
             "product_id": product.id,
             "product_uom_qty": 1.0,
         })
+        delivery_product = self.env["product.product"].create({
+            "name": "Standard delivery",
+            "is_storable": False,
+            "list_price": 25.0,
+        })
+        delivery_line = self.env["sale.order.line"].create({
+            "order_id": order.id,
+            "product_id": delivery_product.id,
+            "name": "Standard delivery",
+            "product_uom_qty": 1.0,
+            "is_delivery": True,
+            "price_unit": 25.0,
+        })
         chinese_currency = order.currency_id
 
         order._apply_website_checkout_language(True)
@@ -1682,6 +1695,8 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(order.currency_id.symbol, "$")
         self.assertEqual(line.name, "Test Ski Boots 100 flex")
         self.assertEqual(line.price_unit, 545.0)
+        self.assertEqual(delivery_line.name, "Standard delivery")
+        self.assertEqual(delivery_line.price_unit, 25.0)
 
         order._apply_website_checkout_language(False)
 

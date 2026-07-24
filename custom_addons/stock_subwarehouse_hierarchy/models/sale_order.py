@@ -175,6 +175,7 @@ class SaleOrder(models.Model):
                 missing_mappings = order.order_line.filtered(
                     lambda line: (
                         not line.display_type
+                        and not line.is_delivery
                         and line.product_id
                         and not line.product_id.product_tmpl_id.x_website_code_mapping_id
                     )
@@ -188,7 +189,9 @@ class SaleOrder(models.Model):
                 usd_pricelist = order._get_website_usd_pricelist()
                 if order.pricelist_id != usd_pricelist:
                     order.pricelist_id = usd_pricelist
-                for line in order.order_line.filtered(lambda line: not line.display_type and line.product_id):
+                for line in order.order_line.filtered(
+                    lambda line: not line.display_type and not line.is_delivery and line.product_id
+                ):
                     template = line.product_id.product_tmpl_id
                     line.write({
                         "name": template._get_website_display_name(True),
@@ -199,7 +202,9 @@ class SaleOrder(models.Model):
                 if chinese_pricelist and order.pricelist_id != chinese_pricelist:
                     order.pricelist_id = chinese_pricelist
                 order._recompute_prices()
-                for line in order.order_line.filtered(lambda line: not line.display_type and line.product_id):
+                for line in order.order_line.filtered(
+                    lambda line: not line.display_type and not line.is_delivery and line.product_id
+                ):
                     line.name = line.product_id.with_context(lang="zh_CN").get_product_multiline_description_sale()
             order.x_website_checkout_language = target_language
 
