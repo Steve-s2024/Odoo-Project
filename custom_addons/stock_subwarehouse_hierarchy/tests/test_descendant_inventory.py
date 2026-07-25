@@ -7,6 +7,7 @@ from odoo.exceptions import UserError
 from odoo.tests import TransactionCase, tagged
 
 from odoo.addons.stock_subwarehouse_hierarchy.controllers.website import _amap_search_url
+from odoo.addons.stock_subwarehouse_hierarchy.controllers.purchase_history import WebsitePurchaseHistory
 
 
 @tagged("post_install", "-at_install")
@@ -1728,6 +1729,31 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertFalse(SaleOrder._is_website_checkout_country_allowed(china, True))
         self.assertFalse(SaleOrder._is_website_checkout_country_allowed(united_states, False))
         self.assertTrue(SaleOrder._is_website_checkout_country_allowed(united_states, True))
+
+    def test_purchase_pages_use_english_product_and_status_labels(self):
+        product = self.env["product.product"].create({
+            "name": "中文雪鞋",
+            "default_code": "012307S2-MA100-H001220",
+            "is_storable": True,
+        })
+        product.product_tmpl_id.write({
+            "x_website_english_name": "English Ski Boots",
+        })
+        order = self.env["sale.order"].create({
+            "partner_id": self.customer.id,
+            "website_id": self.env["website"].get_current_website().id,
+            "x_website_payment_state": "paid",
+        })
+        line = self.env["sale.order.line"].create({
+            "order_id": order.id,
+            "product_id": product.id,
+            "product_uom_qty": 1.0,
+        })
+
+        self.assertEqual(
+            WebsitePurchaseHistory._customer_line_name(line, True), "English Ski Boots"
+        )
+        self.assertEqual(WebsitePurchaseHistory._payment_status(order, True), "Paid")
 
     def test_currency_symbols_use_yuan(self):
         usd = self.env.ref("base.USD")

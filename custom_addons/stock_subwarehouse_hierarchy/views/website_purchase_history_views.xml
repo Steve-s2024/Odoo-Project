@@ -94,7 +94,7 @@
                             <h2 class="h4 mb-3" t-out="'Items' if is_english else '商品明细'"/>
                             <div class="x_purchase_lines">
                                 <div t-foreach="order.order_line" t-as="line" t-if="not line.display_type" class="x_purchase_line">
-                                    <div class="x_purchase_line_name" t-out="customer_line_name(line)"/>
+                                    <div class="x_purchase_line_name" t-out="customer_line_name(line, is_english)"/>
                                     <div class="x_purchase_line_qty"><t t-out="line.product_uom_qty"/> × <span t-field="line.price_unit" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
                                     <div class="x_purchase_line_total"><span t-field="line.price_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
                                 </div>
@@ -104,7 +104,7 @@
                             <dl>
                                 <dt t-out="'Order date' if is_english else '下单时间'"/><dd><span t-field="order.date_order"/></dd>
                                 <dt t-out="'Customer' if is_english else '客户'"/><dd t-out="order.partner_id.name"/>
-                                <dt t-out="'Payment status' if is_english else '支付状态'"/><dd t-out="order.x_website_payment_state"/>
+                                <dt t-out="'Payment status' if is_english else '支付状态'"/><dd t-out="payment_status"/>
                                 <dt t-out="'Payment reference' if is_english else '支付交易号'"/><dd t-out="order.x_website_payment_reference or '-'"/>
                             </dl>
                             <dl class="x_purchase_total">
@@ -125,7 +125,7 @@
                         <div class="x_purchase_lines">
                             <div t-foreach="refund_requests" t-as="refund_request" class="x_purchase_line">
                                 <div class="x_purchase_line_name"><t t-out="refund_request.name"/></div>
-                                <div class="x_purchase_line_qty"><t t-out="refund_request.state"/></div>
+                                <div class="x_purchase_line_qty"><t t-out="refund_request_status(refund_request, is_english)"/></div>
                                 <div class="x_purchase_line_total"><span t-field="refund_request.amount_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
                             </div>
                         </div>
@@ -159,7 +159,7 @@
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                         <div class="x_refund_table">
                             <div t-foreach="order.order_line" t-as="line" t-if="not line.display_type" class="x_refund_row">
-                                <div><strong t-out="line.product_id.name"/><small class="d-block text-muted"><t t-out="'Purchased quantity: ' if is_english else '购买数量：'"/><t t-out="line.product_uom_qty"/></small></div>
+                                <div><strong t-out="customer_line_name(line, is_english)"/><small class="d-block text-muted"><t t-out="'Purchased quantity: ' if is_english else '购买数量：'"/><t t-out="line.product_uom_qty"/></small></div>
                                 <div><span t-field="line.price_unit" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
                                 <input type="number" min="0" t-att-max="line.product_uom_qty" step="0.01" value="0" t-attf-name="quantity_#{line.id}" aria-label="Refund quantity"/>
                             </div>

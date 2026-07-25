@@ -46,13 +46,36 @@ class WebsitePurchaseHistory(CustomerPortal):
         return "Completed" if is_english else "已完成"
 
     @staticmethod
-    def _customer_line_name(line):
+    def _customer_line_name(line, is_english=False):
         """Do not expose an internal SKU if older order lines contain it in their label."""
+        if is_english and line.product_id and not line.is_delivery:
+            return line.product_id.product_tmpl_id._get_website_display_name(True)
         name = line.name or line.product_id.name or ""
         code = line.product_id.default_code
         if code:
             name = name.replace(f"[{code}]", "").replace(code, "")
         return name.strip(" -") or line.product_id.name
+
+    @staticmethod
+    def _payment_status(order, is_english):
+        labels = {
+            "unpaid": ("Unpaid", "未支付"),
+            "pending": ("Payment processing", "支付处理中"),
+            "paid": ("Paid", "已支付"),
+            "error": ("Payment failed", "支付失败"),
+        }
+        return labels.get(order.x_website_payment_state, ("Unknown", "未知"))[is_english]
+
+    @staticmethod
+    def _refund_request_status(refund_request, is_english):
+        labels = {
+            "requested": ("Awaiting review", "待审核"),
+            "processing": ("Refund processing", "退款处理中"),
+            "refunded": ("Refunded", "已退款"),
+            "failed": ("Refund failed", "退款失败"),
+            "rejected": ("Refund rejected", "已拒绝"),
+        }
+        return labels.get(refund_request.state, ("Unknown", "未知"))[is_english]
 
     def _get_customer_order(self, order_id):
         orders = request.env["sale.order"].sudo().search(
@@ -112,6 +135,8 @@ class WebsitePurchaseHistory(CustomerPortal):
             "is_english": is_english,
             "purchase_status": self._purchase_status(order, is_english),
             "customer_line_name": self._customer_line_name,
+            "payment_status": self._payment_status(order, is_english),
+            "refund_request_status": self._refund_request_status,
             "additional_title": "Purchase Details" if is_english else "购买详情",
         })
 
@@ -137,6 +162,7 @@ class WebsitePurchaseHistory(CustomerPortal):
         return request.render("stock_subwarehouse_hierarchy.refund_item_page", {
             "order": order,
             "is_english": is_english,
+            "customer_line_name": self._customer_line_name,
             "additional_title": "Refund Items" if is_english else "申请退款",
         })
 
