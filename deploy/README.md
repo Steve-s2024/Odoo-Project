@@ -2,6 +2,15 @@
 
 Use `setup-odoo-vps.sh` on a fresh Ubuntu VPS.
 
+For a fresh TencentOS (dnf-based) CVM, use `setup-odoo-tencentos.sh` instead.
+It compiles Python 3.11 because TencentOS's system Python can be too old for
+Odoo 19:
+
+```bash
+sudo PROJECT_REPO=https://github.com/Steve-s2024/Odoo-Project.git \
+  bash deploy/setup-odoo-tencentos.sh
+```
+
 Minimum recommended test server:
 
 ```text
