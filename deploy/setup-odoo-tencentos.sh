@@ -81,10 +81,10 @@ if [[ ! -f /var/lib/pgsql/data/PG_VERSION ]]; then
 fi
 systemctl enable --now postgresql
 
-sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$ODOO_DB_USER'" | grep -q 1 || \
-    sudo -u postgres createuser --createdb "$ODOO_DB_USER"
-sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$ODOO_DB'" | grep -q 1 || \
-    sudo -u postgres createdb --owner="$ODOO_DB_USER" "$ODOO_DB"
+runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$ODOO_DB_USER'" | grep -q 1 || \
+    runuser -u postgres -- createuser --createdb "$ODOO_DB_USER"
+runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname='$ODOO_DB'" | grep -q 1 || \
+    runuser -u postgres -- createdb --owner="$ODOO_DB_USER" "$ODOO_DB"
 
 if ! id "$ODOO_USER" >/dev/null 2>&1; then
     useradd --system --home-dir "$ODOO_HOME" --create-home --user-group "$ODOO_USER"
@@ -94,21 +94,21 @@ chown -R "$ODOO_USER:$ODOO_USER" "$ODOO_HOME"
 
 echo "==> Fetching Odoo $ODOO_VERSION and project customizations"
 if [[ ! -d "$ODOO_SRC/.git" ]]; then
-    sudo -u "$ODOO_USER" git clone --branch "$ODOO_VERSION" --depth 1 https://github.com/odoo/odoo.git "$ODOO_SRC"
+    runuser -u "$ODOO_USER" -- git clone --branch "$ODOO_VERSION" --depth 1 https://github.com/odoo/odoo.git "$ODOO_SRC"
 else
-    sudo -u "$ODOO_USER" git -C "$ODOO_SRC" pull --ff-only
+    runuser -u "$ODOO_USER" -- git -C "$ODOO_SRC" pull --ff-only
 fi
 if [[ ! -d "$PROJECT_DIR/.git" ]]; then
-    sudo -u "$ODOO_USER" git clone "$PROJECT_REPO" "$PROJECT_DIR"
+    runuser -u "$ODOO_USER" -- git clone "$PROJECT_REPO" "$PROJECT_DIR"
 else
-    sudo -u "$ODOO_USER" git -C "$PROJECT_DIR" pull --ff-only
+    runuser -u "$ODOO_USER" -- git -C "$PROJECT_DIR" pull --ff-only
 fi
 
 echo "==> Creating Python virtual environment"
-sudo -u "$ODOO_USER" "$PYTHON_BIN" -m venv "$ODOO_HOME/venv"
-sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/pip" install --upgrade pip wheel setuptools
-sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/pip" install -r "$ODOO_SRC/requirements.txt"
-sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/pip" install openpyxl cryptography
+runuser -u "$ODOO_USER" -- "$PYTHON_BIN" -m venv "$ODOO_HOME/venv"
+runuser -u "$ODOO_USER" -- "$ODOO_HOME/venv/bin/pip" install --upgrade pip wheel setuptools
+runuser -u "$ODOO_USER" -- "$ODOO_HOME/venv/bin/pip" install -r "$ODOO_SRC/requirements.txt"
+runuser -u "$ODOO_USER" -- "$ODOO_HOME/venv/bin/pip" install openpyxl cryptography
 
 ADMIN_PASSWD="$(openssl rand -hex 24)"
 cat > "$ODOO_CONFIG" <<EOF
@@ -156,7 +156,7 @@ WantedBy=multi-user.target
 EOF
 
 echo "==> Initializing custom Odoo modules"
-sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/python" "$ODOO_SRC/odoo-bin" \
+runuser -u "$ODOO_USER" -- "$ODOO_HOME/venv/bin/python" "$ODOO_SRC/odoo-bin" \
     -c "$ODOO_CONFIG" -d "$ODOO_DB" \
     -i stock_subwarehouse_hierarchy --stop-after-init --no-http
 
