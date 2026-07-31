@@ -18,6 +18,7 @@ ODOO_PORT="${ODOO_PORT:-8069}"
 PROJECT_REPO="${PROJECT_REPO:-https://github.com/Steve-s2024/Odoo-Project.git}"
 PYTHON_VERSION="${PYTHON_VERSION:-3.11.11}"
 ODOO_SOURCE_ARCHIVE="${ODOO_SOURCE_ARCHIVE:-}"
+UPDATE_ODOO_SOURCE="${UPDATE_ODOO_SOURCE:-0}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
     echo "Run as root: sudo bash deploy/setup-odoo-tencentos.sh"
@@ -126,7 +127,11 @@ if [[ -n "$ODOO_SOURCE_ARCHIVE" ]]; then
     tar -xzf "$ODOO_SOURCE_ARCHIVE" -C "$ODOO_SRC"
     chown -R "$ODOO_USER:$ODOO_USER" "$ODOO_SRC"
 elif git -C "$ODOO_SRC" rev-parse --verify HEAD >/dev/null 2>&1; then
-    runuser -u "$ODOO_USER" -- git -C "$ODOO_SRC" pull --ff-only
+    if [[ "$UPDATE_ODOO_SOURCE" == "1" ]]; then
+        runuser -u "$ODOO_USER" -- git -C "$ODOO_SRC" pull --ff-only
+    else
+        echo "    Reusing existing Odoo source; set UPDATE_ODOO_SOURCE=1 to fetch updates."
+    fi
 else
     clone_odoo
 fi
@@ -139,6 +144,18 @@ fi
 echo "==> Creating Python virtual environment"
 runuser -u "$ODOO_USER" -- "$PYTHON_BIN" -m venv "$ODOO_HOME/venv"
 runuser -u "$ODOO_USER" -- "$ODOO_HOME/venv/bin/pip" install --upgrade pip wheel setuptools
+
+# TencentOS OpenLDAP no longer provides the legacy libldap_r linker alias.
+# Build the Odoo-pinned package against its standard ldap/lber libraries first.
+LDAP_BUILD_DIR="/tmp/python-ldap-3.4.0"
+rm -rf "$LDAP_BUILD_DIR" /tmp/python-ldap-3.4.0.tar.gz
+runuser -u "$ODOO_USER" -- "$ODOO_HOME/venv/bin/pip" download \
+    --no-binary=:all: --no-deps --dest /tmp python-ldap==3.4.0
+tar -xzf /tmp/python-ldap-3.4.0.tar.gz -C /tmp
+sed -i 's/^libs = .*/libs = ldap lber sasl2 ssl crypto/' "$LDAP_BUILD_DIR/setup.cfg"
+chown -R "$ODOO_USER:$ODOO_USER" "$LDAP_BUILD_DIR"
+runuser -u "$ODOO_USER" -- "$ODOO_HOME/venv/bin/pip" install "$LDAP_BUILD_DIR"
+
 runuser -u "$ODOO_USER" -- "$ODOO_HOME/venv/bin/pip" install -r "$ODOO_SRC/requirements.txt"
 runuser -u "$ODOO_USER" -- "$ODOO_HOME/venv/bin/pip" install openpyxl cryptography
 
