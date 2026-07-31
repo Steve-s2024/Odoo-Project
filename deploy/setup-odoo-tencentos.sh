@@ -28,6 +28,10 @@ if ! command -v dnf >/dev/null 2>&1; then
     exit 1
 fi
 
+# The deployment can be launched from /root, which the PostgreSQL and Odoo
+# system users cannot enter. Use a neutral working directory for child tools.
+cd /
+
 echo "==> Installing TencentOS system dependencies"
 dnf install -y \
     ca-certificates \
@@ -93,10 +97,27 @@ mkdir -p "$ODOO_HOME"
 chown -R "$ODOO_USER:$ODOO_USER" "$ODOO_HOME"
 
 echo "==> Fetching Odoo $ODOO_VERSION and project customizations"
-if [[ ! -d "$ODOO_SRC/.git" ]]; then
-    runuser -u "$ODOO_USER" -- git clone --branch "$ODOO_VERSION" --depth 1 https://github.com/odoo/odoo.git "$ODOO_SRC"
-else
+clone_odoo() {
+    local attempt
+    for attempt in 1 2 3; do
+        echo "    Odoo download attempt $attempt/3"
+        rm -rf "$ODOO_SRC"
+        if runuser -u "$ODOO_USER" -- env GIT_TERMINAL_PROMPT=0 \
+            git -c http.version=HTTP/1.1 clone \
+            --branch "$ODOO_VERSION" --depth 1 --single-branch --no-tags \
+            https://github.com/odoo/odoo.git "$ODOO_SRC"; then
+            return 0
+        fi
+        sleep "$((attempt * 10))"
+    done
+    echo "Unable to download Odoo after three attempts. Check the CVM's outbound Internet access to github.com."
+    return 1
+}
+
+if git -C "$ODOO_SRC" rev-parse --verify HEAD >/dev/null 2>&1; then
     runuser -u "$ODOO_USER" -- git -C "$ODOO_SRC" pull --ff-only
+else
+    clone_odoo
 fi
 if [[ ! -d "$PROJECT_DIR/.git" ]]; then
     runuser -u "$ODOO_USER" -- git clone "$PROJECT_REPO" "$PROJECT_DIR"
