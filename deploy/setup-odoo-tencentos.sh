@@ -17,6 +17,7 @@ ODOO_DB_USER="${ODOO_DB_USER:-odoo}"
 ODOO_PORT="${ODOO_PORT:-8069}"
 PROJECT_REPO="${PROJECT_REPO:-https://github.com/Steve-s2024/Odoo-Project.git}"
 PYTHON_VERSION="${PYTHON_VERSION:-3.11.11}"
+ODOO_SOURCE_ARCHIVE="${ODOO_SOURCE_ARCHIVE:-}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
     echo "Run as root: sudo bash deploy/setup-odoo-tencentos.sh"
@@ -114,7 +115,17 @@ clone_odoo() {
     return 1
 }
 
-if git -C "$ODOO_SRC" rev-parse --verify HEAD >/dev/null 2>&1; then
+if [[ -n "$ODOO_SOURCE_ARCHIVE" ]]; then
+    if [[ ! -f "$ODOO_SOURCE_ARCHIVE" ]]; then
+        echo "Odoo source archive was not found: $ODOO_SOURCE_ARCHIVE"
+        exit 1
+    fi
+    echo "    Extracting Odoo source archive: $ODOO_SOURCE_ARCHIVE"
+    rm -rf "$ODOO_SRC"
+    mkdir -p "$ODOO_SRC"
+    tar -xzf "$ODOO_SOURCE_ARCHIVE" -C "$ODOO_SRC"
+    chown -R "$ODOO_USER:$ODOO_USER" "$ODOO_SRC"
+elif git -C "$ODOO_SRC" rev-parse --verify HEAD >/dev/null 2>&1; then
     runuser -u "$ODOO_USER" -- git -C "$ODOO_SRC" pull --ff-only
 else
     clone_odoo

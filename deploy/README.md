@@ -11,6 +11,14 @@ sudo PROJECT_REPO=https://github.com/Steve-s2024/Odoo-Project.git \
   bash deploy/setup-odoo-tencentos.sh
 ```
 
+If the CVM cannot reliably download Odoo from GitHub, upload a local Odoo
+source archive to the server first and pass its path to the script:
+
+```bash
+ODOO_SOURCE_ARCHIVE=/root/odoo-19.0-source.tar.gz \
+  bash deploy/setup-odoo-tencentos.sh
+```
+
 Minimum recommended test server:
 
 ```text
