@@ -23,6 +23,7 @@
         "data/branding_data.xml",
         "data/language_data.xml",
         "views/branding_views.xml",
+        "views/app_menu_views.xml",
         "views/descendant_inventory_total_views.xml",
         "views/product_attribute_apply_views.xml",
         "views/product_international_mapping_views.xml",

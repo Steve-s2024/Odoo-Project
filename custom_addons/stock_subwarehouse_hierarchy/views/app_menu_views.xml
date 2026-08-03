@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="stock.menu_stock_root" model="ir.ui.menu">
+        <field name="sequence">1</field>
+    </record>
+
+    <menuitem
+        id="menu_product_root"
+        name="产品"
+        action="stock.product_template_action_product"
+        sequence="2"
+        web_icon="product,static/description/icon.png"
+        groups="base.group_user"
+    />
+</odoo>
