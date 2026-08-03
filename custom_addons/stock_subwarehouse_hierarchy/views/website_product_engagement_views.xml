@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Product detail pages should focus on the selected product. -->
+    <record id="website_sale.product_search" model="ir.ui.view">
+        <field name="active" eval="False"/>
+    </record>
+
+    <!-- Enable Odoo's standard rating and customer discussion thread. -->
+    <record id="website_sale.product_comment" model="ir.ui.view">
+        <field name="active" eval="True"/>
+    </record>
+
+    <!-- Keep the standard persisted wishlist behavior available on product pages. -->
+    <record id="website_sale_wishlist.product_add_to_wishlist" model="ir.ui.view">
+        <field name="active" eval="True"/>
+    </record>
+
+    <template
+        id="product_page_favorite_button"
+        inherit_id="website_sale_wishlist.product_add_to_wishlist"
+        name="Product page favorite button"
+        priority="30"
+    >
+        <xpath expr="//a[@data-action='o_wishlist']" position="attributes">
+            <attribute name="t-att-class">_button_classes + ' x_shop_favorite_button'</attribute>
+            <attribute name="t-att-title">'Add to favorites' if (request.lang and request.lang.code or '').lower().startswith('en') else '收藏商品'</attribute>
+        </xpath>
+        <xpath expr="//a[@data-action='o_wishlist']/span" position="replace">
+            <span class="d-inline">
+                <t t-out="'Add to favorites' if (request.lang and request.lang.code or '').lower().startswith('en') else '收藏商品'"/>
+            </span>
+        </xpath>
+    </template>
+
+    <template
+        id="product_page_engagement_style"
+        inherit_id="website_sale.product"
+        name="Product engagement styling"
+        priority="35"
+    >
+        <xpath expr="//section[@id='product_detail']" position="inside">
+            <style>
+                .o_wsale_product_page .o_wsale_products_searchbar_form,
+                .o_wsale_product_page .o_wsale_product_search_mobile_btn {
+                    display: none !important;
+                }
+                .x_shop_favorite_button {
+                    min-height: 3.8rem;
+                    border-radius: 0;
+                    border: 1px solid #111;
+                    background: #fff;
+                    color: #111;
+                    font-weight: 900;
+                    letter-spacing: 0;
+                    text-transform: uppercase;
+                }
+                .x_shop_favorite_button:hover,
+                .x_shop_favorite_button:focus {
+                    border-color: #111;
+                    background: #f2f2f2;
+                    color: #111;
+                }
+                .x_shop_favorite_button[disabled] {
+                    opacity: 1;
+                    background: #111;
+                    color: #fff;
+                }
+                #o_product_page_reviews {
+                    border-top: 1px solid #dedede;
+                }
+                #o_product_page_reviews .o_product_page_reviews_title h2 {
+                    font-weight: 900;
+                    letter-spacing: 0;
+                }
+            </style>
+        </xpath>
+    </template>
+</odoo>
