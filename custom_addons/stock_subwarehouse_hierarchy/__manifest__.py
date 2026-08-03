@@ -29,6 +29,7 @@
         "views/stock_quant_views.xml",
         "views/stock_location_views.xml",
         "views/stock_warehouse_views.xml",
+        "views/warehouse_history_views.xml",
         "views/sale_order_views.xml",
         "views/website_video_views.xml",
         "views/website_collections_views.xml",

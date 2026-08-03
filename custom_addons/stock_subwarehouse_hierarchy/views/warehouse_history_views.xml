@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="mrp_production_list_warehouse_locations" model="ir.ui.view">
+        <field name="name">mrp.production.list.warehouse.locations</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.mrp_production_tree_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='product_id']" position="after">
+                <field name="location_src_id"
+                    string="来源仓库"
+                    options="{'no_create': True}"
+                    optional="show"
+                    readonly="1"/>
+                <field name="location_dest_id"
+                    string="目标仓库"
+                    options="{'no_create': True}"
+                    optional="show"
+                    readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="stock_move_list_warehouse_locations" model="ir.ui.view">
+        <field name="name">stock.move.list.warehouse.locations</field>
+        <field name="model">stock.move</field>
+        <field name="inherit_id" ref="stock.view_move_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='location_id']" position="attributes">
+                <attribute name="string">来源仓库</attribute>
+            </xpath>
+            <xpath expr="//field[@name='location_dest_id']" position="attributes">
+                <attribute name="string">目标仓库</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="stock_picking_list_warehouse_locations" model="ir.ui.view">
+        <field name="name">stock.picking.list.warehouse.locations</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.vpicktree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='location_id']" position="attributes">
+                <attribute name="string">来源仓库</attribute>
+                <attribute name="optional">show</attribute>
+            </xpath>
+            <xpath expr="//field[@name='location_dest_id']" position="attributes">
+                <attribute name="string">目标仓库</attribute>
+                <attribute name="optional">show</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>
