@@ -578,10 +578,23 @@ class TestDescendantInventoryTotals(TransactionCase):
             group["key"]: group["values"]
             for group in option_groups
         }
+        groups_by_key = {
+            group["key"]: group
+            for group in option_groups
+        }
 
         self.assertEqual(options_by_key["color"], ["黑", "白"])
         self.assertEqual(options_by_key["size"], ["150", "155"])
         self.assertEqual(options_by_key["flex"], ["无硬度", "100"])
+        self.assertEqual(
+            groups_by_key["color"]["image_products"][options_by_key["color"][0]],
+            product_1,
+        )
+        self.assertEqual(
+            groups_by_key["color"]["image_products"][options_by_key["color"][1]],
+            product_2,
+        )
+        self.assertFalse(groups_by_key["size"]["image_products"])
 
     def test_shop_availability_uses_current_product_on_hand(self):
         product = self.env["product.template"].create({

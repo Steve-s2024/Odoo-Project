@@ -265,16 +265,28 @@ class ProductTemplate(models.Model):
         for key, label in option_specs:
             values = []
             seen_values = set()
+            image_products = {}
             for row in rows:
                 value = row["values"].get(key) or "未识别"
                 if value in seen_values:
+                    current_image_product = image_products.get(value)
+                    if (
+                        key == "color"
+                        and current_image_product
+                        and not current_image_product.image_1920
+                        and row["product"].image_1920
+                    ):
+                        image_products[value] = row["product"]
                     continue
                 seen_values.add(value)
                 values.append(value)
+                if key == "color":
+                    image_products[value] = row["product"]
             groups.append({
                 "key": key,
                 "label": label,
                 "values": values,
+                "image_products": image_products,
             })
         return groups
 

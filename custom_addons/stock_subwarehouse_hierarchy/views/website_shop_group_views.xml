@@ -588,6 +588,36 @@
                         background: #111;
                         color: #fff;
                     }
+                    .o_shop_group_variant_selector .o_shop_color_image_choice {
+                        width: 6.5rem;
+                        min-width: 6.5rem;
+                        min-height: 7.75rem;
+                        padding: .35rem;
+                        flex-direction: column;
+                        gap: .35rem;
+                        background: #fff;
+                        border-color: #ddd !important;
+                    }
+                    .o_shop_group_variant_selector .o_shop_color_image_choice img {
+                        width: 100%;
+                        height: 5.5rem;
+                        object-fit: contain;
+                        background: #fff;
+                    }
+                    .o_shop_group_variant_selector .o_shop_color_image_choice span {
+                        width: 100%;
+                        overflow: hidden;
+                        color: #111;
+                        font-size: .78rem;
+                        line-height: 1.15;
+                        text-align: center;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                    .o_shop_group_variant_selector .o_shop_variant_choice_input:checked + .o_shop_color_image_choice {
+                        background: #fff;
+                        box-shadow: inset 0 0 0 2px #111;
+                    }
                     .o_shop_group_variant_selector .fw-semibold {
                         font-size: .9rem;
                         font-weight: 800 !important;
@@ -607,6 +637,10 @@
                     <div class="d-flex flex-wrap gap-2">
                         <t t-foreach="option_group['values']" t-as="option_value">
                             <t
+                                t-set="color_image_product"
+                                t-value="option_group.get('image_products', {}).get(option_value)"
+                            />
+                            <t
                                 t-set="option_input_id"
                                 t-value="'o_shop_variant_%s_%s' % (option_group['key'], option_value)"
                             />
@@ -621,10 +655,19 @@
                                 autocomplete="off"
                             />
                             <label
-                                class="btn btn-light border rounded-0 px-3 py-2 o_shop_variant_choice"
+                                t-attf-class="btn btn-light border rounded-0 o_shop_variant_choice {{'o_shop_color_image_choice' if option_group['key'] == 'color' else 'px-3 py-2'}}"
                                 t-att-for="option_input_id"
-                                t-out="option_value"
-                            />
+                            >
+                                <t t-if="option_group['key'] == 'color' and color_image_product">
+                                    <img
+                                        t-att-src="'/web/image/product.template/%s/image_512' % color_image_product.id"
+                                        t-att-alt="option_value"
+                                        loading="lazy"
+                                    />
+                                    <span t-out="option_value"/>
+                                </t>
+                                <t t-else="" t-out="option_value"/>
+                            </label>
                         </t>
                     </div>
                 </div>
@@ -675,6 +718,12 @@
                             });
                         }
 
+                        function findVariantForColor() {
+                            const color = selectedValue("color");
+                            const variants = Array.from(root.querySelectorAll(".o_shop_group_variant_map [data-product-id]"));
+                            return findSelectedVariant() || variants.find((entry) => entry.dataset.color === color);
+                        }
+
                         function setCartAvailability(isAvailable) {
                             const { addToCart, unavailable } = getCartButtons();
                             if (!addToCart || !unavailable) {
@@ -687,8 +736,10 @@
                             }
                         }
 
-                        function refreshSelection(redirect) {
-                            const variant = findSelectedVariant();
+                        function refreshSelection(redirect, changedKey) {
+                            const variant = changedKey === "color"
+                                ? findVariantForColor()
+                                : findSelectedVariant();
                             if (!variant) {
                                 setCartAvailability(false);
                                 return;
@@ -703,7 +754,7 @@
 
                         root.addEventListener("change", function (event) {
                             if (event.target.matches(".o_shop_variant_choice_input")) {
-                                refreshSelection(true);
+                                refreshSelection(true, event.target.dataset.optionKey);
                             }
                         });
                         refreshSelection(false);
