@@ -18,7 +18,7 @@ class IrHttp(models.AbstractModel):
 
     @classmethod
     def _sun_format_website_title(cls, title):
-        is_english = request.lang and request.lang.code == "en_US"
+        is_english = bool((request.lang and request.lang.code or "").lower().startswith("en"))
         if not title:
             return "Home | SUN" if is_english else "主页 | 思安奇"
 
@@ -44,6 +44,8 @@ class IrHttp(models.AbstractModel):
             "snowboard items": "Snowboard Products",
             "other items": "Other Products",
             "stores": "Stores",
+            "about us": "About Us",
+            "关于我们": "About Us",
             "contact us": "Contact Us",
             "contact": "Contact",
         }

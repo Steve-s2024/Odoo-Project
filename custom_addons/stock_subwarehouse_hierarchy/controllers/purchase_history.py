@@ -94,7 +94,7 @@ class WebsitePurchaseHistory(CustomerPortal):
         if redirect:
             return redirect
 
-        is_english = request.lang and request.lang.code == "en_US"
+        is_english = bool((request.lang and request.lang.code or "").lower().startswith("en"))
         orders = request.env["sale.order"].sudo().search(
             self._purchase_domain(), order="date_order desc, id desc"
         )
@@ -125,7 +125,7 @@ class WebsitePurchaseHistory(CustomerPortal):
         if not order:
             return request.redirect("/")
 
-        is_english = request.lang and request.lang.code == "en_US"
+        is_english = bool((request.lang and request.lang.code or "").lower().startswith("en"))
         return request.render("stock_subwarehouse_hierarchy.purchase_detail_page", {
             "order": order,
             "refund_requests": self._get_order_refund_requests(order),
@@ -158,7 +158,7 @@ class WebsitePurchaseHistory(CustomerPortal):
         order = self._get_customer_order(order_id)
         if not order:
             return request.redirect("/")
-        is_english = request.lang and request.lang.code == "en_US"
+        is_english = bool((request.lang and request.lang.code or "").lower().startswith("en"))
         return request.render("stock_subwarehouse_hierarchy.refund_item_page", {
             "order": order,
             "is_english": is_english,
