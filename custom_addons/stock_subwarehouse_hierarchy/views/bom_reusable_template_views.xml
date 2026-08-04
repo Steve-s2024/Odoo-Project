@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_bom_reusable_template_list" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.bom.template.list</field>
+        <field name="model">stock.subwarehouse.bom.template</field>
+        <field name="arch" type="xml">
+            <list string="可复用BOM模板">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_bom_reusable_template_form" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.bom.template.form</field>
+        <field name="model">stock.subwarehouse.bom.template</field>
+        <field name="arch" type="xml">
+            <form string="可复用BOM模板">
+                <sheet>
+                    <widget name="web_ribbon" title="已归档" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="例如：普通款单板鞋标准BOM"/></h1>
+                    </div>
+                    <group>
+                        <field name="active" invisible="1"/>
+                        <field name="code"/>
+                        <field name="company_id" groups="base.group_multi_company"/>
+                    </group>
+                    <notebook>
+                        <page string="组件" name="components">
+                            <field name="line_ids">
+                                <list editable="bottom" string="组件">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="product_id"/>
+                                    <field name="product_qty"/>
+                                    <field name="product_uom_id" options="{'no_create': True}"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_bom_reusable_template" model="ir.actions.act_window">
+        <field name="name">可复用BOM模板</field>
+        <field name="res_model">stock.subwarehouse.bom.template</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_bom_reusable_template"
+              name="可复用BOM模板"
+              parent="mrp.menu_mrp_bom"
+              action="action_bom_reusable_template"
+              sequence="30"
+              groups="mrp.group_mrp_user"/>
+
+    <record id="view_mrp_bom_form_reusable_template" model="ir.ui.view">
+        <field name="name">mrp.bom.form.reusable.template</field>
+        <field name="model">mrp.bom</field>
+        <field name="inherit_id" ref="mrp.mrp_bom_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='code']" position="after">
+                <field name="x_reusable_template_id"
+                       options="{'no_create': True}"
+                       context="{'default_company_id': company_id}"/>
+                <div class="o_row">
+                    <button name="action_apply_reusable_template"
+                            type="object"
+                            string="应用模板"
+                            class="btn btn-secondary"
+                            invisible="not x_reusable_template_id"/>
+                    <button name="action_save_as_reusable_template"
+                            type="object"
+                            string="保存为模板"
+                            class="btn btn-secondary"
+                            invisible="not id"/>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>

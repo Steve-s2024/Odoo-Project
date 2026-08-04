@@ -1,3 +1,4 @@
+from . import bom_reusable_template
 from . import mrp_bom
 from . import mrp_production
 from . import payment_transaction

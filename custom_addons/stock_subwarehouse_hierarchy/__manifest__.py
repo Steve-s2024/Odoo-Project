@@ -1,7 +1,7 @@
 {
     "name": "库存子仓库层级",
     "summary": "使用库存库位树跟踪仓库和子仓库。",
-    "version": "19.0.1.0.2",
+    "version": "19.0.1.0.3",
     "category": "库存/库存",
     "author": "Local",
     "license": "LGPL-3",
@@ -23,6 +23,7 @@
         "data/branding_data.xml",
         "data/language_data.xml",
         "views/branding_views.xml",
+        "views/bom_reusable_template_views.xml",
         "views/app_menu_views.xml",
         "views/descendant_inventory_total_views.xml",
         "views/product_attribute_apply_views.xml",

@@ -1391,6 +1391,11 @@ class TestDescendantInventoryTotals(TransactionCase):
     def test_bom_import_template_can_create_component_lines(self):
         self.product_b.default_code = "BOM-COMPONENT-B"
         self.product_b.product_tmpl_id.x_material_type = "component"
+        product_c = self.env["product.product"].create({
+            "name": "BOM Component C",
+            "default_code": "BOM-COMPONENT-C",
+            "is_storable": True,
+        })
 
         result = self.env["mrp.bom"].load(
             [
@@ -1399,28 +1404,70 @@ class TestDescendantInventoryTotals(TransactionCase):
                 "product_uom_id",
                 "type",
                 "code",
-                "x_import_bom_component_product_1",
-                "x_import_bom_component_qty_1",
-                "x_import_bom_component_uom_1",
+                "x_import_bom_component_product",
+                "x_import_bom_component_qty",
+                "x_import_bom_component_uom",
             ],
-            [[
-                self.product_a.product_tmpl_id.display_name,
-                1,
-                self.product_a.uom_id.display_name,
-                "normal",
-                "BOM-IMPORT-TEST",
-                "BOM-COMPONENT-B",
-                2,
-                self.product_b.uom_id.display_name,
-            ]],
+            [
+                [
+                    self.product_a.product_tmpl_id.display_name,
+                    1,
+                    self.product_a.uom_id.display_name,
+                    "normal",
+                    "BOM-IMPORT-TEST",
+                    "BOM-COMPONENT-B",
+                    2,
+                    self.product_b.uom_id.display_name,
+                ],
+                ["", "", "", "", "", "BOM-COMPONENT-C", 3, product_c.uom_id.display_name],
+            ],
         )
 
         self.assertFalse(result["messages"])
         bom = self.env["mrp.bom"].browse(result["ids"][0])
         self.assertEqual(bom.code, "BOM-IMPORT-TEST")
-        self.assertEqual(len(bom.bom_line_ids), 1)
-        self.assertEqual(bom.bom_line_ids.product_id, self.product_b)
-        self.assertEqual(bom.bom_line_ids.product_qty, 2)
+        self.assertEqual(len(bom.bom_line_ids), 2)
+        self.assertEqual(bom.bom_line_ids.filtered(lambda line: line.product_id == self.product_b).product_qty, 2)
+        self.assertEqual(bom.bom_line_ids.filtered(lambda line: line.product_id == product_c).product_qty, 3)
+
+    def test_bom_import_supports_more_than_twenty_one_component_rows(self):
+        components = self.env["product.product"].create([
+            {
+                "name": f"Unlimited BOM Component {index}",
+                "default_code": f"BOM-UNLIMITED-{index:02d}",
+                "is_storable": True,
+            }
+            for index in range(25)
+        ])
+        import_fields = [
+            "product_tmpl_id",
+            "product_qty",
+            "product_uom_id",
+            "type",
+            "code",
+            "x_import_bom_component_product",
+            "x_import_bom_component_qty",
+            "x_import_bom_component_uom",
+        ]
+        import_data = []
+        for index, component in enumerate(components):
+            import_data.append([
+                self.product_a.product_tmpl_id.display_name if index == 0 else "",
+                1 if index == 0 else "",
+                self.product_a.uom_id.display_name if index == 0 else "",
+                "normal" if index == 0 else "",
+                "BOM-UNLIMITED-TEST" if index == 0 else "",
+                component.default_code,
+                index + 1,
+                component.uom_id.display_name,
+            ])
+
+        result = self.env["mrp.bom"].load(import_fields, import_data)
+
+        self.assertFalse(result["messages"])
+        bom = self.env["mrp.bom"].browse(result["ids"][0])
+        self.assertEqual(len(bom.bom_line_ids), 25)
+        self.assertEqual(bom.bom_line_ids[-1].product_qty, 25)
 
     def test_bom_import_fails_when_component_product_is_missing(self):
         with self.assertRaisesRegex(UserError, "MISSING-COMPONENT-REF"):
@@ -1431,9 +1478,9 @@ class TestDescendantInventoryTotals(TransactionCase):
                     "product_uom_id",
                     "type",
                     "code",
-                    "x_import_bom_component_product_1",
-                    "x_import_bom_component_qty_1",
-                    "x_import_bom_component_uom_1",
+                    "x_import_bom_component_product",
+                    "x_import_bom_component_qty",
+                    "x_import_bom_component_uom",
                 ],
                 [[
                     self.product_a.product_tmpl_id.display_name,
@@ -1447,7 +1494,7 @@ class TestDescendantInventoryTotals(TransactionCase):
                 ]],
             )
 
-    def test_bom_import_export_template_matches_component_slots(self):
+    def test_bom_import_export_template_matches_vertical_component_rows(self):
         from openpyxl import load_workbook
 
         self.product_b.default_code = "BOM-EXPORT-COMPONENT"
@@ -1468,11 +1515,13 @@ class TestDescendantInventoryTotals(TransactionCase):
             read_only=True,
         )
         import_rows = list(import_workbook["物料清单导入"].iter_rows(values_only=True))
-        self.assertIn("x_import_bom_component_product_1", import_rows[0])
+        self.assertIn("x_import_bom_component_product", import_rows[0])
+        self.assertNotIn("x_import_bom_component_product_1", import_rows[0])
         self.assertEqual(
-            import_rows[1][import_rows[0].index("x_import_bom_component_product_1")],
-            "组件产品 1",
+            import_rows[1][import_rows[0].index("x_import_bom_component_product")],
+            "组件产品",
         )
+        self.assertEqual(import_rows[3][import_rows[0].index("product_tmpl_id")], None)
 
         export_workbook = load_workbook(
             BytesIO(bom._generate_bom_export_xlsx()),
@@ -1485,10 +1534,41 @@ class TestDescendantInventoryTotals(TransactionCase):
         )
         self.assertEqual(export_rows[2][export_rows[0].index("code")], "BOM-EXPORT-TEST")
         self.assertEqual(
-            export_rows[2][export_rows[0].index("x_import_bom_component_product_1")],
+            export_rows[2][export_rows[0].index("x_import_bom_component_product")],
             "BOM-EXPORT-COMPONENT",
         )
-        self.assertEqual(export_rows[2][export_rows[0].index("x_import_bom_component_qty_1")], 3)
+        self.assertEqual(export_rows[2][export_rows[0].index("x_import_bom_component_qty")], 3)
+
+    def test_bom_can_be_saved_and_applied_as_reusable_template(self):
+        source_bom = self.env["mrp.bom"].create({
+            "product_tmpl_id": self.product_a.product_tmpl_id.id,
+            "product_qty": 1,
+            "product_uom_id": self.product_a.uom_id.id,
+            "code": "BOM-REUSABLE-SOURCE",
+            "bom_line_ids": [Command.create({
+                "product_id": self.product_b.id,
+                "product_qty": 4,
+                "product_uom_id": self.product_b.uom_id.id,
+            })],
+        })
+        action = source_bom.action_save_as_reusable_template()
+        template = self.env["stock.subwarehouse.bom.template"].browse(action["res_id"])
+        target_product = self.env["product.product"].create({
+            "name": "Reusable BOM Target",
+            "is_storable": True,
+        })
+        target_bom = self.env["mrp.bom"].create({
+            "product_tmpl_id": target_product.product_tmpl_id.id,
+            "product_qty": 1,
+            "product_uom_id": target_product.uom_id.id,
+            "x_reusable_template_id": template.id,
+        })
+
+        target_bom.action_apply_reusable_template()
+
+        self.assertEqual(len(template.line_ids), 1)
+        self.assertEqual(target_bom.bom_line_ids.product_id, self.product_b)
+        self.assertEqual(target_bom.bom_line_ids.product_qty, 4)
 
     def test_sale_order_import_template_uses_product_internal_reference_and_chinese_labels(self):
         from openpyxl import load_workbook

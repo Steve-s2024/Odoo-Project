@@ -8,71 +8,36 @@ from odoo.fields import Command
 
 BOM_IMPORT_TEMPLATE_ROUTE = "/stock_subwarehouse_hierarchy/import_template/mrp_bom.xlsx"
 BOM_IMPORT_COMPONENT_SLOT_COUNT = 20
+BOM_COMPONENT_PRODUCT_FIELD = "x_import_bom_component_product"
+BOM_COMPONENT_QTY_FIELD = "x_import_bom_component_qty"
+BOM_COMPONENT_UOM_FIELD = "x_import_bom_component_uom"
 
 
 class MrpBom(models.Model):
     _inherit = "mrp.bom"
 
-    x_import_bom_component_product_1 = fields.Char(string="导入组件产品 1", copy=False)
-    x_import_bom_component_qty_1 = fields.Float(string="导入组件数量 1", copy=False)
-    x_import_bom_component_uom_1 = fields.Char(string="导入组件单位 1", copy=False)
-    x_import_bom_component_product_2 = fields.Char(string="导入组件产品 2", copy=False)
-    x_import_bom_component_qty_2 = fields.Float(string="导入组件数量 2", copy=False)
-    x_import_bom_component_uom_2 = fields.Char(string="导入组件单位 2", copy=False)
-    x_import_bom_component_product_3 = fields.Char(string="导入组件产品 3", copy=False)
-    x_import_bom_component_qty_3 = fields.Float(string="导入组件数量 3", copy=False)
-    x_import_bom_component_uom_3 = fields.Char(string="导入组件单位 3", copy=False)
-    x_import_bom_component_product_4 = fields.Char(string="导入组件产品 4", copy=False)
-    x_import_bom_component_qty_4 = fields.Float(string="导入组件数量 4", copy=False)
-    x_import_bom_component_uom_4 = fields.Char(string="导入组件单位 4", copy=False)
-    x_import_bom_component_product_5 = fields.Char(string="导入组件产品 5", copy=False)
-    x_import_bom_component_qty_5 = fields.Float(string="导入组件数量 5", copy=False)
-    x_import_bom_component_uom_5 = fields.Char(string="导入组件单位 5", copy=False)
-    x_import_bom_component_product_6 = fields.Char(string="导入组件产品 6", copy=False)
-    x_import_bom_component_qty_6 = fields.Float(string="导入组件数量 6", copy=False)
-    x_import_bom_component_uom_6 = fields.Char(string="导入组件单位 6", copy=False)
-    x_import_bom_component_product_7 = fields.Char(string="导入组件产品 7", copy=False)
-    x_import_bom_component_qty_7 = fields.Float(string="导入组件数量 7", copy=False)
-    x_import_bom_component_uom_7 = fields.Char(string="导入组件单位 7", copy=False)
-    x_import_bom_component_product_8 = fields.Char(string="导入组件产品 8", copy=False)
-    x_import_bom_component_qty_8 = fields.Float(string="导入组件数量 8", copy=False)
-    x_import_bom_component_uom_8 = fields.Char(string="导入组件单位 8", copy=False)
-    x_import_bom_component_product_9 = fields.Char(string="导入组件产品 9", copy=False)
-    x_import_bom_component_qty_9 = fields.Float(string="导入组件数量 9", copy=False)
-    x_import_bom_component_uom_9 = fields.Char(string="导入组件单位 9", copy=False)
-    x_import_bom_component_product_10 = fields.Char(string="导入组件产品 10", copy=False)
-    x_import_bom_component_qty_10 = fields.Float(string="导入组件数量 10", copy=False)
-    x_import_bom_component_uom_10 = fields.Char(string="导入组件单位 10", copy=False)
-    x_import_bom_component_product_11 = fields.Char(string="导入组件产品 11", copy=False)
-    x_import_bom_component_qty_11 = fields.Float(string="导入组件数量 11", copy=False)
-    x_import_bom_component_uom_11 = fields.Char(string="导入组件单位 11", copy=False)
-    x_import_bom_component_product_12 = fields.Char(string="导入组件产品 12", copy=False)
-    x_import_bom_component_qty_12 = fields.Float(string="导入组件数量 12", copy=False)
-    x_import_bom_component_uom_12 = fields.Char(string="导入组件单位 12", copy=False)
-    x_import_bom_component_product_13 = fields.Char(string="导入组件产品 13", copy=False)
-    x_import_bom_component_qty_13 = fields.Float(string="导入组件数量 13", copy=False)
-    x_import_bom_component_uom_13 = fields.Char(string="导入组件单位 13", copy=False)
-    x_import_bom_component_product_14 = fields.Char(string="导入组件产品 14", copy=False)
-    x_import_bom_component_qty_14 = fields.Float(string="导入组件数量 14", copy=False)
-    x_import_bom_component_uom_14 = fields.Char(string="导入组件单位 14", copy=False)
-    x_import_bom_component_product_15 = fields.Char(string="导入组件产品 15", copy=False)
-    x_import_bom_component_qty_15 = fields.Float(string="导入组件数量 15", copy=False)
-    x_import_bom_component_uom_15 = fields.Char(string="导入组件单位 15", copy=False)
-    x_import_bom_component_product_16 = fields.Char(string="导入组件产品 16", copy=False)
-    x_import_bom_component_qty_16 = fields.Float(string="导入组件数量 16", copy=False)
-    x_import_bom_component_uom_16 = fields.Char(string="导入组件单位 16", copy=False)
-    x_import_bom_component_product_17 = fields.Char(string="导入组件产品 17", copy=False)
-    x_import_bom_component_qty_17 = fields.Float(string="导入组件数量 17", copy=False)
-    x_import_bom_component_uom_17 = fields.Char(string="导入组件单位 17", copy=False)
-    x_import_bom_component_product_18 = fields.Char(string="导入组件产品 18", copy=False)
-    x_import_bom_component_qty_18 = fields.Float(string="导入组件数量 18", copy=False)
-    x_import_bom_component_uom_18 = fields.Char(string="导入组件单位 18", copy=False)
-    x_import_bom_component_product_19 = fields.Char(string="导入组件产品 19", copy=False)
-    x_import_bom_component_qty_19 = fields.Float(string="导入组件数量 19", copy=False)
-    x_import_bom_component_uom_19 = fields.Char(string="导入组件单位 19", copy=False)
-    x_import_bom_component_product_20 = fields.Char(string="导入组件产品 20", copy=False)
-    x_import_bom_component_qty_20 = fields.Float(string="导入组件数量 20", copy=False)
-    x_import_bom_component_uom_20 = fields.Char(string="导入组件单位 20", copy=False)
+    x_import_bom_component_product = fields.Char(string="导入组件产品", copy=False)
+    x_import_bom_component_qty = fields.Float(string="导入组件数量", copy=False)
+    x_import_bom_component_uom = fields.Char(string="导入组件单位", copy=False)
+    x_reusable_template_id = fields.Many2one(
+        "stock.subwarehouse.bom.template",
+        string="可复用BOM模板",
+        copy=False,
+        check_company=True,
+    )
+
+    # These fields keep previously downloaded 20-slot workbooks importable.
+    for _slot_number in range(1, BOM_IMPORT_COMPONENT_SLOT_COUNT + 1):
+        locals()[f"x_import_bom_component_product_{_slot_number}"] = fields.Char(
+            string=f"导入组件产品 {_slot_number}", copy=False
+        )
+        locals()[f"x_import_bom_component_qty_{_slot_number}"] = fields.Float(
+            string=f"导入组件数量 {_slot_number}", copy=False
+        )
+        locals()[f"x_import_bom_component_uom_{_slot_number}"] = fields.Char(
+            string=f"导入组件单位 {_slot_number}", copy=False
+        )
+    del _slot_number
 
     @api.model
     def get_import_templates(self):
@@ -83,7 +48,11 @@ class MrpBom(models.Model):
 
     @staticmethod
     def _get_bom_import_component_field_names():
-        field_names = set()
+        field_names = {
+            BOM_COMPONENT_PRODUCT_FIELD,
+            BOM_COMPONENT_QTY_FIELD,
+            BOM_COMPONENT_UOM_FIELD,
+        }
         for slot_number in range(1, BOM_IMPORT_COMPONENT_SLOT_COUNT + 1):
             field_names.update({
                 f"x_import_bom_component_product_{slot_number}",
@@ -93,49 +62,96 @@ class MrpBom(models.Model):
         return field_names
 
     def load(self, import_fields, import_data):
-        component_rows = self._extract_bom_component_import_rows(import_fields, import_data)
-        component_field_names = self._get_bom_import_component_field_names()
+        component_fields = self._get_bom_import_component_field_names()
+        if not any(field_name in import_fields for field_name in component_fields):
+            return super().load(import_fields, import_data)
+
         kept_indexes = [
             index
             for index, field_name in enumerate(import_fields)
-            if field_name not in component_field_names
+            if field_name not in component_fields
         ]
         cleaned_fields = [import_fields[index] for index in kept_indexes]
-        cleaned_data = [[row[index] for index in kept_indexes] for row in import_data]
-
-        result = super().load(cleaned_fields, cleaned_data)
-        if result.get("ids") and component_rows:
-            boms = self.browse(result["ids"])
-            for bom, component_values in zip(boms, component_rows):
-                bom._write_imported_bom_components(component_values)
+        groups = self._group_bom_import_rows(import_fields, import_data, kept_indexes)
+        result = super().load(cleaned_fields, [group["parent"] for group in groups])
+        if result.get("ids"):
+            for bom, group in zip(self.browse(result["ids"]), groups):
+                if group["components"]:
+                    bom._write_imported_bom_components(group["components"])
         return result
 
-    def _extract_bom_component_import_rows(self, import_fields, import_data):
-        if not any(field_name in import_fields for field_name in self._get_bom_import_component_field_names()):
-            return []
-
-        rows = []
+    def _group_bom_import_rows(self, import_fields, import_data, kept_indexes):
+        identity_fields = [
+            field_name
+            for field_name in ("id", "code", "product_id", "product_tmpl_id")
+            if field_name in import_fields
+        ]
+        groups = []
+        current_group = None
+        current_key = None
         for row in import_data:
-            components = []
-            for slot_number in range(1, BOM_IMPORT_COMPONENT_SLOT_COUNT + 1):
-                product_field = f"x_import_bom_component_product_{slot_number}"
-                qty_field = f"x_import_bom_component_qty_{slot_number}"
-                uom_field = f"x_import_bom_component_uom_{slot_number}"
-                if product_field not in import_fields:
-                    continue
-                product_ref = str(row[import_fields.index(product_field)] or "").strip()
-                if not product_ref:
-                    continue
-                quantity = 1.0
-                if qty_field in import_fields:
-                    raw_quantity = row[import_fields.index(qty_field)]
-                    quantity = float(raw_quantity or 0.0) or 1.0
-                uom_ref = ""
-                if uom_field in import_fields:
-                    uom_ref = str(row[import_fields.index(uom_field)] or "").strip()
-                components.append((product_ref, quantity, uom_ref))
-            rows.append(components)
-        return rows
+            key = tuple(
+                str(row[import_fields.index(field_name)] or "").strip()
+                for field_name in identity_fields
+            )
+            has_identity = any(key)
+            if current_group is None or (has_identity and key != current_key):
+                current_group = {
+                    "parent": [row[index] for index in kept_indexes],
+                    "components": [],
+                }
+                groups.append(current_group)
+                current_key = key
+            current_group["components"].extend(
+                self._extract_bom_components_from_row(import_fields, row)
+            )
+        return groups
+
+    def _extract_bom_component_import_rows(self, import_fields, import_data):
+        return [
+            self._extract_bom_components_from_row(import_fields, row)
+            for row in import_data
+        ]
+
+    def _extract_bom_components_from_row(self, import_fields, row):
+        components = []
+        if BOM_COMPONENT_PRODUCT_FIELD in import_fields:
+            product_ref = str(
+                row[import_fields.index(BOM_COMPONENT_PRODUCT_FIELD)] or ""
+            ).strip()
+            if product_ref:
+                components.append((
+                    product_ref,
+                    self._component_quantity(import_fields, row, BOM_COMPONENT_QTY_FIELD),
+                    self._component_uom(import_fields, row, BOM_COMPONENT_UOM_FIELD),
+                ))
+
+        for slot_number in range(1, BOM_IMPORT_COMPONENT_SLOT_COUNT + 1):
+            product_field = f"x_import_bom_component_product_{slot_number}"
+            qty_field = f"x_import_bom_component_qty_{slot_number}"
+            uom_field = f"x_import_bom_component_uom_{slot_number}"
+            if product_field not in import_fields:
+                continue
+            product_ref = str(row[import_fields.index(product_field)] or "").strip()
+            if product_ref:
+                components.append((
+                    product_ref,
+                    self._component_quantity(import_fields, row, qty_field),
+                    self._component_uom(import_fields, row, uom_field),
+                ))
+        return components
+
+    @staticmethod
+    def _component_quantity(import_fields, row, qty_field):
+        if qty_field not in import_fields:
+            return 1.0
+        return float(row[import_fields.index(qty_field)] or 0.0) or 1.0
+
+    @staticmethod
+    def _component_uom(import_fields, row, uom_field):
+        if uom_field not in import_fields:
+            return ""
+        return str(row[import_fields.index(uom_field)] or "").strip()
 
     def _write_imported_bom_components(self, component_values):
         commands = [Command.clear()]
@@ -183,7 +199,7 @@ class MrpBom(models.Model):
         return Uom.browse(matches[0][0]) if matches else Uom
 
     def _get_bom_import_template_columns(self):
-        columns = [
+        return [
             ("product_tmpl_id", "成品模板"),
             ("product_id", "成品变体"),
             ("product_qty", "成品数量"),
@@ -191,14 +207,10 @@ class MrpBom(models.Model):
             ("type", "清单类型"),
             ("code", "物料清单编号"),
             ("company_id", "公司"),
+            (BOM_COMPONENT_PRODUCT_FIELD, "组件产品"),
+            (BOM_COMPONENT_QTY_FIELD, "组件数量"),
+            (BOM_COMPONENT_UOM_FIELD, "组件单位"),
         ]
-        for slot_number in range(1, BOM_IMPORT_COMPONENT_SLOT_COUNT + 1):
-            columns += [
-                (f"x_import_bom_component_product_{slot_number}", f"组件产品 {slot_number}"),
-                (f"x_import_bom_component_qty_{slot_number}", f"组件数量 {slot_number}"),
-                (f"x_import_bom_component_uom_{slot_number}", f"组件单位 {slot_number}"),
-            ]
-        return columns
 
     def _generate_bom_import_template_xlsx(self):
         workbook = self._create_bom_workbook(include_records=False)
@@ -225,6 +237,8 @@ class MrpBom(models.Model):
             from openpyxl import Workbook
             from openpyxl.styles import Font, PatternFill
             from openpyxl.utils import get_column_letter
+            from openpyxl.workbook.defined_name import DefinedName
+            from openpyxl.worksheet.datavalidation import DataValidation
         except ImportError as error:
             raise ImportError(_("生成模板需要安装 openpyxl。")) from error
 
@@ -237,20 +251,14 @@ class MrpBom(models.Model):
 
         if include_records:
             for bom in self:
-                sheet.append(bom._get_bom_export_row(columns))
+                for row in bom._get_bom_export_rows(columns):
+                    sheet.append(row)
         else:
             sheet.append([
-                "示例成品",
-                "",
-                1,
-                "件",
-                "normal",
-                "BOM-EXAMPLE-001",
-                self.env.company.display_name,
-                "COMPONENT-001",
-                2,
-                "件",
+                "示例成品", "", 1, "件", "normal", "BOM-EXAMPLE-001",
+                self.env.company.display_name, "COMPONENT-001", 2, "件",
             ])
+            sheet.append(["", "", "", "", "", "", "", "COMPONENT-002", 1, "件"])
 
         product_sheet = workbook.create_sheet("产品列表")
         product_sheet.append(["产品ID", "产品名称", "内部编号", "物料类型", "单位"])
@@ -262,6 +270,22 @@ class MrpBom(models.Model):
                 product.product_tmpl_id.x_material_type or "",
                 product.uom_id.display_name,
             ])
+
+        component_range = f"'产品列表'!$C$2:$C${max(product_sheet.max_row, 2)}"
+        workbook.defined_names.add(DefinedName("bom_component_refs", attr_text=component_range))
+        validation = DataValidation(type="list", formula1="=bom_component_refs", allow_blank=True)
+        validation.error = "请选择产品列表中的内部编号。"
+        validation.errorTitle = "组件产品无效"
+        validation.prompt = "可从下拉列表选择，也可输入现有产品内部编号。"
+        validation.promptTitle = "选择组件产品"
+        sheet.add_data_validation(validation)
+        component_column = next(
+            index + 1
+            for index, (field_name, _label) in enumerate(columns)
+            if field_name == BOM_COMPONENT_PRODUCT_FIELD
+        )
+        column_letter = get_column_letter(component_column)
+        validation.add(f"{column_letter}3:{column_letter}5000")
 
         field_sheet = workbook.create_sheet("导入字段")
         field_sheet.append(["字段", "中文说明"])
@@ -282,8 +306,8 @@ class MrpBom(models.Model):
                 worksheet.column_dimensions[get_column_letter(column_cells[0].column)].width = min(max(max_length + 2, 12), 45)
         return workbook
 
-    def _get_bom_export_row(self, columns):
-        values = {
+    def _get_bom_export_rows(self, columns):
+        parent_values = {
             "product_tmpl_id": self.product_tmpl_id.display_name,
             "product_id": self.product_id.display_name if self.product_id else "",
             "product_qty": self.product_qty,
@@ -292,8 +316,57 @@ class MrpBom(models.Model):
             "code": self.code or "",
             "company_id": self.company_id.display_name if self.company_id else "",
         }
-        for slot_number, line in enumerate(self.bom_line_ids[:BOM_IMPORT_COMPONENT_SLOT_COUNT], start=1):
-            values[f"x_import_bom_component_product_{slot_number}"] = line.product_id.default_code or line.product_id.display_name
-            values[f"x_import_bom_component_qty_{slot_number}"] = line.product_qty
-            values[f"x_import_bom_component_uom_{slot_number}"] = line.product_uom_id.display_name
-        return [values.get(field_name, "") for field_name, _label in columns]
+        rows = []
+        for line_index, line in enumerate(list(self.bom_line_ids) or [False]):
+            values = dict(parent_values) if line_index == 0 else {}
+            if line:
+                values.update({
+                    BOM_COMPONENT_PRODUCT_FIELD: line.product_id.default_code or line.product_id.display_name,
+                    BOM_COMPONENT_QTY_FIELD: line.product_qty,
+                    BOM_COMPONENT_UOM_FIELD: line.product_uom_id.display_name,
+                })
+            rows.append([values.get(field_name, "") for field_name, _label in columns])
+        return rows
+
+    def action_apply_reusable_template(self):
+        for bom in self:
+            template = bom.x_reusable_template_id
+            if not template:
+                raise UserError(_("请先选择一个可复用BOM模板。"))
+            bom.bom_line_ids = [Command.clear()] + [
+                Command.create({
+                    "product_id": line.product_id.id,
+                    "product_qty": line.product_qty,
+                    "product_uom_id": line.product_uom_id.id,
+                })
+                for line in template.line_ids
+            ]
+        return True
+
+    def action_save_as_reusable_template(self):
+        self.ensure_one()
+        if not self.bom_line_ids:
+            raise UserError(_("当前物料清单没有组件，无法保存为模板。"))
+        template = self.env["stock.subwarehouse.bom.template"].create({
+            "name": _("%s BOM模板") % (self.code or self.product_tmpl_id.display_name),
+            "code": self.code or False,
+            "company_id": self.company_id.id or self.env.company.id,
+            "line_ids": [
+                Command.create({
+                    "sequence": line.sequence,
+                    "product_id": line.product_id.id,
+                    "product_qty": line.product_qty,
+                    "product_uom_id": line.product_uom_id.id,
+                })
+                for line in self.bom_line_ids
+            ],
+        })
+        self.x_reusable_template_id = template
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("可复用BOM模板"),
+            "res_model": "stock.subwarehouse.bom.template",
+            "res_id": template.id,
+            "view_mode": "form",
+            "target": "current",
+        }
