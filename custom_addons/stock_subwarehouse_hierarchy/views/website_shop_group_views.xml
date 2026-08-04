@@ -627,7 +627,69 @@
                         pointer-events: none;
                         opacity: 1;
                     }
+                    .o_shop_variant_loading_overlay {
+                        position: fixed;
+                        inset: 0;
+                        z-index: 1090;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        background: rgba(255, 255, 255, .72);
+                        opacity: 0;
+                        visibility: hidden;
+                        pointer-events: none;
+                        transition: opacity .24s ease, visibility 0s linear .24s;
+                    }
+                    .o_shop_variant_loading_indicator {
+                        display: flex;
+                        align-items: center;
+                        gap: .75rem;
+                        padding: .9rem 1.15rem;
+                        color: #111;
+                        background: #fff;
+                        border: 1px solid #ddd;
+                        box-shadow: 0 12px 35px rgba(0, 0, 0, .12);
+                        font-size: .9rem;
+                        font-weight: 700;
+                    }
+                    .o_shop_variant_loading_spinner {
+                        width: 1.25rem;
+                        height: 1.25rem;
+                        border: 2px solid #ccc;
+                        border-top-color: #111;
+                        border-radius: 50%;
+                        animation: o_shop_variant_spin .7s linear infinite;
+                    }
+                    body.o_shop_variant_is_loading .o_shop_variant_loading_overlay {
+                        opacity: 1;
+                        visibility: visible;
+                        pointer-events: auto;
+                        transition-delay: 0s;
+                    }
+                    body.o_shop_variant_is_loading #product_detail {
+                        opacity: .32;
+                        transform: translateY(4px);
+                        transition: opacity .22s ease, transform .22s ease;
+                    }
+                    @keyframes o_shop_variant_spin {
+                        to { transform: rotate(360deg); }
+                    }
+                    @media (prefers-reduced-motion: reduce) {
+                        .o_shop_variant_loading_overlay,
+                        body.o_shop_variant_is_loading #product_detail {
+                            transition: none;
+                        }
+                        .o_shop_variant_loading_spinner {
+                            animation-duration: 1.4s;
+                        }
+                    }
                 </style>
+                <div class="o_shop_variant_loading_overlay" aria-hidden="true">
+                    <div class="o_shop_variant_loading_indicator" role="status" aria-live="polite">
+                        <span class="o_shop_variant_loading_spinner" aria-hidden="true"/>
+                        <span t-out="'Loading product...' if is_english else '正在加载商品...'"/>
+                    </div>
+                </div>
                 <div
                     t-foreach="shop_group_option_groups"
                     t-as="option_group"
@@ -692,6 +754,7 @@
                             return;
                         }
                         let defaultCartText = "";
+                        let isNavigating = false;
 
                         function getCartButtons() {
                             const addToCart = document.querySelector(".x_shop_add_to_cart_button");
@@ -736,7 +799,32 @@
                             }
                         }
 
-                        function refreshSelection(redirect, changedKey) {
+                        function resetLoadingState() {
+                            isNavigating = false;
+                            document.body.classList.remove("o_shop_variant_is_loading");
+                        }
+
+                        function navigateToVariant(variant, changedInput) {
+                            if (isNavigating) {
+                                return;
+                            }
+                            isNavigating = true;
+                            document.body.classList.add("o_shop_variant_is_loading");
+
+                            const selectedLabel = changedInput && changedInput.id
+                                ? root.querySelector(`label[for="${CSS.escape(changedInput.id)}"]`)
+                                : null;
+                            const selectedImage = selectedLabel && selectedLabel.querySelector("img");
+                            if (selectedImage && !selectedImage.complete) {
+                                selectedImage.loading = "eager";
+                            }
+
+                            window.setTimeout(function () {
+                                window.location.assign(variant.dataset.url);
+                            }, 180);
+                        }
+
+                        function refreshSelection(redirect, changedKey, changedInput) {
                             const variant = changedKey === "color"
                                 ? findVariantForColor()
                                 : findSelectedVariant();
@@ -746,7 +834,7 @@
                             }
                             const isAvailable = variant.dataset.available === "1";
                             if (redirect && variant.dataset.productId !== root.dataset.currentProductId) {
-                                window.location.href = variant.dataset.url;
+                                navigateToVariant(variant, changedInput);
                                 return;
                             }
                             setCartAvailability(isAvailable);
@@ -754,9 +842,10 @@
 
                         root.addEventListener("change", function (event) {
                             if (event.target.matches(".o_shop_variant_choice_input")) {
-                                refreshSelection(true, event.target.dataset.optionKey);
+                                refreshSelection(true, event.target.dataset.optionKey, event.target);
                             }
                         });
+                        window.addEventListener("pageshow", resetLoadingState);
                         refreshSelection(false);
                         window.addEventListener("load", function () {
                             refreshSelection(false);
