@@ -126,6 +126,9 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='default_code']" position="after">
                 <field name="x_material_type" string="&#29289;&#26009;&#31867;&#22411;" optional="show"/>
+                <field name="x_component_material" string="&#26448;&#26009;" optional="hide"/>
+                <field name="x_component_specification" string="&#23610;&#23544;&#35268;&#26684;" optional="hide"/>
+                <field name="x_component_color" string="&#39068;&#33394;" optional="hide"/>
             </xpath>
         </field>
     </record>
@@ -137,6 +140,9 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='type']" position="after">
                 <field name="x_material_type" string="&#29289;&#26009;&#31867;&#22411;"/>
+                <field name="x_component_material" string="&#26448;&#26009;" invisible="x_material_type != 'component'"/>
+                <field name="x_component_specification" string="&#23610;&#23544;&#35268;&#26684;" invisible="x_material_type != 'component'"/>
+                <field name="x_component_color" string="&#39068;&#33394;" invisible="x_material_type != 'component'"/>
             </xpath>
         </field>
     </record>

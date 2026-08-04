@@ -65,6 +65,24 @@ class ProductTemplate(models.Model):
         copy=True,
         index=True,
     )
+    x_component_material = fields.Char(
+        string="\u6750\u6599",
+        help="\u90e8\u4ef6\u7684\u6750\u6599\u6216\u6750\u6599\u724c\u53f7\uff0c\u5141\u8bb8\u8f93\u5165\u4efb\u610f\u6587\u672c\u3002",
+        copy=True,
+        index=True,
+    )
+    x_component_specification = fields.Char(
+        string="\u5c3a\u5bf8\u89c4\u683c",
+        help="\u90e8\u4ef6\u7684\u5c3a\u5bf8\u3001\u89c4\u683c\u6216\u516c\u5dee\u63cf\u8ff0\uff0c\u5141\u8bb8\u8f93\u5165\u4efb\u610f\u6587\u672c\u3002",
+        copy=True,
+        index=True,
+    )
+    x_component_color = fields.Char(
+        string="\u989c\u8272",
+        help="\u90e8\u4ef6\u989c\u8272\u6216\u8868\u9762\u5904\u7406\u63cf\u8ff0\uff0c\u5141\u8bb8\u8f93\u5165\u4efb\u610f\u6587\u672c\u3002",
+        copy=True,
+        index=True,
+    )
 
     x_custom_attribute_value_ids = fields.One2many(
         "product.template.custom.attribute.value",
@@ -726,6 +744,9 @@ class ProductTemplate(models.Model):
             ("default_code", "\u5185\u90e8\u7f16\u53f7"),
             ("type", "\u4ea7\u54c1\u7c7b\u578b"),
             ("x_material_type", "\u7269\u6599\u7c7b\u578b"),
+            ("x_component_material", "\u6750\u6599"),
+            ("x_component_specification", "\u5c3a\u5bf8\u89c4\u683c"),
+            ("x_component_color", "\u989c\u8272"),
             ("is_storable", "\u53ef\u5e93\u5b58"),
             ("categ_id", "\u4ea7\u54c1\u7c7b\u522b"),
             ("list_price", "\u9500\u552e\u4ef7\u683c"),
@@ -762,13 +783,16 @@ class ProductTemplate(models.Model):
         import_sheet.append([label for _field_name, label in columns])
 
         sample_row = [
-            "\u793a\u4f8b\u4ea7\u54c1",
-            "Sample Product",
-            "100",
-            99.0,
-            "EXAMPLE-001",
+            "\u5f39\u7c27\u5957\u7ba1",
+            "Spring Sleeve",
+            "",
+            0,
+            "DBX-19",
             "consu",
-            "finished",
+            "component",
+            "\u4e0d\u9508\u94a2",
+            "\u03c68.5*8.1*52",
+            "\u672c\u8272",
             "1",
             "\u5168\u90e8",
             0,

@@ -1086,6 +1086,9 @@ class TestDescendantInventoryTotals(TransactionCase):
         chinese_labels = import_rows[1]
         self.assertIn("name", import_headers)
         self.assertIn("x_material_type", import_headers)
+        self.assertIn("x_component_material", import_headers)
+        self.assertIn("x_component_specification", import_headers)
+        self.assertIn("x_component_color", import_headers)
         self.assertIn("is_storable", import_headers)
         self.assertIn("x_import_custom_attribute_value_1", import_headers)
         self.assertNotIn("x_import_custom_attribute_1", import_headers)
@@ -1093,6 +1096,9 @@ class TestDescendantInventoryTotals(TransactionCase):
             chinese_labels[import_headers.index("x_material_type")],
             "\u7269\u6599\u7c7b\u578b",
         )
+        self.assertEqual(chinese_labels[import_headers.index("x_component_material")], "\u6750\u6599")
+        self.assertEqual(chinese_labels[import_headers.index("x_component_specification")], "\u5c3a\u5bf8\u89c4\u683c")
+        self.assertEqual(chinese_labels[import_headers.index("x_component_color")], "\u989c\u8272")
         self.assertIn("产品名称", chinese_labels)
         self.assertIn("Import Matched Attribute", chinese_labels)
 
@@ -1170,6 +1176,35 @@ class TestDescendantInventoryTotals(TransactionCase):
 
         quantity = self.StockQuant._get_available_quantity(product, self.bin_a)
         self.assertEqual(quantity, 1.0)
+
+    def test_component_import_preserves_material_specification_and_color(self):
+        result = self.env["product.template"].load(
+            [
+                "name",
+                "default_code",
+                "type",
+                "x_material_type",
+                "x_component_material",
+                "x_component_specification",
+                "x_component_color",
+            ],
+            [[
+                "\u5f39\u7c27\u5957\u7ba1",
+                "DBX-19",
+                "consu",
+                "component",
+                "\u4e0d\u9508\u94a2",
+                "\u03c68.5*8.1*52",
+                "\u672c\u8272",
+            ]],
+        )
+
+        self.assertFalse(result["messages"])
+        product_template = self.env["product.template"].browse(result["ids"][0])
+        self.assertEqual(product_template.x_material_type, "component")
+        self.assertEqual(product_template.x_component_material, "\u4e0d\u9508\u94a2")
+        self.assertEqual(product_template.x_component_specification, "\u03c68.5*8.1*52")
+        self.assertEqual(product_template.x_component_color, "\u672c\u8272")
 
     def test_product_import_preserves_legacy_repeated_custom_attribute_columns(self):
         self.env["stock.subwarehouse.product.attribute.apply.wizard"].create({
