@@ -16,12 +16,7 @@
     </template>
 
     <template id="product_title_international_mapping" inherit_id="website_sale.product_title" name="Localized Product Detail Name">
-        <xpath expr="//h1[@t-field='product.name']" position="replace">
-            <h1
-                t-attf-class="h3 {{'mb-3' if not product.description_ecommerce and not is_view_active('website_sale.product_comment') else ''}}"
-                t-out="product._get_website_display_name(request.lang and request.lang.code == 'en_US')"
-            />
-        </xpath>
+        <xpath expr="//h1[@t-field='product.name']" position="replace"/>
     </template>
 
     <template id="product_price_international_mapping" inherit_id="website_sale.product_price" name="Localized Product Detail Price">

@@ -707,7 +707,7 @@
                     t-as="option_group"
                     class="mb-3"
                 >
-                    <div class="fw-semibold mb-2" t-out="option_group['label']"/>
+                    <div t-if="option_group['key'] != 'color'" class="fw-semibold mb-2" t-out="option_group['label']"/>
                     <div class="d-flex flex-wrap gap-2">
                         <t t-foreach="option_group['values']" t-as="option_value">
                             <t
@@ -765,14 +765,14 @@
                         if (!root) {
                             return;
                         }
-                        let defaultCartText = "";
+                        let defaultCartMarkup = "";
                         let isNavigating = false;
 
                         function getCartButtons() {
                             const addToCart = document.querySelector(".x_shop_add_to_cart_button");
                             const unavailable = document.querySelector(".x_shop_unavailable_button");
-                            if (addToCart && !defaultCartText) {
-                                defaultCartText = addToCart.textContent.trim();
+                            if (addToCart && !defaultCartMarkup) {
+                                defaultCartMarkup = addToCart.innerHTML;
                             }
                             return { addToCart, unavailable };
                         }
@@ -807,7 +807,7 @@
                             addToCart.classList.toggle("d-none", !isAvailable);
                             unavailable.classList.toggle("d-none", isAvailable);
                             if (isAvailable) {
-                                addToCart.textContent = defaultCartText || "加入购物车";
+                                addToCart.innerHTML = defaultCartMarkup;
                             }
                         }
 
@@ -883,15 +883,22 @@
                 t-att-data-product-id="product.product_variant_id.id"
                 t-att-data-show-quantity="is_view_active('website_sale.product_quantity')"
             >
-                <i class="fa fa-shopping-cart me-2"/>
-                <t t-out="'Add to cart' if is_english else '加入购物车'"/>
+                <span class="x_shop_cart_icon" aria-hidden="true">
+                    <i class="fa fa-shopping-cart"/>
+                </span>
+                <span class="visually-hidden" t-out="'Add to cart' if is_english else '加入购物车'"/>
             </button>
             <button
                 type="button"
                 disabled="disabled"
                 t-attf-class="btn btn-primary flex-grow-1 x_shop_unavailable_button {{'d-none' if current_shop_available else ''}}"
+                t-att-title="'Out of stock' if is_english else '库存不足'"
+                t-att-aria-label="'Out of stock, cannot add to cart' if is_english else '库存不足，无法加入购物车'"
             >
-                <t t-out="'Out of stock' if is_english else '库存不足，无法加入购物车'"/>
+                <span class="x_shop_cart_icon x_shop_cart_icon_unavailable" aria-hidden="true">
+                    <i class="fa fa-shopping-cart"/>
+                    <i class="fa fa-times x_shop_cart_cross"/>
+                </span>
             </button>
         </xpath>
     </template>
@@ -909,14 +916,6 @@
                 }
                 .o_wsale_product_page #o_wsale_product_details_content {
                     max-width: 560px;
-                }
-                .o_wsale_product_page .o_wsale_product_details_content_section_title h1,
-                .o_wsale_product_page h1[itemprop="name"] {
-                    font-size: 1.65rem;
-                    line-height: 1.15;
-                    font-weight: 900;
-                    letter-spacing: .02em;
-                    text-transform: uppercase;
                 }
                 .o_wsale_product_page .product_price .oe_price {
                     font-size: 1.4rem;
@@ -944,6 +943,30 @@
                 }
                 .x_shop_unavailable_button:disabled {
                     opacity: 1;
+                }
+                .x_shop_cart_icon {
+                    position: relative;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    min-width: 2rem;
+                    font-size: 1.45rem;
+                    line-height: 1;
+                }
+                .x_shop_cart_cross {
+                    position: absolute;
+                    top: -.45rem;
+                    right: -.45rem;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 1rem;
+                    height: 1rem;
+                    border-radius: 50%;
+                    background: #fff;
+                    color: #111;
+                    font-size: .72rem;
+                    line-height: 1;
                 }
                 .o_wsale_product_page,
                 .o_wsale_product_page *,
@@ -1094,7 +1117,7 @@
 
     <template id="product_page_open_discussion_by_default" inherit_id="website_sale.product_comment" name="Open product discussion by default" active="True">
         <xpath expr="//a[@data-bs-target='#o_product_page_reviews_content']" position="attributes">
-            <attribute name="class">o_product_page_reviews_title d-flex justify-content-between text-reset text-decoration-none</attribute>
+            <attribute name="class">o_product_page_reviews_title d-none</attribute>
             <attribute name="aria-expanded">true</attribute>
         </xpath>
         <xpath expr="//div[@id='o_product_page_reviews_content']" position="attributes">

@@ -1,7 +1,7 @@
 {
     "name": "库存子仓库层级",
     "summary": "使用库存库位树跟踪仓库和子仓库。",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.2",
     "category": "库存/库存",
     "author": "Local",
     "license": "LGPL-3",
