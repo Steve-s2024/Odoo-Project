@@ -572,6 +572,7 @@
     <template id="product_page_shop_group_siblings" inherit_id="website_sale.product" name="Same-name shop variants">
         <xpath expr="//t[@name='variant_info']" position="after">
             <t t-set="is_english" t-value="request.lang and request.lang.code == 'en_US'"/>
+            <t t-set="is_shop_boot" t-value="product.sudo()._is_shop_boot_product()"/>
             <t t-set="shop_group_siblings" t-value="product.sudo()._get_shop_group_siblings()"/>
             <t t-set="shop_group_variant_rows" t-value="product.sudo()._get_shop_group_variant_rows(is_english=is_english)"/>
             <t t-set="shop_group_option_groups" t-value="product.sudo()._get_shop_group_variant_option_groups(is_english=is_english)"/>
@@ -601,34 +602,119 @@
                         color: #fff;
                     }
                     .o_shop_group_variant_selector .o_shop_color_image_choice {
-                        width: 6.5rem;
-                        min-width: 6.5rem;
-                        min-height: 7.75rem;
-                        padding: .35rem;
-                        flex-direction: column;
-                        gap: .35rem;
+                        width: 5.75rem;
+                        min-width: 5.75rem;
+                        min-height: 6rem;
+                        padding: .25rem;
                         background: #fff;
                         border-color: #ddd !important;
                     }
                     .o_shop_group_variant_selector .o_shop_color_image_choice img {
                         width: 100%;
-                        height: 5.5rem;
+                        height: 5.35rem;
                         object-fit: contain;
                         background: #fff;
-                    }
-                    .o_shop_group_variant_selector .o_shop_color_image_choice span {
-                        width: 100%;
-                        overflow: hidden;
-                        color: #111;
-                        font-size: .78rem;
-                        line-height: 1.15;
-                        text-align: center;
-                        text-overflow: ellipsis;
-                        white-space: nowrap;
                     }
                     .o_shop_group_variant_selector .o_shop_variant_choice_input:checked + .o_shop_color_image_choice {
                         background: #fff;
                         box-shadow: inset 0 0 0 2px #111;
+                    }
+                    .o_shop_variant_heading {
+                        display: flex;
+                        align-items: baseline;
+                        justify-content: space-between;
+                        gap: 1rem;
+                    }
+                    .o_shop_size_guide_toggle {
+                        padding: 0;
+                        border: 0;
+                        background: transparent;
+                        color: #111;
+                        font-size: .82rem;
+                        font-weight: 700;
+                        text-decoration: underline;
+                        text-underline-offset: .2rem;
+                    }
+                    .o_shop_size_guide_toggle .fa {
+                        margin-left: .3rem;
+                        transition: transform .2s ease;
+                    }
+                    .o_shop_size_guide_toggle[aria-expanded="true"] .fa {
+                        transform: rotate(180deg);
+                    }
+                    .o_shop_size_slider_shell {
+                        display: grid;
+                        grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem;
+                        gap: .35rem;
+                        align-items: stretch;
+                    }
+                    .o_shop_size_slider_track {
+                        display: flex;
+                        gap: .4rem;
+                        min-width: 0;
+                        overflow-x: auto;
+                        overscroll-behavior-inline: contain;
+                        scrollbar-width: none;
+                        scroll-behavior: smooth;
+                        scroll-snap-type: inline proximity;
+                    }
+                    .o_shop_size_slider_track::-webkit-scrollbar {
+                        display: none;
+                    }
+                    .o_shop_size_slider_track .o_shop_variant_choice {
+                        min-width: 3.65rem;
+                        min-height: 2.55rem;
+                        padding: .4rem .65rem !important;
+                        scroll-snap-align: start;
+                        font-size: .86rem;
+                    }
+                    .o_shop_size_slider_button {
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 2.25rem;
+                        min-height: 2.55rem;
+                        padding: 0;
+                        border: 1px solid #ddd;
+                        background: #fff;
+                        color: #111;
+                    }
+                    .o_shop_size_slider_button:hover {
+                        border-color: #111;
+                    }
+                    .o_shop_size_guide_panel {
+                        margin-top: .85rem;
+                        border-top: 1px solid #ddd;
+                    }
+                    .o_shop_size_guide_scroll {
+                        overflow-x: auto;
+                    }
+                    .o_shop_size_guide_table {
+                        width: 100%;
+                        min-width: 780px;
+                        border-collapse: separate;
+                        border-spacing: 0;
+                        font-size: .78rem;
+                        text-align: center;
+                    }
+                    .o_shop_size_guide_table th,
+                    .o_shop_size_guide_table td {
+                        padding: .72rem .6rem;
+                        border-bottom: 1px solid #fff;
+                        background: #f6f6f6;
+                        white-space: nowrap;
+                    }
+                    .o_shop_size_guide_table th {
+                        padding-top: .9rem;
+                        padding-bottom: .9rem;
+                        background: #ededed;
+                        font-size: .7rem;
+                        font-weight: 900;
+                        text-transform: uppercase;
+                    }
+                    .o_shop_size_guide_table td:first-child,
+                    .o_shop_size_guide_table td:nth-child(2) {
+                        font-weight: 800;
                     }
                     .o_shop_group_variant_selector .fw-semibold {
                         font-size: .9rem;
@@ -707,8 +793,33 @@
                     t-as="option_group"
                     class="mb-3"
                 >
-                    <div t-if="option_group['key'] != 'color'" class="fw-semibold mb-2" t-out="option_group['label']"/>
-                    <div class="d-flex flex-wrap gap-2">
+                    <div t-if="option_group['key'] != 'color'" class="o_shop_variant_heading mb-2">
+                        <span class="fw-semibold" t-out="option_group['label']"/>
+                        <button
+                            t-if="option_group['key'] == 'size' and is_shop_boot"
+                            type="button"
+                            class="o_shop_size_guide_toggle"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#o_shop_boot_size_guide"
+                            aria-expanded="false"
+                            aria-controls="o_shop_boot_size_guide"
+                        >
+                            <span>鞋码表/size guide</span>
+                            <i class="fa fa-chevron-down" aria-hidden="true"/>
+                        </button>
+                    </div>
+                    <div t-attf-class="{{'o_shop_size_slider_shell' if option_group['key'] == 'size' else ''}}">
+                        <button
+                            t-if="option_group['key'] == 'size'"
+                            type="button"
+                            class="o_shop_size_slider_button"
+                            data-size-scroll="-1"
+                            t-att-title="'Previous sizes' if is_english else '向前浏览尺码'"
+                            t-att-aria-label="'Previous sizes' if is_english else '向前浏览尺码'"
+                        >
+                            <i class="fa fa-chevron-left" aria-hidden="true"/>
+                        </button>
+                        <div t-attf-class="d-flex gap-2 {{'o_shop_size_slider_track' if option_group['key'] == 'size' else 'flex-wrap'}}">
                         <t t-foreach="option_group['values']" t-as="option_value">
                             <t
                                 t-set="color_image_product"
@@ -731,6 +842,8 @@
                             <label
                                 t-attf-class="btn btn-light border rounded-0 o_shop_variant_choice {{'o_shop_color_image_choice' if option_group['key'] == 'color' else 'px-3 py-2'}}"
                                 t-att-for="option_input_id"
+                                t-att-title="option_value if option_group['key'] == 'color' else None"
+                                t-att-aria-label="option_value if option_group['key'] == 'color' else None"
                             >
                                 <t t-if="option_group['key'] == 'color' and color_image_product">
                                     <img
@@ -738,11 +851,54 @@
                                         t-att-alt="option_value"
                                         loading="lazy"
                                     />
-                                    <span t-out="option_value"/>
                                 </t>
                                 <t t-else="" t-out="option_value"/>
                             </label>
                         </t>
+                        </div>
+                        <button
+                            t-if="option_group['key'] == 'size'"
+                            type="button"
+                            class="o_shop_size_slider_button"
+                            data-size-scroll="1"
+                            t-att-title="'Next sizes' if is_english else '向后浏览尺码'"
+                            t-att-aria-label="'Next sizes' if is_english else '向后浏览尺码'"
+                        >
+                            <i class="fa fa-chevron-right" aria-hidden="true"/>
+                        </button>
+                    </div>
+                    <div
+                        t-if="option_group['key'] == 'size' and is_shop_boot"
+                        id="o_shop_boot_size_guide"
+                        class="collapse o_shop_size_guide_panel"
+                    >
+                        <div class="o_shop_size_guide_scroll">
+                            <table class="o_shop_size_guide_table">
+                                <thead>
+                                    <tr>
+                                        <th>脚长/MONDO</th>
+                                        <th>中国鞋号/CHINA</th>
+                                        <th>靴底长度/BOOT SOLE</th>
+                                        <th>楦宽/LAST WIDTH</th>
+                                        <th>欧码/EU</th>
+                                        <th>英码/UK</th>
+                                        <th>美码/US</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>22–22.5</td><td>220–225</td><td>265</td><td>92</td><td>34.5–35</td><td>2.5–3</td><td>3.5–4</td></tr>
+                                    <tr><td>23–23.5</td><td>230–235</td><td>275</td><td>94</td><td>36–37</td><td>3.5–4</td><td>4.5–5</td></tr>
+                                    <tr><td>24–24.5</td><td>240–245</td><td>285</td><td>96</td><td>37.5–38</td><td>5–5.5</td><td>6–6.5</td></tr>
+                                    <tr><td>25–25.5</td><td>250–255</td><td>295</td><td>98</td><td>39–40</td><td>6–6.5</td><td>7–7.5</td></tr>
+                                    <tr><td>26–26.5</td><td>260–265</td><td>305</td><td>100</td><td>40.5–41</td><td>7–7.5</td><td>8–8.5</td></tr>
+                                    <tr><td>27–27.5</td><td>270–275</td><td>315</td><td>102</td><td>42–43</td><td>8–9</td><td>9–10</td></tr>
+                                    <tr><td>28–28.5</td><td>280–285</td><td>325</td><td>104</td><td>43.5–44</td><td>9.5–10</td><td>10.5–11</td></tr>
+                                    <tr><td>29–29.5</td><td>290–295</td><td>335</td><td>106</td><td>45–46</td><td>10.5–11</td><td>11.5–12</td></tr>
+                                    <tr><td>30–30.5</td><td>300–305</td><td>345</td><td>108</td><td>46.5–47</td><td>12–12.5</td><td>13–13.5</td></tr>
+                                    <tr><td>31–32.5</td><td>310–325</td><td>365</td><td>112</td><td>48–49.5</td><td>13–14.5</td><td>14–15.5</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
                 <div class="d-none o_shop_group_variant_map">
@@ -856,6 +1012,16 @@
                             if (event.target.matches(".o_shop_variant_choice_input")) {
                                 refreshSelection(true, event.target.dataset.optionKey, event.target);
                             }
+                        });
+                        root.querySelectorAll("[data-size-scroll]").forEach(function (button) {
+                            button.addEventListener("click", function () {
+                                const track = button.parentElement.querySelector(".o_shop_size_slider_track");
+                                if (!track) {
+                                    return;
+                                }
+                                const direction = parseInt(button.dataset.sizeScroll || "1", 10);
+                                track.scrollBy({ left: direction * Math.max(track.clientWidth * .7, 180), behavior: "smooth" });
+                            });
                         });
                         window.addEventListener("pageshow", resetLoadingState);
                         refreshSelection(false);

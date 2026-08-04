@@ -271,6 +271,38 @@ class ProductTemplate(models.Model):
             })
         return rows
 
+    def _is_shop_boot_product(self):
+        self.ensure_one()
+        normalized_name = " ".join((self.name or "").lower().split())
+        return any(term in normalized_name for term in (
+            "双板鞋",
+            "单板鞋",
+            "滑雪鞋",
+            "ski boot",
+            "snowboard boot",
+        ))
+
+    def _get_shop_variant_option_sort_key(self, key, value):
+        normalized_value = " ".join((value or "").strip().split())
+        if key == "size":
+            number_match = re.search(r"\d+(?:\.\d+)?", normalized_value.replace(",", "."))
+            if number_match:
+                return (0, float(number_match.group()), normalized_value.casefold())
+            letter_sizes = {
+                "xxs": 0,
+                "xs": 1,
+                "s": 2,
+                "m": 3,
+                "l": 4,
+                "xl": 5,
+                "xxl": 6,
+                "xxxl": 7,
+            }
+            letter_rank = letter_sizes.get(normalized_value.casefold())
+            if letter_rank is not None:
+                return (1, letter_rank, normalized_value.casefold())
+        return (2, 0, normalized_value.casefold())
+
     def _get_shop_group_variant_option_groups(self, is_english=False):
         self.ensure_one()
         rows = self._get_shop_group_variant_rows(is_english=is_english)
@@ -300,6 +332,7 @@ class ProductTemplate(models.Model):
                 values.append(value)
                 if key == "color":
                     image_products[value] = row["product"]
+            values.sort(key=lambda value: self._get_shop_variant_option_sort_key(key, value))
             groups.append({
                 "key": key,
                 "label": label,

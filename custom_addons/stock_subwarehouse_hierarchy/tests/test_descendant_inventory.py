@@ -597,6 +597,40 @@ class TestDescendantInventoryTotals(TransactionCase):
         )
         self.assertFalse(groups_by_key["size"]["image_products"])
 
+    def test_shop_variant_sizes_are_sorted_numerically(self):
+        products = self.env["product.template"].create([
+            {
+                "name": "Sorted Ski Boot",
+                "default_code": "012307S2-MA100-H001275",
+                "sale_ok": True,
+            },
+            {
+                "name": "Sorted Ski Boot",
+                "default_code": "012307S2-MA100-H001220",
+                "sale_ok": True,
+            },
+            {
+                "name": "Sorted Ski Boot",
+                "default_code": "012307S2-MA100-H001245",
+                "sale_ok": True,
+            },
+        ])
+        products.action_publish_to_shop()
+
+        groups = products[0]._get_shop_group_variant_option_groups()
+        sizes = next(group["values"] for group in groups if group["key"] == "size")
+
+        self.assertEqual(sizes, ["220", "245", "275"])
+
+    def test_shop_boot_product_detection(self):
+        ski_boot = self.env["product.template"].create({"name": "双板滑雪鞋"})
+        snowboard = self.env["product.template"].create({"name": "Snowboard Boot Pro"})
+        ski = self.env["product.template"].create({"name": "双板滑雪板"})
+
+        self.assertTrue(ski_boot._is_shop_boot_product())
+        self.assertTrue(snowboard._is_shop_boot_product())
+        self.assertFalse(ski._is_shop_boot_product())
+
     def test_shop_availability_uses_current_product_on_hand(self):
         product = self.env["product.template"].create({
             "name": "Shop Stock Test",
