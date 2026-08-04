@@ -1,5 +1,6 @@
 import base64
 from io import BytesIO
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from odoo import Command
@@ -1766,7 +1767,9 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(
             WebsitePurchaseHistory._customer_line_name(line, True), "English Ski Boots"
         )
-        self.assertEqual(WebsitePurchaseHistory._payment_status(order, True), "Paid")
+        paid_order = SimpleNamespace(x_website_payment_state="paid")
+        self.assertEqual(WebsitePurchaseHistory._payment_status(paid_order, True), "Paid")
+        self.assertEqual(WebsitePurchaseHistory._payment_status(paid_order, False), "已支付")
 
     def test_currency_symbols_use_yuan(self):
         usd = self.env.ref("base.USD")
@@ -1776,10 +1779,6 @@ class TestDescendantInventoryTotals(TransactionCase):
 
         self.assertTrue(cny.active)
         self.assertEqual(cny.symbol, "￥")
-        self.assertEqual(usd.symbol, "￥")
+        self.assertTrue(usd.active)
+        self.assertEqual(usd.symbol, "$")
         self.assertEqual(self.env.company.currency_id, cny)
-        if "product.pricelist" in self.env:
-            self.assertTrue(all(
-                pricelist.currency_id == cny
-                for pricelist in self.env["product.pricelist"].search([])
-            ))

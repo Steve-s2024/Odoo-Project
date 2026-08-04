@@ -292,6 +292,18 @@
     </template>
 
     <template id="item_pages_product_card_section" inherit_id="website.layout" name="Item Pages Product Cards">
+        <xpath expr="//head/t[@t-if='not title']" position="after">
+            <t t-set="x_item_title_slug" t-value="request.httprequest.path.rstrip('/').rsplit('/', 1)[-1]"/>
+            <t t-if="x_item_title_slug in ('ski-items', 'snowboard-items', 'other-items')">
+                <t t-set="x_item_title_is_english" t-value="bool(request.lang and (request.lang.code or '').lower().startswith('en'))"/>
+                <t t-set="x_item_browser_title" t-value="{
+                    'ski-items': 'Ski Products' if x_item_title_is_english else '双板商品(SKI PRODUCTS)',
+                    'snowboard-items': 'Snowboard Products' if x_item_title_is_english else '单板商品(SNOWBOARD PRODUCTS)',
+                    'other-items': 'Other Products' if x_item_title_is_english else '其他商品(OTHER PRODUCTS)',
+                }.get(x_item_title_slug)"/>
+                <t t-set="title" t-value="x_item_browser_title + ' | ' + website.name"/>
+            </t>
+        </xpath>
         <xpath expr="//div[@id='wrapwrap']/main/t[@t-out='0']" position="after">
             <t t-set="x_item_page_slug" t-value="request.httprequest.path.rstrip('/').rsplit('/', 1)[-1]"/>
             <t t-set="x_item_page_family" t-value="{
@@ -300,7 +312,7 @@
                 'other-items': 'other',
             }.get(x_item_page_slug)"/>
             <t t-if="x_item_page_family">
-                <t t-set="x_item_page_is_english" t-value="request.lang and request.lang.code == 'en_US'"/>
+                <t t-set="x_item_page_is_english" t-value="bool(request.lang and (request.lang.code or '').lower().startswith('en'))"/>
                 <t t-set="x_item_page_title" t-value="{
                     'ski-items': 'Ski Products' if x_item_page_is_english else '双板商品(SKI PRODUCTS)',
                     'snowboard-items': 'Snowboard Products' if x_item_page_is_english else '单板商品(SNOWBOARD PRODUCTS)',

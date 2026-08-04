@@ -16,13 +16,14 @@ class ResCurrency(models.Model):
                 "position": "before",
             })
 
-        self.with_context(active_test=False).search([]).write({
-            "symbol": "￥",
-            "position": "before",
-        })
+        usd = self.env.ref("base.USD", raise_if_not_found=False)
+        if usd:
+            usd.write({
+                "active": True,
+                "symbol": "$",
+                "position": "before",
+            })
 
         if yuan:
             self.env["res.company"].search([]).write({"currency_id": yuan.id})
-            if "product.pricelist" in self.env:
-                self.env["product.pricelist"].search([]).write({"currency_id": yuan.id})
         return True

@@ -64,7 +64,9 @@ class WebsitePurchaseHistory(CustomerPortal):
             "paid": ("Paid", "已支付"),
             "error": ("Payment failed", "支付失败"),
         }
-        return labels.get(order.x_website_payment_state, ("Unknown", "未知"))[is_english]
+        return labels.get(order.x_website_payment_state, ("Unknown", "未知"))[
+            0 if is_english else 1
+        ]
 
     @staticmethod
     def _refund_request_status(refund_request, is_english):
@@ -75,7 +77,9 @@ class WebsitePurchaseHistory(CustomerPortal):
             "failed": ("Refund failed", "退款失败"),
             "rejected": ("Refund rejected", "已拒绝"),
         }
-        return labels.get(refund_request.state, ("Unknown", "未知"))[is_english]
+        return labels.get(refund_request.state, ("Unknown", "未知"))[
+            0 if is_english else 1
+        ]
 
     def _get_customer_order(self, order_id):
         orders = request.env["sale.order"].sudo().search(
