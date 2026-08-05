@@ -642,6 +642,16 @@
                     .o_shop_size_guide_toggle[aria-expanded="true"] .fa {
                         transform: rotate(180deg);
                     }
+                    .o_shop_size_guide_toggle span {
+                        font-size: 0;
+                    }
+                    .o_shop_size_guide_toggle span::before {
+                        content: "鞋码表";
+                        font-size: .82rem;
+                    }
+                    html[lang^="en"] .o_shop_size_guide_toggle span::before {
+                        content: "Size guide";
+                    }
                     .o_shop_size_slider_shell {
                         display: grid;
                         grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem;
@@ -804,7 +814,7 @@
                             aria-expanded="false"
                             aria-controls="o_shop_boot_size_guide"
                         >
-                            <span>鞋码表/size guide</span>
+                            <span class="o_shop_size_guide_label" aria-hidden="true"/>
                             <i class="fa fa-chevron-down" aria-hidden="true"/>
                         </button>
                     </div>
@@ -1090,6 +1100,11 @@
                 }
                 .o_wsale_product_page .o_wsale_product_details_content_section {
                     border: 0 !important;
+                }
+                .o_wsale_product_page #o-carousel-product .product_detail_img {
+                    object-fit: contain !important;
+                    object-position: center !important;
+                    background: #fff;
                 }
                 .x_shop_add_to_cart_button,
                 .x_shop_unavailable_button {

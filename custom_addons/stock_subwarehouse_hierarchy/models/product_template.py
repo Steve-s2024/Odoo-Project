@@ -173,7 +173,8 @@ class ProductTemplate(models.Model):
 
     def _normalize_shop_group_name(self):
         self.ensure_one()
-        return " ".join((self.name or "").split()).casefold()
+        base_name = self.with_context(lang="zh_CN").name or self.name or ""
+        return " ".join(base_name.split()).casefold()
 
     def _get_website_display_name(self, is_english=False):
         self.ensure_one()
@@ -249,14 +250,16 @@ class ProductTemplate(models.Model):
 
     def _get_shop_group_siblings(self):
         self.ensure_one()
-        normalized_name = " ".join((self.name or "").split())
+        base_product = self.with_context(lang="zh_CN")
+        normalized_name = " ".join((base_product.name or self.name or "").split())
         if not normalized_name:
             return self
-        return self.search([
+        sibling_ids = base_product.search([
             ("name", "=ilike", normalized_name),
             ("sale_ok", "=", True),
             ("website_published", "=", True),
-        ], order="default_code, id")
+        ], order="default_code, id").ids
+        return self.browse(sibling_ids)
 
     def _get_shop_group_variant_rows(self, is_english=False):
         self.ensure_one()

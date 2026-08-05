@@ -622,6 +622,30 @@ class TestDescendantInventoryTotals(TransactionCase):
 
         self.assertEqual(sizes, ["220", "245", "275"])
 
+    def test_shop_groups_use_stable_chinese_name_across_languages(self):
+        products = self.env["product.template"].create([
+            {
+                "name": "Legacy Ski Boot",
+                "default_code": "012307S2-MA100-H001245",
+                "sale_ok": True,
+            },
+            {
+                "name": "Edited English Ski Boot",
+                "default_code": "012307S2-MA100-H001250",
+                "sale_ok": True,
+            },
+        ])
+        products.with_context(lang="zh_CN").write({"name": "分组语言稳定性测试雪鞋"})
+        products.action_publish_to_shop()
+
+        english_products = products.with_context(lang="en_US")
+
+        self.assertEqual(len(english_products._get_shop_grouped_products()), 1)
+        self.assertEqual(
+            english_products[0]._get_shop_group_siblings(),
+            english_products,
+        )
+
     def test_shop_boot_product_detection(self):
         ski_boot = self.env["product.template"].create({"name": "双板滑雪鞋"})
         snowboard = self.env["product.template"].create({"name": "Snowboard Boot Pro"})
