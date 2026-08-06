@@ -10,6 +10,7 @@
                 <field name="partner_id"/>
                 <field name="amount_total" widget="monetary"/>
                 <field name="currency_id" column_invisible="True"/>
+                <field name="return_required" optional="show"/>
                 <field name="state"/>
                 <field name="create_date"/>
             </list>
@@ -21,16 +22,31 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="action_submit_wechat_refund" type="object" string="通过并提交微信退款" class="btn-primary" invisible="state != 'requested'"/>
+                    <button name="action_submit_wechat_refund" type="object" string="审核通过" class="btn-primary" invisible="state != 'requested'"/>
+                    <button name="action_submit_wechat_refund" type="object" string="退货已收货，提交微信退款" class="btn-primary" invisible="state != 'return_received'"/>
+                    <button name="action_recreate_customer_return" type="object" string="重新创建客户退货单" class="btn-primary" invisible="state != 'return_cancelled'"/>
                     <button name="action_reject" type="object" string="拒绝" invisible="state != 'requested'"/>
-                    <field name="state" widget="statusbar" statusbar_visible="requested,processing,refunded,failed,rejected"/>
+                    <field name="state" widget="statusbar" statusbar_visible="requested,returning,return_received,processing,refunded,failed,rejected"/>
                 </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_return_pickings" type="object" class="oe_stat_button" icon="fa-undo" invisible="return_picking_count == 0">
+                            <field name="return_picking_count" widget="statinfo" string="客户退货单"/>
+                        </button>
+                        <button name="action_view_credit_note" type="object" class="oe_stat_button" icon="fa-file-text-o" invisible="not credit_note_id">
+                            <div class="o_stat_info"><span class="o_stat_text">退款贷项通知单</span></div>
+                        </button>
+                    </div>
                     <group>
                         <field name="order_id"/>
                         <field name="partner_id"/>
                         <field name="source_transaction_id"/>
                         <field name="refund_transaction_id"/>
+                        <field name="credit_note_id"/>
+                        <field name="return_required"/>
+                        <field name="return_warehouse_id" invisible="not return_required"/>
+                        <field name="return_location_id" readonly="state != 'requested'"/>
+                        <field name="return_picking_count" invisible="1"/>
                         <field name="currency_id" invisible="1"/>
                         <field name="amount_total" widget="monetary"/>
                     </group>
@@ -40,6 +56,15 @@
                             <field name="quantity"/>
                             <field name="amount" widget="monetary"/>
                             <field name="currency_id" column_invisible="True"/>
+                        </list>
+                    </field>
+                    <field name="return_picking_ids" readonly="1" invisible="not return_required">
+                        <list create="0" delete="0">
+                            <field name="name"/>
+                            <field name="picking_type_id"/>
+                            <field name="location_id"/>
+                            <field name="location_dest_id"/>
+                            <field name="state"/>
                         </list>
                     </field>
                 </sheet>

@@ -193,7 +193,10 @@ class ProductTemplate(models.Model):
         normalized = "".join(str(value or "").split()).casefold()
         for marker in ("硬度", "flex"):
             normalized = normalized.replace(marker, "")
-        if normalized in {"", "000", "\u65e0", "none", "noflex", "n/a", "notapplicable", "\u672a\u8bc6\u522b", "\u9ed8\u8ba4"}:
+        if normalized in {
+            "", "000", "\u65e0", "no", "none", "noflex", "n/a", "notapplicable",
+            "notspecified", "\u672a\u8bc6\u522b", "\u9ed8\u8ba4",
+        }:
             return ""
         return normalized
 
@@ -310,12 +313,17 @@ class ProductTemplate(models.Model):
         self.ensure_one()
         rows = self._get_shop_group_variant_rows(is_english=is_english)
         option_specs = [
-            ("color", "Color" if is_english else "颜色"),
+            ("type_color", "Type / Color" if is_english else "类型 / 颜色"),
             ("size", "Size" if is_english else "尺码"),
             ("flex", "Flex" if is_english else "硬度"),
         ]
         groups = []
         for key, label in option_specs:
+            if key == "flex" and not any(
+                self._normalize_website_mapping_flex(row["values"].get(key))
+                for row in rows
+            ):
+                continue
             values = []
             seen_values = set()
             image_products = {}
@@ -324,7 +332,7 @@ class ProductTemplate(models.Model):
                 if value in seen_values:
                     current_image_product = image_products.get(value)
                     if (
-                        key == "color"
+                        key == "type_color"
                         and current_image_product
                         and not current_image_product.image_1920
                         and row["product"].image_1920
@@ -333,7 +341,7 @@ class ProductTemplate(models.Model):
                     continue
                 seen_values.add(value)
                 values.append(value)
-                if key == "color":
+                if key == "type_color":
                     image_products[value] = row["product"]
             values.sort(key=lambda value: self._get_shop_variant_option_sort_key(key, value))
             groups.append({
@@ -514,6 +522,18 @@ class ProductTemplate(models.Model):
                 for key, value in values.items()
                 if key != "default_code"
             })
+        code_parts = (self.default_code or "").strip().split("-")
+        first_block = code_parts[0].strip().upper() if code_parts else ""
+        last_block = code_parts[-1].strip().upper() if code_parts else ""
+        type_code = first_block[-2:] if len(first_block) >= 2 else first_block
+        color_code = last_block[:4]
+        type_label = type_code or ("Unknown type" if is_english else "未知类型")
+        color_label = values["color"]
+        values.update({
+            "type_code": type_code,
+            "color_code": color_code,
+            "type_color": f"{type_label} · {color_label}",
+        })
         return values
 
     def _get_shop_group_summary(self):

@@ -1,4 +1,6 @@
-from odoo import _, api, fields, models
+from collections import defaultdict
+
+from odoo import _, Command, api, fields, models
 from odoo.exceptions import ValidationError
 
 
@@ -16,6 +18,29 @@ class WebsiteRefundRequest(models.Model):
     refund_transaction_id = fields.Many2one(
         "payment.transaction", string="微信退款交易", readonly=True, ondelete="restrict"
     )
+    credit_note_id = fields.Many2one(
+        "account.move", string="退款贷项通知单", readonly=True, copy=False, ondelete="restrict"
+    )
+    return_required = fields.Boolean(string="需要退货", readonly=True, copy=False)
+    return_warehouse_id = fields.Many2one(
+        "stock.warehouse", string="退货仓库", readonly=True, copy=False
+    )
+    return_location_id = fields.Many2one(
+        "stock.location",
+        string="退货目的库位",
+        domain="[('usage', '=', 'internal')]",
+        copy=False,
+        help="默认使用商品原发货库位；审核前可改为其他内部库位。",
+    )
+    return_picking_ids = fields.One2many(
+        "stock.picking",
+        "website_refund_request_id",
+        string="客户退货单",
+        readonly=True,
+    )
+    return_picking_count = fields.Integer(
+        string="退货单数量", compute="_compute_return_picking_count"
+    )
     currency_id = fields.Many2one(related="source_transaction_id.currency_id")
     line_ids = fields.One2many(
         "stock.subwarehouse.website.refund.request.line", "request_id", string="退款商品"
@@ -24,6 +49,9 @@ class WebsiteRefundRequest(models.Model):
     state = fields.Selection(
         [
             ("requested", "待审核"),
+            ("returning", "等待客户退货"),
+            ("return_received", "退货已收货"),
+            ("return_cancelled", "退货单已取消"),
             ("processing", "退款处理中"),
             ("refunded", "已退款"),
             ("failed", "退款失败"),
@@ -33,50 +61,294 @@ class WebsiteRefundRequest(models.Model):
         store=True,
     )
     review_state = fields.Selection(
-        [("requested", "待审核"), ("rejected", "已拒绝")],
+        [("requested", "待审核"), ("approved", "已通过"), ("rejected", "已拒绝")],
         default="requested",
         required=True,
     )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        refund_requests = super().create(vals_list)
+        for refund_request in refund_requests.filtered(lambda request: not request.return_location_id):
+            original_locations = refund_request._get_original_return_locations()
+            if len(original_locations) == 1:
+                refund_request.return_location_id = original_locations
+        return refund_requests
+
+    @api.depends("return_picking_ids")
+    def _compute_return_picking_count(self):
+        for refund_request in self:
+            refund_request.return_picking_count = len(refund_request.return_picking_ids)
 
     @api.depends("line_ids.amount")
     def _compute_amount_total(self):
         for refund_request in self:
             refund_request.amount_total = sum(refund_request.line_ids.mapped("amount"))
 
-    @api.depends("review_state", "refund_transaction_id.state")
+    @api.depends(
+        "review_state",
+        "return_required",
+        "return_picking_ids.state",
+        "refund_transaction_id.state",
+    )
     def _compute_state(self):
         for refund_request in self:
             transaction = refund_request.refund_transaction_id
             if refund_request.review_state == "rejected":
                 refund_request.state = "rejected"
-            elif not transaction:
-                refund_request.state = "requested"
-            elif transaction.state == "done":
+            elif transaction and transaction.state == "done":
                 refund_request.state = "refunded"
-            elif transaction.state == "error":
+            elif transaction and transaction.state == "error":
                 refund_request.state = "failed"
+            elif transaction:
+                refund_request.state = "processing"
+            elif refund_request.review_state == "requested":
+                refund_request.state = "requested"
+            elif refund_request.return_required:
+                active_returns = refund_request.return_picking_ids.filtered(
+                    lambda picking: picking.state != "cancel"
+                )
+                if active_returns and all(picking.state == "done" for picking in active_returns):
+                    refund_request.state = "return_received"
+                elif active_returns:
+                    refund_request.state = "returning"
+                else:
+                    refund_request.state = "return_cancelled"
             else:
                 refund_request.state = "processing"
 
     def action_submit_wechat_refund(self):
+        return_pickings = self.env["stock.picking"]
         for refund_request in self:
-            if refund_request.state != "requested":
-                raise ValidationError(_("该退款申请已处理，不能重复提交。"))
-            if refund_request.source_transaction_id.provider_code != "wechatpay":
-                raise ValidationError(_("仅支持从微信支付交易发起退款。"))
-            if refund_request.amount_total <= 0:
-                raise ValidationError(_("退款金额必须大于零。"))
-            available = refund_request.source_transaction_id.amount - sum(
-                -transaction.amount
-                for transaction in refund_request.source_transaction_id.child_transaction_ids
-                if transaction.operation == "refund"
-                and transaction.state in ("draft", "pending", "authorized", "done")
-            )
-            if refund_request.amount_total > available:
-                raise ValidationError(_("退款金额超过当前可退款金额。"))
-            transaction = refund_request.source_transaction_id._refund(refund_request.amount_total)
-            refund_request.refund_transaction_id = transaction
+            if refund_request.state not in ("requested", "return_received"):
+                raise ValidationError(_("该退款申请当前不能提交退款。"))
+            refund_request._validate_payment_refund()
+
+            if refund_request.state == "requested":
+                quantities_by_picking = refund_request._get_return_quantities_by_picking()
+                refund_request.review_state = "approved"
+                if quantities_by_picking:
+                    if not refund_request.return_location_id:
+                        original_locations = refund_request._get_original_return_locations(
+                            quantities_by_picking
+                        )
+                        if len(original_locations) == 1:
+                            refund_request.return_location_id = original_locations
+                    refund_request.return_required = True
+                    return_pickings |= refund_request._create_customer_return_pickings(
+                        quantities_by_picking
+                    )
+                    continue
+
+            refund_request._submit_payment_refund()
+
+        if return_pickings:
+            return self._return_pickings_action(return_pickings)
         return True
+
+    def _validate_payment_refund(self):
+        self.ensure_one()
+        if self.source_transaction_id.provider_code != "wechatpay":
+            raise ValidationError(_("仅支持从微信支付交易发起退款。"))
+        if self.amount_total <= 0:
+            raise ValidationError(_("退款金额必须大于零。"))
+        available = self.source_transaction_id.amount - sum(
+            -transaction.amount
+            for transaction in self.source_transaction_id.child_transaction_ids
+            if transaction.operation == "refund"
+            and transaction.state in ("draft", "pending", "authorized", "done")
+        )
+        if self.amount_total > available:
+            raise ValidationError(_("退款金额超过当前可退款金额。"))
+
+    def _submit_payment_refund(self):
+        self.ensure_one()
+        if self.refund_transaction_id:
+            return self.refund_transaction_id
+        if self.return_required and self.state != "return_received":
+            raise ValidationError(_("必须先完成客户退货入库，才能提交支付退款。"))
+        transaction = self.source_transaction_id._refund(self.amount_total)
+        self.refund_transaction_id = transaction
+        if transaction.state == "done":
+            self._ensure_credit_note()
+        return transaction
+
+    def _ensure_credit_note(self):
+        """Create one posted partial credit note after a successful payment refund."""
+        for refund_request in self.filtered(
+            lambda request: request.refund_transaction_id.state == "done"
+            and not request.credit_note_id
+        ):
+            posted_invoices = refund_request.order_id.invoice_ids.filtered(
+                lambda move: move.move_type == "out_invoice" and move.state == "posted"
+            ).sorted(key=lambda move: (move.invoice_date or fields.Date.today(), move.id), reverse=True)
+            if not posted_invoices:
+                continue
+
+            selected_sale_lines = refund_request.line_ids.mapped("sale_line_id")
+            invoice = posted_invoices.filtered(
+                lambda move: all(
+                    sale_line.invoice_lines.filtered(
+                        lambda invoice_line: invoice_line.move_id == move
+                        and invoice_line.display_type == "product"
+                    )
+                    for sale_line in selected_sale_lines
+                )
+            )[:1] or posted_invoices[:1]
+
+            credit_lines = []
+            for refund_line in refund_request.line_ids:
+                sale_line = refund_line.sale_line_id
+                invoice_line = sale_line.invoice_lines.filtered(
+                    lambda line: line.move_id == invoice and line.display_type == "product"
+                )[:1]
+                if not invoice_line:
+                    continue
+                quantity = sale_line.product_uom_id._compute_quantity(
+                    refund_line.quantity, invoice_line.product_uom_id
+                )
+                credit_lines.append(Command.create({
+                    "product_id": invoice_line.product_id.id,
+                    "name": invoice_line.name,
+                    "account_id": invoice_line.account_id.id,
+                    "quantity": quantity,
+                    "product_uom_id": invoice_line.product_uom_id.id,
+                    "price_unit": invoice_line.price_unit,
+                    "discount": invoice_line.discount,
+                    "tax_ids": [Command.set(invoice_line.tax_ids.ids)],
+                    "sale_line_ids": [Command.set(sale_line.ids)],
+                }))
+            if not credit_lines:
+                continue
+
+            credit_note = self.env["account.move"].sudo().create({
+                "move_type": "out_refund",
+                "partner_id": invoice.partner_id.id,
+                "currency_id": invoice.currency_id.id,
+                "journal_id": invoice.journal_id.id,
+                "invoice_date": fields.Date.context_today(refund_request),
+                "invoice_origin": refund_request.order_id.name,
+                "ref": _("网站退款 %(refund)s", refund=refund_request.display_name),
+                "reversed_entry_id": invoice.id,
+                "invoice_line_ids": credit_lines,
+            })
+            credit_note.action_post()
+            refund_request.credit_note_id = credit_note
+
+    def action_view_credit_note(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("退款贷项通知单"),
+            "res_model": "account.move",
+            "view_mode": "form",
+            "res_id": self.credit_note_id.id,
+        }
+
+    def _get_return_quantities_by_picking(self):
+        """Allocate delivered refund quantities to their original outgoing moves."""
+        self.ensure_one()
+        quantities_by_picking = defaultdict(dict)
+        for refund_line in self.line_ids:
+            remaining_qty = refund_line.quantity
+            sale_uom = refund_line.sale_line_id.product_uom_id
+            delivered_moves = refund_line.sale_line_id.move_ids.filtered(
+                lambda move: move.state == "done"
+                and move.picking_id.picking_type_code == "outgoing"
+                and not move.origin_returned_move_id
+            ).sorted(lambda move: (move.date, move.id))
+            for move in delivered_moves:
+                delivered_qty = move.product_uom._compute_quantity(move.quantity, sale_uom)
+                returned_qty = sum(
+                    returned_move.product_uom._compute_quantity(
+                        returned_move.quantity
+                        if returned_move.state == "done"
+                        else returned_move.product_uom_qty,
+                        sale_uom,
+                    )
+                    for returned_move in move.returned_move_ids
+                    if returned_move.state != "cancel"
+                )
+                available_qty = max(delivered_qty - returned_qty, 0.0)
+                quantity = min(remaining_qty, available_qty)
+                if sale_uom.is_zero(quantity):
+                    continue
+                quantities_by_picking[move.picking_id][move] = sale_uom._compute_quantity(
+                    quantity, move.product_uom
+                )
+                remaining_qty -= quantity
+                if sale_uom.is_zero(remaining_qty):
+                    break
+        return quantities_by_picking
+
+    def _get_original_return_locations(self, quantities_by_picking=None):
+        self.ensure_one()
+        quantities_by_picking = quantities_by_picking or self._get_return_quantities_by_picking()
+        locations = self.env["stock.location"]
+        for quantities_by_move in quantities_by_picking.values():
+            for move in quantities_by_move:
+                locations |= move.location_id
+        return locations
+
+    def _create_customer_return_pickings(self, quantities_by_picking):
+        self.ensure_one()
+        return_pickings = self.env["stock.picking"]
+        for delivery, quantities_by_move in quantities_by_picking.items():
+            wizard = self.env["stock.return.picking"].create({"picking_id": delivery.id})
+            for return_line in wizard.product_return_moves:
+                return_line.quantity = quantities_by_move.get(return_line.move_id, 0.0)
+            return_picking = wizard._create_return()
+            destinations_by_move = {
+                return_move: self.return_location_id
+                or return_move.origin_returned_move_id.location_id
+                for return_move in return_picking.move_ids
+            }
+            destinations = self.env["stock.location"]
+            for destination in destinations_by_move.values():
+                destinations |= destination
+            if destinations:
+                return_picking.location_dest_id = destinations[:1]
+                for return_move, destination in destinations_by_move.items():
+                    return_move.location_dest_id = destination
+            return_picking.write({
+                "website_refund_request_id": self.id,
+                "origin": _(
+                    "%(origin)s / 网站退款 %(refund)s",
+                    origin=return_picking.origin,
+                    refund=self.name,
+                ),
+            })
+            return_pickings |= return_picking
+            if not self.return_warehouse_id:
+                self.return_warehouse_id = delivery.picking_type_id.warehouse_id
+        return return_pickings
+
+    def action_recreate_customer_return(self):
+        self.ensure_one()
+        if self.state != "return_cancelled":
+            raise ValidationError(_("仅已取消的客户退货流程可以重新创建退货单。"))
+        quantities_by_picking = self._get_return_quantities_by_picking()
+        if not quantities_by_picking:
+            raise ValidationError(_("没有可重新创建的已交付退货数量。"))
+        return self._return_pickings_action(
+            self._create_customer_return_pickings(quantities_by_picking)
+        )
+
+    def action_view_return_pickings(self):
+        self.ensure_one()
+        return self._return_pickings_action(self.return_picking_ids)
+
+    def _return_pickings_action(self, pickings):
+        action = {
+            "type": "ir.actions.act_window",
+            "name": _("客户退货单"),
+            "res_model": "stock.picking",
+            "view_mode": "list,form",
+            "domain": [("id", "in", pickings.ids)],
+        }
+        if len(pickings) == 1:
+            action.update({"view_mode": "form", "res_id": pickings.id})
+        return action
 
     def action_reject(self):
         self.filtered(lambda refund_request: refund_request.state == "requested").write({

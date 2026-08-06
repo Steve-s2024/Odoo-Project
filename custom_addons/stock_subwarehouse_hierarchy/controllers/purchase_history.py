@@ -1,9 +1,13 @@
 from odoo.http import request, route
-from odoo.addons.portal.controllers.portal import CustomerPortal
+from odoo.addons.sale.controllers.portal import CustomerPortal
 
 
 class WebsitePurchaseHistory(CustomerPortal):
     """Customer-facing website order history, separate from the generic portal."""
+
+    @route()
+    def portal_my_orders(self, **kwargs):
+        return request.redirect("/purchase-history")
 
     def _redirect_home_if_public(self):
         if request.env.user._is_public():
@@ -72,6 +76,9 @@ class WebsitePurchaseHistory(CustomerPortal):
     def _refund_request_status(refund_request, is_english):
         labels = {
             "requested": ("Awaiting review", "待审核"),
+            "returning": ("Awaiting product return", "等待退货"),
+            "return_received": ("Return received", "退货已收货"),
+            "return_cancelled": ("Return arrangement cancelled", "退货安排已取消"),
             "processing": ("Refund processing", "退款处理中"),
             "refunded": ("Refunded", "已退款"),
             "failed": ("Refund failed", "退款失败"),
@@ -165,8 +172,10 @@ class WebsitePurchaseHistory(CustomerPortal):
         is_english = bool((request.lang and request.lang.code or "").lower().startswith("en"))
         return request.render("stock_subwarehouse_hierarchy.refund_item_page", {
             "order": order,
+            "refund_requests": self._get_order_refund_requests(order),
             "is_english": is_english,
             "customer_line_name": self._customer_line_name,
+            "refund_request_status": self._refund_request_status,
             "additional_title": "Refund Items" if is_english else "申请退款",
         })
 

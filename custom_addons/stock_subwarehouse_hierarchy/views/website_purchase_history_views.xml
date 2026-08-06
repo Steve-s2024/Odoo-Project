@@ -55,6 +55,75 @@
         </t>
     </template>
 
+    <template id="refund_history_section" name="SUN Refund History Section">
+        <section class="x_refund_history mt-5" t-if="refund_requests">
+            <style>
+                .x_refund_history_list { border-top: 2px solid #111; }
+                .x_refund_history_entry { padding: 20px 0; border-bottom: 1px solid #dedede; }
+                .x_refund_history_head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 20px; align-items: center; }
+                .x_refund_history_status { color: #555; font-weight: 800; }
+                .x_refund_history_total { font-weight: 900; text-align: right; white-space: nowrap; }
+                .x_refund_history_items { margin-top: 14px; padding: 12px 16px; background: #f7f7f7; }
+                .x_refund_history_item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 20px; padding: 8px 0; align-items: center; }
+                .x_refund_history_item + .x_refund_history_item { border-top: 1px solid #dedede; }
+                .x_refund_history_product { font-weight: 700; }
+                .x_refund_history_quantity, .x_refund_history_amount { white-space: nowrap; }
+                .x_refund_history_amount { text-align: right; font-weight: 700; }
+                .x_refund_return { margin-top: 12px; padding: 12px 16px; border-left: 3px solid #111; background: #fff8df; color: #4a3b00; }
+                .x_refund_return strong { display: block; margin-bottom: 4px; color: #111; }
+                .x_refund_return_refs { margin-top: 5px; font-weight: 700; }
+                @media (max-width: 680px) {
+                    .x_refund_history_head { grid-template-columns: 1fr auto; }
+                    .x_refund_history_status { grid-column: 1 / -1; grid-row: 2; }
+                    .x_refund_history_item { grid-template-columns: 1fr auto; }
+                    .x_refund_history_amount { grid-column: 1 / -1; text-align: left; color: #666; }
+                }
+            </style>
+            <h2 class="h4 mb-3" t-out="'Refund history' if is_english else '退款记录'"/>
+            <div class="x_refund_history_list">
+                <article t-foreach="refund_requests" t-as="refund_request" class="x_refund_history_entry">
+                    <div class="x_refund_history_head">
+                        <strong>
+                            <t t-out="'Refund request' if is_english else '退款申请'"/>
+                            <span class="text-muted" t-field="refund_request.create_date"/>
+                        </strong>
+                        <span class="x_refund_history_status" t-out="refund_request_status(refund_request, is_english)"/>
+                        <span class="x_refund_history_total" t-field="refund_request.amount_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/>
+                    </div>
+                    <div class="x_refund_history_items">
+                        <div t-foreach="refund_request.line_ids" t-as="refund_line" class="x_refund_history_item">
+                            <span class="x_refund_history_product" t-out="customer_line_name(refund_line.sale_line_id, is_english)"/>
+                            <span class="x_refund_history_quantity">
+                                <t t-out="'Quantity:' if is_english else '数量：'"/>
+                                <t t-out="refund_line.quantity"/>
+                            </span>
+                            <span class="x_refund_history_amount" t-field="refund_line.amount" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/>
+                        </div>
+                    </div>
+                    <div class="x_refund_return" t-if="refund_request.return_required and refund_request.state in ('returning', 'return_cancelled')">
+                        <strong t-out="'Product return required' if is_english else '需要退回商品'"/>
+                        <t t-if="refund_request.state == 'returning'">
+                            <span t-out="'Ship the listed products back to the return warehouse. The payment refund can only begin after the warehouse confirms receipt.' if is_english else '请将上述商品寄回退货仓库。仓库确认收货后，才能发起支付退款。'"/>
+                            <div t-if="refund_request.return_warehouse_id" class="mt-1">
+                                <t t-out="'Return address: ' if is_english else '退货地址：'"/>
+                                <t t-out="refund_request.return_warehouse_id.partner_id.contact_address"/>
+                            </div>
+                        </t>
+                        <t t-elif="refund_request.state == 'return_cancelled'">
+                            <span t-out="'The return arrangement was cancelled. Please contact customer service for a new return reference.' if is_english else '退货安排已取消，请联系客服重新生成退货单号。'"/>
+                        </t>
+                        <div class="x_refund_return_refs" t-if="refund_request.return_picking_ids">
+                            <t t-out="'Return reference: ' if is_english else '退货单号：'"/>
+                            <t t-foreach="refund_request.return_picking_ids" t-as="return_picking">
+                                <span t-if="return_picking.state != 'cancel'" t-out="return_picking.name"/>
+                            </t>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </section>
+    </template>
+
     <template id="purchase_detail_page" name="SUN Purchase Detail">
         <t t-call="website.layout">
             <main id="wrap" class="x_purchase_page">
@@ -120,16 +189,7 @@
                             </a>
                         </aside>
                     </div>
-                    <section class="mt-5" t-if="refund_requests or refund_transactions">
-                        <h2 class="h4 mb-3" t-out="'Refund history' if is_english else '退款记录'"/>
-                        <div class="x_purchase_lines">
-                            <div t-foreach="refund_requests" t-as="refund_request" class="x_purchase_line">
-                                <div class="x_purchase_line_name"><t t-out="refund_request.name"/></div>
-                                <div class="x_purchase_line_qty"><t t-out="refund_request_status(refund_request, is_english)"/></div>
-                                <div class="x_purchase_line_total"><span t-field="refund_request.amount_total" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
-                            </div>
-                        </div>
-                    </section>
+                    <t t-call="stock_subwarehouse_hierarchy.refund_history_section"/>
                     <div id="oe_structure_purchase_detail_bottom" class="oe_structure oe_empty"/>
                 </section>
             </main>
@@ -161,11 +221,12 @@
                             <div t-foreach="order.order_line" t-as="line" t-if="not line.display_type" class="x_refund_row">
                                 <div><strong t-out="customer_line_name(line, is_english)"/><small class="d-block text-muted"><t t-out="'Purchased quantity: ' if is_english else '购买数量：'"/><t t-out="line.product_uom_qty"/></small></div>
                                 <div><span t-field="line.price_unit" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/></div>
-                                <input type="number" min="0" t-att-max="line.product_uom_qty" step="0.01" value="0" t-attf-name="quantity_#{line.id}" aria-label="Refund quantity"/>
+                                <input type="number" min="0" t-att-max="line.product_uom_qty" step="1" value="0" t-attf-name="quantity_#{line.id}" aria-label="Refund quantity"/>
                             </div>
                         </div>
                         <button type="submit" class="btn btn-dark x_refund_submit" t-out="'Submit refund request' if is_english else '提交退款申请'"/>
                     </form>
+                    <t t-call="stock_subwarehouse_hierarchy.refund_history_section"/>
                     <div id="oe_structure_refund_item_bottom" class="oe_structure oe_empty"/>
                 </section>
             </main>

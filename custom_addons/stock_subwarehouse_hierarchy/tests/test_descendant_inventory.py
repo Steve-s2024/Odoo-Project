@@ -128,7 +128,9 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.env["res.lang"].action_use_chinese_by_default()
 
         zh_cn = self.env["res.lang"].with_context(active_test=False).search([("code", "=", "zh_CN")])
+        en_us = self.env["res.lang"].with_context(active_test=False).search([("code", "=", "en_US")])
         self.assertTrue(zh_cn.active)
+        self.assertEqual(en_us.name, "English")
         self.assertEqual(self.env["ir.default"]._get("res.partner", "lang"), "zh_CN")
         self.assertEqual(self.env.user.lang, "zh_CN")
         self.assertEqual(self.env.user.partner_id.lang, "zh_CN")
@@ -584,18 +586,42 @@ class TestDescendantInventoryTotals(TransactionCase):
             for group in option_groups
         }
 
-        self.assertEqual(options_by_key["color"], ["黑", "白"])
+        self.assertEqual(options_by_key["type_color"], ["YB · 白", "YB · 黑"])
         self.assertEqual(options_by_key["size"], ["150", "155"])
-        self.assertEqual(options_by_key["flex"], ["无硬度", "100"])
+        self.assertEqual(options_by_key["flex"], ["100", "无硬度"])
         self.assertEqual(
-            groups_by_key["color"]["image_products"][options_by_key["color"][0]],
+            groups_by_key["type_color"]["image_products"]["YB · 黑"],
             product_1,
         )
         self.assertEqual(
-            groups_by_key["color"]["image_products"][options_by_key["color"][1]],
+            groups_by_key["type_color"]["image_products"]["YB · 白"],
             product_2,
         )
         self.assertFalse(groups_by_key["size"]["image_products"])
+
+    def test_shop_picture_options_distinguish_product_type_and_color_code(self):
+        t1_glove, t5_glove = self.env["product.template"].create([
+            {
+                "name": "Type Color Selector Test Glove",
+                "default_code": "112411T1-MA000-H001##S",
+                "sale_ok": True,
+            },
+            {
+                "name": "Type Color Selector Test Glove",
+                "default_code": "112411T5-MA000-H001##S",
+                "sale_ok": True,
+            },
+        ])
+        (t1_glove | t5_glove).action_publish_to_shop()
+
+        values = {
+            group["key"]: group["values"]
+            for group in t1_glove._get_shop_group_variant_option_groups()
+        }
+
+        self.assertEqual(values["type_color"], ["T1 · 黑", "T5 · 黑"])
+        self.assertEqual(t1_glove._get_shop_variant_display_values()["color_code"], "H001")
+        self.assertEqual(t5_glove._get_shop_variant_display_values()["type_code"], "T5")
 
     def test_shop_variant_sizes_are_sorted_numerically(self):
         products = self.env["product.template"].create([
@@ -621,6 +647,25 @@ class TestDescendantInventoryTotals(TransactionCase):
         sizes = next(group["values"] for group in groups if group["key"] == "size")
 
         self.assertEqual(sizes, ["220", "245", "275"])
+
+    def test_shop_variant_option_groups_hide_flex_when_all_products_have_no_flex(self):
+        products = self.env["product.template"].create([
+            {
+                "name": "No Flex Glove Selector Test",
+                "default_code": "072409Y-MA000-G001##S",
+                "sale_ok": True,
+            },
+            {
+                "name": "No Flex Glove Selector Test",
+                "default_code": "072409Y-MA000-H001##M",
+                "sale_ok": True,
+            },
+        ])
+        products.action_publish_to_shop()
+
+        groups = products[0]._get_shop_group_variant_option_groups()
+
+        self.assertNotIn("flex", [group["key"] for group in groups])
 
     def test_shop_groups_use_stable_chinese_name_across_languages(self):
         products = self.env["product.template"].create([

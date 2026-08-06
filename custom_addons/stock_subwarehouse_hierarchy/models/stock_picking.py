@@ -1,10 +1,18 @@
-from odoo import _, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_compare
 
 
 class StockPicking(models.Model):
     _inherit = "stock.picking"
+
+    website_refund_request_id = fields.Many2one(
+        "stock.subwarehouse.website.refund.request",
+        string="网站退款申请",
+        copy=False,
+        index=True,
+        ondelete="set null",
+    )
 
     def button_validate(self):
         self._check_exact_source_location_stock()

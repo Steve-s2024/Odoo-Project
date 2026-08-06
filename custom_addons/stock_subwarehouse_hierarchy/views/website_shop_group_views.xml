@@ -738,11 +738,14 @@
                     .o_shop_variant_loading_overlay {
                         position: fixed;
                         inset: 0;
-                        z-index: 1090;
+                        z-index: 2147483000;
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        background: rgba(255, 255, 255, .72);
+                        background: rgba(255, 255, 255, .58);
+                        backdrop-filter: blur(8px);
+                        -webkit-backdrop-filter: blur(8px);
+                        isolation: isolate;
                         opacity: 0;
                         visibility: hidden;
                         pointer-events: none;
@@ -750,23 +753,40 @@
                     }
                     .o_shop_variant_loading_indicator {
                         display: flex;
+                        flex-direction: column;
                         align-items: center;
-                        gap: .75rem;
-                        padding: .9rem 1.15rem;
+                        gap: .7rem;
+                        min-width: 9.5rem;
+                        padding: 1.15rem 1.4rem 1rem;
                         color: #111;
-                        background: #fff;
-                        border: 1px solid #ddd;
-                        box-shadow: 0 12px 35px rgba(0, 0, 0, .12);
-                        font-size: .9rem;
+                        background: rgba(255, 255, 255, .94);
+                        border: 1px solid rgba(17, 17, 17, .08);
+                        border-radius: 1.25rem;
+                        box-shadow: 0 18px 55px rgba(0, 0, 0, .16);
+                        font-size: .78rem;
                         font-weight: 700;
+                        letter-spacing: .04em;
                     }
-                    .o_shop_variant_loading_spinner {
-                        width: 1.25rem;
-                        height: 1.25rem;
-                        border: 2px solid #ccc;
-                        border-top-color: #111;
+                    .o_shop_variant_loading_visual {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: .38rem;
+                        width: 4.5rem;
+                        height: 2.25rem;
+                    }
+                    .o_shop_variant_loading_visual span {
+                        width: .72rem;
+                        height: .72rem;
                         border-radius: 50%;
-                        animation: o_shop_variant_spin .7s linear infinite;
+                        background: #111;
+                        animation: o_shop_variant_pulse .9s ease-in-out infinite both;
+                    }
+                    .o_shop_variant_loading_visual span:nth-child(2) {
+                        animation-delay: .12s;
+                    }
+                    .o_shop_variant_loading_visual span:nth-child(3) {
+                        animation-delay: .24s;
                     }
                     body.o_shop_variant_is_loading .o_shop_variant_loading_overlay {
                         opacity: 1;
@@ -779,23 +799,27 @@
                         transform: translateY(4px);
                         transition: opacity .22s ease, transform .22s ease;
                     }
-                    @keyframes o_shop_variant_spin {
-                        to { transform: rotate(360deg); }
+                    @keyframes o_shop_variant_pulse {
+                        0%, 80%, 100% { opacity: .25; transform: translateY(0) scale(.8); }
+                        40% { opacity: 1; transform: translateY(-.38rem) scale(1); }
                     }
                     @media (prefers-reduced-motion: reduce) {
                         .o_shop_variant_loading_overlay,
                         body.o_shop_variant_is_loading #product_detail {
                             transition: none;
                         }
-                        .o_shop_variant_loading_spinner {
-                            animation-duration: 1.4s;
+                        .o_shop_variant_loading_visual span {
+                            animation: none;
+                            opacity: .65;
                         }
                     }
                 </style>
                 <div class="o_shop_variant_loading_overlay" aria-hidden="true">
                     <div class="o_shop_variant_loading_indicator" role="status" aria-live="polite">
-                        <span class="o_shop_variant_loading_spinner" aria-hidden="true"/>
-                        <span t-out="'Loading product...' if is_english else '正在加载商品...'"/>
+                        <span class="o_shop_variant_loading_visual" aria-hidden="true">
+                            <span/><span/><span/>
+                        </span>
+                        <span t-out="'Switching product' if is_english else '正在切换商品'"/>
                     </div>
                 </div>
                 <div
@@ -850,12 +874,12 @@
                                 autocomplete="off"
                             />
                             <label
-                                t-attf-class="btn btn-light border rounded-0 o_shop_variant_choice {{'o_shop_color_image_choice' if option_group['key'] == 'color' else 'px-3 py-2'}}"
+                                t-attf-class="btn btn-light border rounded-0 o_shop_variant_choice {{'o_shop_color_image_choice' if option_group['key'] == 'type_color' else 'px-3 py-2'}}"
                                 t-att-for="option_input_id"
-                                t-att-title="option_value if option_group['key'] == 'color' else None"
-                                t-att-aria-label="option_value if option_group['key'] == 'color' else None"
+                                t-att-title="option_value if option_group['key'] == 'type_color' else None"
+                                t-att-aria-label="option_value if option_group['key'] == 'type_color' else None"
                             >
-                                <t t-if="option_group['key'] == 'color' and color_image_product">
+                                <t t-if="option_group['key'] == 'type_color' and color_image_product">
                                     <img
                                         t-att-src="'/web/image/product.template/%s/image_512' % color_image_product.id"
                                         t-att-alt="option_value"
@@ -917,7 +941,7 @@
                         t-as="variant_row"
                         t-att-data-product-id="variant_row['product'].id"
                         t-att-data-url="variant_row['product']._get_product_url(category)"
-                        t-att-data-color="variant_row['values']['color']"
+                        t-att-data-type-color="variant_row['values']['type_color']"
                         t-att-data-size="variant_row['values']['size']"
                         t-att-data-flex="variant_row['values']['flex']"
                         t-att-data-available="'1' if variant_row['is_available'] else '0'"
@@ -933,6 +957,10 @@
                         }
                         let defaultCartMarkup = "";
                         let isNavigating = false;
+                        const loadingOverlay = root.querySelector(".o_shop_variant_loading_overlay");
+                        if (loadingOverlay) {
+                            document.body.appendChild(loadingOverlay);
+                        }
 
                         function getCartButtons() {
                             const addToCart = document.querySelector(".x_shop_add_to_cart_button");
@@ -949,20 +977,23 @@
                         }
 
                         function findSelectedVariant() {
-                            const color = selectedValue("color");
+                            const typeColor = selectedValue("type_color");
                             const size = selectedValue("size");
                             const flex = selectedValue("flex");
+                            const hasFlexSelector = Boolean(
+                                root.querySelector('input[data-option-key="flex"]')
+                            );
                             return Array.from(root.querySelectorAll(".o_shop_group_variant_map [data-product-id]")).find((entry) => {
-                                return entry.dataset.color === color
+                                return entry.dataset.typeColor === typeColor
                                     && entry.dataset.size === size
-                                    && entry.dataset.flex === flex;
+                                    && (!hasFlexSelector || entry.dataset.flex === flex);
                             });
                         }
 
-                        function findVariantForColor() {
-                            const color = selectedValue("color");
+                        function findVariantForTypeColor() {
+                            const typeColor = selectedValue("type_color");
                             const variants = Array.from(root.querySelectorAll(".o_shop_group_variant_map [data-product-id]"));
-                            return findSelectedVariant() || variants.find((entry) => entry.dataset.color === color);
+                            return findSelectedVariant() || variants.find((entry) => entry.dataset.typeColor === typeColor);
                         }
 
                         function setCartAvailability(isAvailable) {
@@ -1003,8 +1034,8 @@
                         }
 
                         function refreshSelection(redirect, changedKey, changedInput) {
-                            const variant = changedKey === "color"
-                                ? findVariantForColor()
+                            const variant = changedKey === "type_color"
+                                ? findVariantForTypeColor()
                                 : findSelectedVariant();
                             if (!variant) {
                                 setCartAvailability(false);
@@ -1105,6 +1136,22 @@
                     object-fit: contain !important;
                     object-position: center !important;
                     background: #fff;
+                }
+                .o_wsale_product_page #o-carousel-product.carousel-fade .carousel-item {
+                    opacity: 0;
+                    transform: none !important;
+                    transition: opacity .42s ease-in-out !important;
+                }
+                .o_wsale_product_page #o-carousel-product.carousel-fade .carousel-item.active,
+                .o_wsale_product_page #o-carousel-product.carousel-fade .carousel-item-next.carousel-item-start,
+                .o_wsale_product_page #o-carousel-product.carousel-fade .carousel-item-prev.carousel-item-end {
+                    z-index: 1;
+                    opacity: 1;
+                }
+                .o_wsale_product_page #o-carousel-product.carousel-fade .active.carousel-item-start,
+                .o_wsale_product_page #o-carousel-product.carousel-fade .active.carousel-item-end {
+                    z-index: 0;
+                    opacity: 0;
                 }
                 .x_shop_add_to_cart_button,
                 .x_shop_unavailable_button {
@@ -1268,18 +1315,27 @@
                             discussionTitle.setAttribute("aria-expanded", "true");
                         }
                     }
+                    function setupGalleryFade() {
+                        const carousel = document.querySelector("#o-carousel-product");
+                        if (carousel) {
+                            carousel.classList.add("carousel-fade");
+                        }
+                    }
                     setupCustomCartButton();
                     keepSearchInProductSection();
                     openDiscussion();
+                    setupGalleryFade();
                     window.addEventListener("load", function () {
                         setupCustomCartButton();
                         keepSearchInProductSection();
                         openDiscussion();
+                        setupGalleryFade();
                     });
                     window.requestAnimationFrame(function () {
                         setupCustomCartButton();
                         keepSearchInProductSection();
                         openDiscussion();
+                        setupGalleryFade();
                     });
                 })();
                 ]]>
