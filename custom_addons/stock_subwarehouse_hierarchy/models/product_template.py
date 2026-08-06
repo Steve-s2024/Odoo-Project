@@ -3,6 +3,7 @@ from io import BytesIO
 from urllib.parse import urlencode
 
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 from odoo.fields import Command
 
 
@@ -94,11 +95,33 @@ class ProductTemplate(models.Model):
         string="同名网店规格数",
         compute="_compute_x_shop_group_variant_count",
     )
+    x_shop_group_cover = fields.Boolean(
+        string="同名商品网店封面",
+        help="设置后，同名商品组的网店商品卡将使用此产品的主图。每个同名商品组只能有一个封面。",
+        copy=False,
+        index=True,
+    )
     x_website_english_name = fields.Char(
         string="英文网站名称",
         help="面向英文网站访客显示的产品名称，不会改变中文ERP产品名称或库存编码。",
         copy=True,
         index=True,
+    )
+    x_website_description_zh = fields.Html(
+        string="中文网站描述",
+        help="中文网站商品页显示的产品描述。",
+        sanitize_overridable=True,
+        sanitize_attributes=False,
+        sanitize_form=False,
+        copy=True,
+    )
+    x_website_description_en = fields.Html(
+        string="英文网站描述",
+        help="英文网站商品页显示的产品描述。",
+        sanitize_overridable=True,
+        sanitize_attributes=False,
+        sanitize_form=False,
+        copy=True,
     )
     x_website_code_mapping_id = fields.Many2one(
         "stock.subwarehouse.product.website.code.mapping",
@@ -170,6 +193,18 @@ class ProductTemplate(models.Model):
                SET x_material_type = 'finished'
              WHERE x_material_type IS NULL
         """)
+        # Preserve descriptions entered before bilingual fields were introduced.
+        # The existing website description is translated JSON in Odoo 19; prefer
+        # its Chinese value, with English as a last-resort migration source.
+        self.env.cr.execute("""
+            UPDATE product_template
+               SET x_website_description_zh = COALESCE(
+                       description_ecommerce->>'zh_CN',
+                       description_ecommerce->>'en_US'
+                   )
+             WHERE x_website_description_zh IS NULL
+               AND description_ecommerce IS NOT NULL
+        """)
 
     def _normalize_shop_group_name(self):
         self.ensure_one()
@@ -206,15 +241,68 @@ class ProductTemplate(models.Model):
 
     def _get_shop_grouped_products(self):
         ProductTemplate = self.env["product.template"]
-        representative_ids = []
-        seen_keys = set()
+        grouped_products = {}
+        ordered_keys = []
         for product in self:
             key = product._normalize_shop_group_name()
-            if key in seen_keys:
-                continue
-            seen_keys.add(key)
-            representative_ids.append(product.id)
+            if key not in grouped_products:
+                grouped_products[key] = ProductTemplate
+                ordered_keys.append(key)
+            grouped_products[key] |= product
+
+        representative_ids = []
+        for key in ordered_keys:
+            products = grouped_products[key]
+            selected_cover = products.filtered(
+                lambda product: product.x_shop_group_cover and product.image_1920
+            )[:1]
+            representative_ids.append((selected_cover or products[:1]).id)
         return ProductTemplate.browse(representative_ids)
+
+    def _get_all_shop_group_siblings(self):
+        self.ensure_one()
+        base_product = self.with_context(lang="zh_CN")
+        normalized_name = " ".join((base_product.name or self.name or "").split())
+        if not normalized_name:
+            return self
+        return base_product.search([
+            ("name", "=ilike", normalized_name),
+        ], order="default_code, id")
+
+    def action_set_shop_group_cover(self):
+        self.ensure_one()
+        if not self.sale_ok or not self.website_published:
+            raise UserError(_("请先将此产品设为可销售并发布到网店。"))
+        if not self.image_1920:
+            raise UserError(_("此产品没有主图，请先在“产品图片”页签上传主图。"))
+
+        siblings = self._get_all_shop_group_siblings()
+        siblings.filtered("x_shop_group_cover").write({"x_shop_group_cover": False})
+        self.write({"x_shop_group_cover": True})
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("网店封面已设置"),
+                "message": _("同名商品卡现在使用此产品的主图。"),
+                "type": "success",
+            },
+        }
+
+    def action_clear_shop_group_cover(self):
+        self.ensure_one()
+        self._get_all_shop_group_siblings().filtered("x_shop_group_cover").write({
+            "x_shop_group_cover": False,
+        })
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("已恢复自动封面"),
+                "message": _("同名商品卡将使用原有的自动选择规则。"),
+                "type": "success",
+            },
+        }
 
     def _get_shop_product_family(self):
         self.ensure_one()

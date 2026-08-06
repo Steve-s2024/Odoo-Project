@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_product_bulk_update_wizard_form" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.product.bulk.update.wizard.form</field>
+        <field name="model">stock.subwarehouse.product.bulk.update.wizard</field>
+        <field name="arch" type="xml">
+            <form string="批量修改产品">
+                <sheet>
+                    <group>
+                        <field name="selected_product_ids" widget="many2many_tags" readonly="1"/>
+                    </group>
+                    <notebook>
+                        <page string="产品图片" name="images">
+                            <group string="共享主图">
+                                <field name="apply_main_image"/>
+                                <field
+                                    name="main_image"
+                                    widget="image"
+                                    class="oe_avatar"
+                                    options="{'preview_image': 'main_image'}"
+                                    invisible="not apply_main_image"
+                                />
+                            </group>
+                            <group string="共享图片集">
+                                <field name="gallery_mode"/>
+                                <field
+                                    name="gallery_image_ids"
+                                    widget="x2_many_media_viewer"
+                                    mode="kanban"
+                                    nolabel="1"
+                                    context="{'default_name': '产品图片'}"
+                                    options="{'convert_to_webp': True}"
+                                    invisible="gallery_mode == 'keep'"
+                                />
+                            </group>
+                        </page>
+                        <page string="通用属性" name="general_attributes">
+                            <group>
+                                <group>
+                                    <field name="apply_description_zh"/>
+                                    <field name="apply_description_en"/>
+                                    <field name="apply_english_name"/>
+                                    <field name="apply_category"/>
+                                    <field name="apply_material_type"/>
+                                    <field name="apply_list_price"/>
+                                </group>
+                                <group>
+                                    <field name="website_english_name" invisible="not apply_english_name"/>
+                                    <field name="categ_id" invisible="not apply_category"/>
+                                    <field name="material_type" invisible="not apply_material_type"/>
+                                    <field name="list_price" invisible="not apply_list_price"/>
+                                </group>
+                            </group>
+                            <separator string="中文网站描述" invisible="not apply_description_zh"/>
+                            <field
+                                name="description_zh"
+                                string="中文网站描述"
+                                nolabel="1"
+                                colspan="4"
+                                placeholder="输入显示在中文网站商品页上的产品描述。"
+                                invisible="not apply_description_zh"
+                            />
+                            <separator string="英文网站描述" invisible="not apply_description_en"/>
+                            <field
+                                name="description_en"
+                                string="英文网站描述"
+                                nolabel="1"
+                                colspan="4"
+                                placeholder="Enter the description shown on the English product page."
+                                invisible="not apply_description_en"
+                            />
+                        </page>
+                    </notebook>
+                </sheet>
+                <footer>
+                    <button name="action_apply" type="object" string="应用到所选产品" class="btn-primary"/>
+                    <button special="cancel" string="取消"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_product_bulk_update" model="ir.actions.act_window">
+        <field name="name">批量修改产品图片与属性</field>
+        <field name="res_model">stock.subwarehouse.product.bulk.update.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="product.model_product_template"/>
+        <field name="binding_view_types">list</field>
+    </record>
+</odoo>

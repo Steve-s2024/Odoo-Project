@@ -26,6 +26,38 @@
             <xpath expr="//field[@name='name']" position="after">
                 <field name="website_published" string="已发布" optional="show"/>
                 <field name="x_shop_group_variant_count" string="同名规格数" optional="show"/>
+                <field name="x_shop_group_cover" string="网店封面" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="product_template_form_shop_group_cover_buttons" model="ir.ui.view">
+        <field name="name">product.template.form.shop.group.cover.buttons</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_only_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <field name="x_shop_group_cover" invisible="1"/>
+                <button
+                    name="action_set_shop_group_cover"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-picture-o"
+                    invisible="x_shop_group_cover">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_text">设为网店封面</span>
+                    </div>
+                </button>
+                <button
+                    name="action_clear_shop_group_cover"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-undo"
+                    invisible="not x_shop_group_cover">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_text">恢复自动封面</span>
+                    </div>
+                </button>
             </xpath>
         </field>
     </record>
@@ -160,11 +192,12 @@
                     .x_custom_product_image img {
                         width: 100%;
                         height: 100%;
-                        object-fit: cover;
+                        object-fit: contain;
+                        object-position: center;
                         transition: transform 220ms ease;
                     }
                     .x_custom_product_card:hover .x_custom_product_image img {
-                        transform: scale(1.035);
+                        transform: none;
                     }
                     .x_custom_product_meta {
                         display: flex;
@@ -419,11 +452,12 @@
                         .x_item_product_image img {
                             width: 100%;
                             height: 100%;
-                            object-fit: cover;
+                            object-fit: contain;
+                            object-position: center;
                             transition: transform 220ms ease;
                         }
                         .x_item_product_card:hover .x_item_product_image img {
-                            transform: scale(1.035);
+                            transform: none;
                         }
                         .x_item_product_meta {
                             display: flex;
@@ -550,6 +584,8 @@
                 }
                 .o_wsale_product_grid_wrapper img {
                     background: #f6f6f6;
+                    object-fit: contain !important;
+                    object-position: center !important;
                 }
                 .o_wsale_products_item_title {
                     font-size: .92rem !important;
@@ -590,7 +626,7 @@
                         display: inline-flex;
                         align-items: center;
                         justify-content: center;
-                        font-weight: 700;
+                        font-weight: 400;
                         color: #111;
                         background: #f7f7f7;
                         border-color: #f7f7f7 !important;
@@ -631,7 +667,7 @@
                         background: transparent;
                         color: #111;
                         font-size: .82rem;
-                        font-weight: 700;
+                        font-weight: 400;
                         text-decoration: underline;
                         text-underline-offset: .2rem;
                     }
@@ -719,16 +755,16 @@
                         padding-bottom: .9rem;
                         background: #ededed;
                         font-size: .7rem;
-                        font-weight: 900;
+                        font-weight: 400;
                         text-transform: uppercase;
                     }
                     .o_shop_size_guide_table td:first-child,
                     .o_shop_size_guide_table td:nth-child(2) {
-                        font-weight: 800;
+                        font-weight: 400;
                     }
                     .o_shop_group_variant_selector .fw-semibold {
                         font-size: .9rem;
-                        font-weight: 800 !important;
+                        font-weight: 400 !important;
                         color: #111;
                     }
                     .o_shop_unavailable_cta {
@@ -827,12 +863,19 @@
                     t-as="option_group"
                     class="mb-3"
                 >
-                    <div t-if="option_group['key'] != 'color'" class="o_shop_variant_heading mb-2">
-                        <span class="fw-semibold" t-out="option_group['label']"/>
+                    <div
+                        t-if="option_group['key'] not in ('color', 'type_color')"
+                        class="o_shop_variant_heading mb-2"
+                    >
+                        <span
+                            t-if="option_group['key'] != 'size'"
+                            class="fw-semibold"
+                            t-out="option_group['label']"
+                        />
                         <button
                             t-if="option_group['key'] == 'size' and is_shop_boot"
                             type="button"
-                            class="o_shop_size_guide_toggle"
+                            class="o_shop_size_guide_toggle ms-auto"
                             data-bs-toggle="collapse"
                             data-bs-target="#o_shop_boot_size_guide"
                             aria-expanded="false"
@@ -1124,10 +1167,44 @@
                 .o_wsale_product_page #o_wsale_product_details_content {
                     max-width: 560px;
                 }
+                .o_wsale_product_page,
+                .o_wsale_product_page h1,
+                .o_wsale_product_page h2,
+                .o_wsale_product_page h3,
+                .o_wsale_product_page h4,
+                .o_wsale_product_page h5,
+                .o_wsale_product_page h6,
+                .o_wsale_product_page p,
+                .o_wsale_product_page span,
+                .o_wsale_product_page div,
+                .o_wsale_product_page label,
+                .o_wsale_product_page a,
+                .o_wsale_product_page button,
+                .o_wsale_product_page input,
+                .o_wsale_product_page select,
+                .o_wsale_product_page textarea,
+                .o_wsale_product_page th,
+                .o_wsale_product_page td {
+                    font-family: Georgia, "Noto Serif SC", SimSun, serif !important;
+                    font-size: 14px !important;
+                    line-height: 1.8 !important;
+                }
+                .o_wsale_product_page .fa {
+                    font-family: FontAwesome !important;
+                    line-height: 1 !important;
+                }
+                .o_wsale_product_page .oi {
+                    font-family: odoo_ui_icons !important;
+                    line-height: 1 !important;
+                }
                 .o_wsale_product_page .product_price .oe_price {
-                    font-size: 1.4rem;
-                    font-weight: 900;
+                    font-size: 14px !important;
+                    font-weight: 400 !important;
                     color: #111;
+                }
+                .o_wsale_product_page .product_price,
+                .o_wsale_product_page .product_price * {
+                    font-weight: 400 !important;
                 }
                 .o_wsale_product_page .o_wsale_product_details_content_section {
                     border: 0 !important;
@@ -1138,7 +1215,7 @@
                     background: #fff;
                 }
                 .o_wsale_product_page #o-carousel-product.carousel-fade .carousel-item {
-                    opacity: 0;
+                    opacity: 0 !important;
                     transform: none !important;
                     transition: opacity .42s ease-in-out !important;
                 }
@@ -1146,12 +1223,12 @@
                 .o_wsale_product_page #o-carousel-product.carousel-fade .carousel-item-next.carousel-item-start,
                 .o_wsale_product_page #o-carousel-product.carousel-fade .carousel-item-prev.carousel-item-end {
                     z-index: 1;
-                    opacity: 1;
+                    opacity: 1 !important;
                 }
                 .o_wsale_product_page #o-carousel-product.carousel-fade .active.carousel-item-start,
                 .o_wsale_product_page #o-carousel-product.carousel-fade .active.carousel-item-end {
                     z-index: 0;
-                    opacity: 0;
+                    opacity: 0 !important;
                 }
                 .x_shop_add_to_cart_button,
                 .x_shop_unavailable_button {
@@ -1359,6 +1436,133 @@
         </xpath>
         <xpath expr="//div[@id='o_product_page_reviews_content']" position="attributes">
             <attribute name="class">collapse show mt-3</attribute>
+        </xpath>
+    </template>
+
+    <template id="product_page_variant_label_cleanup" inherit_id="product_page_shop_group_siblings" name="Simplified product option labels">
+        <xpath expr="//div[@t-foreach='shop_group_option_groups']/div[hasclass('o_shop_variant_heading')]" position="attributes">
+            <attribute name="t-if">option_group['key'] not in ('color', 'type_color')</attribute>
+        </xpath>
+        <xpath expr="//span[@t-out=&quot;option_group['label']&quot;]" position="attributes">
+            <attribute name="t-if">option_group['key'] != 'size'</attribute>
+        </xpath>
+        <xpath expr="//button[hasclass('o_shop_size_guide_toggle')]" position="attributes">
+            <attribute name="class" add="ms-auto" separator=" "/>
+        </xpath>
+        <xpath expr="//div[hasclass('o_shop_group_variant_selector')]/style" position="after">
+            <style>
+                .o_shop_group_variant_selector .o_shop_variant_choice,
+                .o_shop_group_variant_selector .o_shop_size_guide_toggle,
+                .o_shop_group_variant_selector .fw-semibold,
+                .o_shop_group_variant_selector .o_shop_size_guide_table th,
+                .o_shop_group_variant_selector .o_shop_size_guide_table td {
+                    font-weight: 400 !important;
+                }
+            </style>
+        </xpath>
+    </template>
+
+    <template id="product_page_editorial_typography" inherit_id="website_sale.product" name="Editorial product page typography">
+        <xpath expr="//section[@id='product_detail']" position="before">
+            <style>
+                .o_wsale_product_page,
+                .o_wsale_product_page h1,
+                .o_wsale_product_page h2,
+                .o_wsale_product_page h3,
+                .o_wsale_product_page h4,
+                .o_wsale_product_page h5,
+                .o_wsale_product_page h6,
+                .o_wsale_product_page p,
+                .o_wsale_product_page span,
+                .o_wsale_product_page div,
+                .o_wsale_product_page label,
+                .o_wsale_product_page a,
+                .o_wsale_product_page button,
+                .o_wsale_product_page input,
+                .o_wsale_product_page select,
+                .o_wsale_product_page textarea,
+                .o_wsale_product_page th,
+                .o_wsale_product_page td {
+                    font-family: Georgia, "Noto Serif SC", SimSun, serif !important;
+                    font-size: 14px !important;
+                    line-height: 1.8 !important;
+                }
+                .o_wsale_product_page .fa {
+                    font-family: FontAwesome !important;
+                    line-height: 1 !important;
+                }
+                .o_wsale_product_page .oi {
+                    font-family: odoo_ui_icons !important;
+                    line-height: 1 !important;
+                }
+                .o_wsale_product_page .product_price,
+                .o_wsale_product_page .product_price * {
+                    font-weight: 400 !important;
+                    line-height: 1.8 !important;
+                }
+                #product_detail .product_price .oe_price,
+                #product_detail .product_price .oe_price *,
+                #product_detail .product_price .oe_currency_value {
+                    font-size: 1.4rem !important;
+                }
+                .o_wsale_product_page .o_shop_group_variant_selector .o_shop_variant_choice {
+                    font-size: 1rem !important;
+                }
+                .o_wsale_product_page .o_shop_group_variant_selector .o_shop_size_slider_track .o_shop_variant_choice {
+                    font-size: .86rem !important;
+                }
+                .o_wsale_product_page .o_shop_size_guide_table th {
+                    font-size: .7rem !important;
+                }
+                .o_wsale_product_page .o_shop_size_guide_table td {
+                    font-size: .78rem !important;
+                }
+                .o_wsale_product_page .x_shop_cart_icon {
+                    font-size: 1.45rem !important;
+                    line-height: 1 !important;
+                }
+                .o_wsale_product_page .x_shop_cart_cross {
+                    font-size: .72rem !important;
+                    line-height: 1 !important;
+                }
+                .o_wsale_product_page .o_shop_size_slider_button,
+                .o_wsale_product_page .o_shop_size_slider_button .fa,
+                .o_wsale_product_page .css_quantity .btn,
+                .o_wsale_product_page .css_quantity input {
+                    font-size: 1rem !important;
+                    line-height: 1 !important;
+                }
+            </style>
+        </xpath>
+    </template>
+
+    <template id="product_page_gallery_fade_without_arrows" inherit_id="website_sale.shop_product_carousel" name="Product gallery fade without arrows">
+        <xpath expr="//div[@id='o-carousel-product']" position="attributes">
+            <attribute name="class" add="carousel-fade" separator=" "/>
+        </xpath>
+        <xpath expr="//a[hasclass('carousel-control-prev')]" position="replace"/>
+        <xpath expr="//a[hasclass('carousel-control-next')]" position="replace"/>
+    </template>
+
+    <template id="product_page_bilingual_description" inherit_id="website_sale.product_title" name="Bilingual product description">
+        <xpath expr="//div[@t-field='product.description_ecommerce']" position="replace">
+            <t t-set="x_product_page_is_english" t-value="bool(request.lang and (request.lang.code or '').lower().startswith('en'))"/>
+            <t t-if="x_product_page_is_english">
+                <div
+                    id="product_bilingual_description"
+                    class="oe_structure oe_empty mt16"
+                    t-field="product.x_website_description_en"
+                    placeholder="This space is for the product description."
+                />
+            </t>
+            <t t-else="">
+                <div
+                    id="product_bilingual_description"
+                    class="oe_structure oe_empty mt16"
+                    t-field="product.x_website_description_zh"
+                    placeholder="此处用于显示产品描述。"
+                />
+            </t>
         </xpath>
     </template>
 </odoo>

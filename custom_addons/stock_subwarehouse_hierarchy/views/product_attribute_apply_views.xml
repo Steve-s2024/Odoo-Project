@@ -211,6 +211,22 @@
         <field name="inherit_id" ref="product.product_template_only_form_view"/>
         <field name="arch" type="xml">
             <xpath expr="//page[@name='general_information']" position="after">
+                <page name="product_description" string="产品描述">
+                    <group string="中文网站描述">
+                        <field
+                            name="x_website_description_zh"
+                            nolabel="1"
+                            placeholder="输入显示在中文网站商品页上的产品描述。"
+                        />
+                    </group>
+                    <group string="英文网站描述">
+                        <field
+                            name="x_website_description_en"
+                            nolabel="1"
+                            placeholder="Enter the description shown on the English product page."
+                        />
+                    </group>
+                </page>
                 <page name="product_images" string="产品图片">
                     <group string="主图">
                         <field name="image_1920" widget="image" class="oe_avatar" options="{'preview_image': 'image_128'}"/>

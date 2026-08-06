@@ -442,6 +442,100 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(grouped_products, product_1 | product_3)
         self.assertEqual(product_1.x_shop_group_variant_count, 2)
 
+    def test_shop_group_cover_selects_named_product_and_can_restore_default(self):
+        product_1, product_2 = self.env["product.template"].create([
+            {"name": "Shop Cover Test", "sale_ok": True},
+            {"name": "Shop Cover Test", "sale_ok": True},
+        ])
+        (product_1 | product_2).action_publish_to_shop()
+        product_2.image_1920 = (
+            b"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8A"
+            b"AQUBAScY42YAAAAASUVORK5CYII="
+        )
+
+        product_2.action_set_shop_group_cover()
+
+        self.assertFalse(product_1.x_shop_group_cover)
+        self.assertTrue(product_2.x_shop_group_cover)
+        self.assertEqual(
+            (product_1 | product_2)._get_shop_grouped_products(),
+            product_2,
+        )
+
+        product_2.action_clear_shop_group_cover()
+
+        self.assertFalse(product_2.x_shop_group_cover)
+        self.assertEqual(
+            (product_1 | product_2)._get_shop_grouped_products(),
+            product_1,
+        )
+
+    def test_shop_group_cover_without_image_falls_back_to_default(self):
+        product_1, product_2 = self.env["product.template"].create([
+            {"name": "Missing Cover Image Test", "sale_ok": True},
+            {
+                "name": "Missing Cover Image Test",
+                "sale_ok": True,
+                "x_shop_group_cover": True,
+            },
+        ])
+
+        self.assertEqual(
+            (product_1 | product_2)._get_shop_grouped_products(),
+            product_1,
+        )
+
+    def test_product_bulk_update_applies_shared_images_and_general_fields(self):
+        products = self.env["product.template"].create([
+            {"name": "Bulk Product A", "sale_ok": True},
+            {"name": "Bulk Product B", "sale_ok": True},
+        ])
+        category = self.env["product.category"].create({"name": "Bulk Category"})
+        image_data = (
+            b"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8A"
+            b"AQUBAScY42YAAAAASUVORK5CYII="
+        )
+        wizard = self.env["stock.subwarehouse.product.bulk.update.wizard"].create({
+            "selected_product_ids": [Command.set(products.ids)],
+            "apply_main_image": True,
+            "main_image": image_data,
+            "gallery_mode": "append",
+            "gallery_image_ids": [Command.create({
+                "name": "Shared gallery image",
+                "image_1920": image_data,
+            })],
+            "apply_description_zh": True,
+            "description_zh": "<p>共享中文产品描述</p>",
+            "apply_description_en": True,
+            "description_en": "<p>Shared English product description</p>",
+            "apply_english_name": True,
+            "website_english_name": "Shared English Name",
+            "apply_category": True,
+            "categ_id": category.id,
+            "apply_material_type": True,
+            "material_type": "finished",
+            "apply_list_price": True,
+            "list_price": 799.0,
+        })
+
+        wizard.action_apply()
+
+        for product in products:
+            self.assertTrue(product.image_1920)
+            self.assertIn("共享中文产品描述", product.x_website_description_zh)
+            self.assertIn("Shared English product description", product.x_website_description_en)
+            self.assertEqual(product.x_website_english_name, "Shared English Name")
+            self.assertEqual(product.categ_id, category)
+            self.assertEqual(product.x_material_type, "finished")
+            self.assertEqual(product.list_price, 799.0)
+            self.assertEqual(len(product.product_template_image_ids), 1)
+
+        wizard.action_apply()
+        self.assertEqual(
+            products.mapped("product_template_image_ids").mapped("product_tmpl_id"),
+            products,
+        )
+
     def test_shop_product_family_filter_splits_ski_snowboard_and_other(self):
         ski, bracketed_ski, snowboard, other = self.env["product.template"].create([
             {"name": "零售滑雪双板", "default_code": "062410X-MA006-W001170", "sale_ok": True},
