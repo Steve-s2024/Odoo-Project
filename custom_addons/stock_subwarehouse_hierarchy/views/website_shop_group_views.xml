@@ -1462,6 +1462,105 @@
         </xpath>
     </template>
 
+    <template id="product_page_variant_loading_animation_v2" inherit_id="product_page_shop_group_siblings" name="Product variant loading animation v2">
+        <xpath expr="//div[hasclass('o_shop_group_variant_selector')]/style[1]" position="after">
+            <style>
+                .o_shop_variant_loading_overlay {
+                    position: fixed !important;
+                    inset: 0 !important;
+                    z-index: 2147483000 !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    background: rgba(255, 255, 255, .58) !important;
+                    backdrop-filter: blur(8px);
+                    -webkit-backdrop-filter: blur(8px);
+                    isolation: isolate;
+                    opacity: 0;
+                    visibility: hidden;
+                    pointer-events: none;
+                    transition: opacity .24s ease, visibility 0s linear .24s;
+                }
+                .o_shop_variant_loading_indicator {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: .7rem;
+                    min-width: 9.5rem;
+                    padding: 1.15rem 1.4rem 1rem;
+                    color: #111;
+                    background: rgba(255, 255, 255, .94);
+                    border: 1px solid rgba(17, 17, 17, .08);
+                    border-radius: 1.25rem;
+                    box-shadow: 0 18px 55px rgba(0, 0, 0, .16);
+                    font-size: .78rem;
+                    font-weight: 700;
+                    letter-spacing: .04em;
+                }
+                .o_shop_variant_loading_visual {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: .38rem;
+                    width: 4.5rem;
+                    height: 2.25rem;
+                }
+                .o_shop_variant_loading_visual span {
+                    width: .72rem;
+                    height: .72rem;
+                    border-radius: 50%;
+                    background: #111;
+                    animation: o_shop_variant_pulse_v2 .9s ease-in-out infinite both;
+                }
+                .o_shop_variant_loading_visual span:nth-child(2) {
+                    animation-delay: .12s;
+                }
+                .o_shop_variant_loading_visual span:nth-child(3) {
+                    animation-delay: .24s;
+                }
+                body.o_shop_variant_is_loading .o_shop_variant_loading_overlay {
+                    opacity: 1 !important;
+                    visibility: visible !important;
+                    pointer-events: auto !important;
+                    transition-delay: 0s;
+                }
+                @keyframes o_shop_variant_pulse_v2 {
+                    0%, 80%, 100% { opacity: .25; transform: translateY(0) scale(.8); }
+                    40% { opacity: 1; transform: translateY(-.38rem) scale(1); }
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .o_shop_variant_loading_overlay {
+                        transition: none;
+                    }
+                    .o_shop_variant_loading_visual span {
+                        animation: none;
+                        opacity: .65;
+                    }
+                }
+            </style>
+        </xpath>
+        <xpath expr="//div[hasclass('o_shop_variant_loading_overlay')]" position="replace">
+            <div class="o_shop_variant_loading_overlay" aria-hidden="true">
+                <div class="o_shop_variant_loading_indicator" role="status" aria-live="polite">
+                    <span class="o_shop_variant_loading_visual" aria-hidden="true">
+                        <span/><span/><span/>
+                    </span>
+                    <span t-out="'Switching product' if is_english else '正在切换商品'"/>
+                </div>
+            </div>
+            <script>
+                <![CDATA[
+                (function () {
+                    const overlay = document.currentScript.previousElementSibling;
+                    if (overlay && overlay.classList.contains("o_shop_variant_loading_overlay")) {
+                        document.body.appendChild(overlay);
+                    }
+                })();
+                ]]>
+            </script>
+        </xpath>
+    </template>
+
     <template id="product_page_editorial_typography" inherit_id="website_sale.product" name="Editorial product page typography">
         <xpath expr="//section[@id='product_detail']" position="before">
             <style>
