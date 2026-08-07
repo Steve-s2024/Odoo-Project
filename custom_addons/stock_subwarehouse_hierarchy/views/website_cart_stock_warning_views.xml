@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="website_cart_stock_quantity_warning" inherit_id="website_sale.cart" name="Cart stock quantity warning">
+        <xpath expr="//t[@t-call='website_sale.cart_lines']" position="before">
+            <div
+                t-attf-class="x_cart_stock_warning alert alert-danger shadow #{'x_cart_stock_warning_visible' if x_stock_quantity_warning else 'd-none'}"
+                role="alert"
+                aria-live="assertive"
+            >
+                <t t-out="'order cannot be satisfied, please reduce quantity' if request.lang and request.lang.code == 'en_US' else '订单无法满足，请更改数量'"/>
+            </div>
+        </xpath>
+    </template>
+
+    <template id="website_cart_stock_shortage_rows" inherit_id="website_sale.cart_lines" name="Highlight cart stock shortages">
+        <xpath expr="//div[@id='cart_products']" position="before">
+            <t
+                t-set="x_stock_shortage_line_ids"
+                t-value="website_sale_order.sudo()._get_source_inventory_shortage_lines().ids if website_sale_order else []"
+            />
+        </xpath>
+        <xpath expr="//div[contains(concat(' ', normalize-space(@class), ' '), ' o_cart_product ')]" position="attributes">
+            <attribute name="t-attf-class">o_cart_product d-flex gap-3 pb-4 #{'x_stock_shortage_row' if line.id in x_stock_shortage_line_ids else ''}</attribute>
+        </xpath>
+    </template>
+</odoo>

@@ -1132,6 +1132,7 @@
                 t-att-data-product-template-id="product.id"
                 t-att-data-product-id="product.product_variant_id.id"
                 t-att-data-show-quantity="is_view_active('website_sale.product_quantity')"
+                t-att-data-added-label="'Added' if is_english else '已加入'"
             >
                 <span class="x_shop_cart_icon" aria-hidden="true">
                     <i class="fa fa-shopping-cart"/>
@@ -1246,6 +1247,39 @@
                     border-color: #333;
                     color: #fff !important;
                 }
+                .x_shop_add_to_cart_button {
+                    transition: background-color .25s ease, border-color .25s ease, box-shadow .25s ease, transform .25s ease;
+                }
+                .x_shop_add_to_cart_button.x_shop_add_to_cart_success,
+                .x_shop_add_to_cart_button.x_shop_add_to_cart_success:hover {
+                    background: #198754 !important;
+                    border-color: #198754 !important;
+                    box-shadow: 0 0 0 .35rem rgba(25, 135, 84, .22);
+                    opacity: 1;
+                    animation: x-shop-add-to-cart-success .9s cubic-bezier(.2, .8, .2, 1) both;
+                }
+                .o_wsale_product_page .x_shop_add_to_cart_success_content {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: .55rem;
+                    font-size: 1rem !important;
+                    letter-spacing: .04em;
+                }
+                .o_wsale_product_page .x_shop_add_to_cart_success_content .fa {
+                    font-size: 1.25rem !important;
+                    animation: x-shop-add-to-cart-check .45s ease-out both;
+                }
+                @keyframes x-shop-add-to-cart-success {
+                    0% { transform: scale(1); }
+                    35% { transform: scale(1.07); }
+                    68% { transform: scale(.985); }
+                    100% { transform: scale(1); }
+                }
+                @keyframes x-shop-add-to-cart-check {
+                    0% { opacity: 0; transform: scale(.35) rotate(-25deg); }
+                    100% { opacity: 1; transform: scale(1) rotate(0); }
+                }
                 .x_shop_unavailable_button:disabled {
                     opacity: 1;
                 }
@@ -1333,6 +1367,7 @@
                         if (button.classList.contains("d-none")) {
                             return;
                         }
+                        const originalContent = button.innerHTML;
                         button.disabled = true;
                         try {
                             const response = await fetch("/shop/cart/add", {
@@ -1355,7 +1390,26 @@
                             if (!response.ok || payload.error) {
                                 throw new Error(payload.error?.data?.message || payload.error?.message || "Add to cart failed");
                             }
-                            window.location.href = "/shop/cart";
+                            const cartQuantity = payload.result?.cart_quantity;
+                            if (Number.isFinite(cartQuantity)) {
+                                window.sessionStorage.setItem("website_sale_cart_quantity", String(cartQuantity));
+                                document.querySelector("li.o_wsale_my_cart")?.classList.remove("d-none");
+                                document.querySelectorAll(".my_cart_quantity").forEach((badge) => {
+                                    badge.textContent = String(cartQuantity);
+                                    badge.classList.toggle("d-none", cartQuantity === 0);
+                                });
+                            }
+                            button.classList.remove("x_shop_add_to_cart_success");
+                            void button.offsetWidth;
+                            button.innerHTML = '<span class="x_shop_add_to_cart_success_content"><i class="fa fa-check" aria-hidden="true"></i><span></span></span>';
+                            const isEnglishPage = (document.documentElement.lang || "").toLowerCase().startsWith("en");
+                            button.querySelector(".x_shop_add_to_cart_success_content span").textContent = button.dataset.addedLabel || (isEnglishPage ? "Added" : "已加入");
+                            button.classList.add("x_shop_add_to_cart_success");
+                            window.setTimeout(() => {
+                                button.classList.remove("x_shop_add_to_cart_success");
+                                button.innerHTML = originalContent;
+                                button.disabled = false;
+                            }, 1200);
                         } catch (error) {
                             button.disabled = false;
                             window.alert("加入购物车失败，请稍后再试。");

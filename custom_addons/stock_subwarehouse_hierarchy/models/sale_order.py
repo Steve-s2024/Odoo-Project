@@ -615,6 +615,52 @@ class SaleOrder(models.Model):
                 ))
         return shortages
 
+    def _get_source_inventory_shortage_lines(self):
+        """Return cart lines whose full quantity cannot be sourced from one location."""
+        precision = self.env["decimal.precision"].precision_get("Product Unit")
+        shortage_lines = self.env["sale.order.line"]
+        for order in self:
+            planned_demands = {}
+            lines = order.order_line.filtered(
+                lambda line: (
+                    not line.display_type
+                    and line.product_id
+                    and line.is_storable
+                    and float_compare(line.product_uom_qty, 0.0, precision_digits=precision) > 0
+                )
+            )
+            for line in lines:
+                product = line.product_id
+                required_qty = line._get_required_qty_in_product_uom()
+                candidates = line._get_source_location_candidates()
+                current_location = line.x_source_location_id
+                if current_location and current_location in candidates:
+                    candidates = current_location | (candidates - current_location)
+
+                selected_location = self.env["stock.location"]
+                selected_available_qty = False
+                for location in candidates:
+                    planned_key = (product.id, location.id)
+                    available_qty = order._get_available_qty_for_source_location(
+                        product,
+                        location,
+                        exclude_order=order,
+                    ) - planned_demands.get(planned_key, 0.0)
+                    if float_compare(available_qty, required_qty, precision_digits=precision) < 0:
+                        continue
+                    if selected_available_qty is False or available_qty < selected_available_qty:
+                        selected_location = location
+                        selected_available_qty = available_qty
+
+                if not selected_location:
+                    shortage_lines |= line
+                    continue
+                planned_key = (product.id, selected_location.id)
+                planned_demands[planned_key] = (
+                    planned_demands.get(planned_key, 0.0) + required_qty
+                )
+        return shortage_lines
+
     def _check_source_inventory_availability(self):
         shortages = self._get_source_inventory_shortages()
         if shortages:

@@ -38,6 +38,7 @@
         "views/website_video_views.xml",
         "views/website_collections_views.xml",
         "views/website_shop_group_views.xml",
+        "views/website_cart_stock_warning_views.xml",
         "views/website_product_engagement_views.xml",
         "views/website_international_mapping_views.xml",
         "views/website_stores_views.xml",
@@ -52,6 +53,10 @@
             "stock_subwarehouse_hierarchy/static/src/js/source_location_many2one.js",
             "stock_subwarehouse_hierarchy/static/src/js/template_format_export_menu.js",
             "stock_subwarehouse_hierarchy/static/src/xml/template_format_export_menu.xml",
+        ],
+        "web.assets_frontend": [
+            "stock_subwarehouse_hierarchy/static/src/js/cart_stock_warning.js",
+            "stock_subwarehouse_hierarchy/static/src/scss/cart_stock_warning.scss",
         ],
     },
     "installable": True,

@@ -324,6 +324,33 @@ class TestDescendantInventoryTotals(TransactionCase):
         with self.assertRaises(UserError):
             second_order._prepare_website_stock_for_payment()
 
+    def test_cart_shortage_line_clears_after_quantity_is_reduced(self):
+        self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 2.0)
+        order, line = self._create_sale_order_line(self.product_a, 3.0)
+        line.x_source_location_id = False
+
+        self.assertIn(line, order._get_source_inventory_shortage_lines())
+        shortage_html = str(self.env["ir.ui.view"]._render_template(
+            "website_sale.cart_lines",
+            {
+                "website_sale_order": order,
+                "is_view_active": lambda _xml_id: True,
+            },
+        ))
+        self.assertIn("x_stock_shortage_row", shortage_html)
+
+        line.product_uom_qty = 2.0
+
+        self.assertNotIn(line, order._get_source_inventory_shortage_lines())
+        available_html = str(self.env["ir.ui.view"]._render_template(
+            "website_sale.cart_lines",
+            {
+                "website_sale_order": order,
+                "is_view_active": lambda _xml_id: True,
+            },
+        ))
+        self.assertNotIn("x_stock_shortage_row", available_html)
+
     def _create_simulated_wechat_transaction(self, order, reference):
         provider = self.env.ref("payment_wechatpay.payment_provider_wechatpay")
         provider.write({

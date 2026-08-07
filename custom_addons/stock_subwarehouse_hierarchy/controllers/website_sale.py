@@ -27,12 +27,16 @@ class WebsiteCartStockSource(WebsiteCheckoutLanguageMixin, Cart):
     @route()
     def cart(self, id=None, access_token=None, revive_method="", **post):
         self._sync_website_checkout_language()
-        return super().cart(
+        show_stock_warning = bool(request.session.pop("x_stock_quantity_warning", False))
+        response = super().cart(
             id=id,
             access_token=access_token,
             revive_method=revive_method,
             **post,
         )
+        if getattr(response, "qcontext", None) is not None:
+            response.qcontext["x_stock_quantity_warning"] = show_stock_warning
+        return response
 
 
 class WebsiteSaleStockSource(WebsiteCheckoutLanguageMixin, WebsiteSale):
@@ -40,6 +44,10 @@ class WebsiteSaleStockSource(WebsiteCheckoutLanguageMixin, WebsiteSale):
     @route()
     def shop_checkout(self, try_skip_step=None, **query_params):
         self._sync_website_checkout_language()
+        order = request.cart
+        if order and order.sudo()._get_source_inventory_shortage_lines():
+            request.session["x_stock_quantity_warning"] = True
+            return request.redirect("/shop/cart")
         return super().shop_checkout(try_skip_step=try_skip_step, **query_params)
 
     @route()
@@ -99,6 +107,14 @@ class WebsiteSaleStockSource(WebsiteCheckoutLanguageMixin, WebsiteSale):
     @route()
     def shop_payment(self, **post):
         self._sync_website_checkout_language()
+        order = request.cart
+        if order and order.state in ("draft", "sent"):
+            try:
+                order.sudo()._prepare_website_stock_for_payment()
+            except UserError:
+                request.session["x_stock_quantity_warning"] = True
+                return request.redirect("/shop/cart")
+            request.update_context(x_website_stock_prepared_for_payment=True)
         return super().shop_payment(**post)
 
     @route()
@@ -322,9 +338,18 @@ class WebsiteSaleStockSource(WebsiteCheckoutLanguageMixin, WebsiteSale):
                     _("Delivery destination is not available"),
                     order._website_checkout_country_message(self._is_english_checkout()),
                 ))
-        if order and order.state in ("draft", "sent"):
+        if (
+            order
+            and order.state in ("draft", "sent")
+            and not request.env.context.get("x_website_stock_prepared_for_payment")
+        ):
             try:
                 order.sudo()._prepare_website_stock_for_payment()
-            except UserError as error:
-                errors.append((_("库存不足"), str(error)))
+            except UserError:
+                message = (
+                    _("order cannot be satisfied, please reduce quantity")
+                    if self._is_english_checkout()
+                    else _("订单无法满足，请更改数量")
+                )
+                errors.append((message, message))
         return errors
