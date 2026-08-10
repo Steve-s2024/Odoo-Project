@@ -61,14 +61,26 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         return request.redirect(f"/web/login?redirect={target}")
 
     def _remote_order(self, order_id):
+        if request.env.user._is_public():
+            return None
+        internal_user = request.env.user._is_internal()
         customer_id = self._remote_customer_id()
-        if not customer_id:
+        if not internal_user and not customer_id:
             return None
         try:
             order = request.env["storefront.erp.client"].get(f"/api/v1/orders/{order_id}")
         except StorefrontApiError:
             return None
-        return order if order.get("customer_id") == customer_id else None
+        # ERP-authorized internal website editors may inspect any storefront
+        # order. Portal users remain restricted to their own ERP customer ID.
+        return order if internal_user or order.get("customer_id") == customer_id else None
+
+    @staticmethod
+    def _can_view_remote_orders():
+        user = request.env.user
+        return not user._is_public() and (
+            user._is_internal() or bool(user.sudo().x_storefront_remote_customer_id)
+        )
 
     def _render_purchase_history_page(self, orders, error=False):
         is_english = self._is_english()
@@ -133,7 +145,7 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         return self._render_remote_detail(order_uuid)
 
     def _render_remote_detail(self, order_id):
-        if not self._remote_customer_id():
+        if not self._can_view_remote_orders():
             return self._login_redirect()
         order = self._remote_order(order_id)
         if not order:
@@ -167,7 +179,7 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         return self._render_remote_refund(order_uuid)
 
     def _render_remote_refund(self, order_id):
-        if not self._remote_customer_id():
+        if not self._can_view_remote_orders():
             return self._login_redirect()
         order = self._remote_order(order_id)
         if not order:
@@ -199,7 +211,7 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         return self._submit_remote_refund(order_uuid, post)
 
     def _submit_remote_refund(self, order_id, post):
-        if not self._remote_customer_id():
+        if not self._can_view_remote_orders():
             return self._login_redirect()
         order = self._remote_order(order_id)
         if not order:

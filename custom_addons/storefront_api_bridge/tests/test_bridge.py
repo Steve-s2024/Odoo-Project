@@ -61,6 +61,81 @@ class TestStorefrontApiClient(TransactionCase):
             "GET", "/api/v1/orders", params={"page": 1, "page_size": 100},
         )
 
+    def test_internal_editor_can_render_purchase_detail_and_refund_items(self):
+        order = {
+            "id": "erp-order-id",
+            "number": "SO001",
+            "customer_id": "another-customer-id",
+            "payment_state": "paid",
+            "state": "sale",
+            "items": [],
+        }
+        fake_client = MagicMock()
+        fake_client.get.side_effect = [order, [], order, []]
+        fake_env = MagicMock()
+        fake_env.user = self.env.user
+        fake_env.__getitem__.return_value = fake_client
+        rendered = []
+        fake_request = SimpleNamespace(
+            env=fake_env,
+            lang=SimpleNamespace(code="en_US"),
+            render=lambda template, values: rendered.append((template, values)) or template,
+            redirect=lambda target: ("redirect", target),
+        )
+        controller = StorefrontCustomerPortal()
+        with patch.object(customer_portal_module, "request", fake_request):
+            detail = controller._render_remote_detail("erp-order-id")
+            refund = controller._render_remote_refund("erp-order-id")
+
+        self.assertEqual(
+            detail, "storefront_api_bridge.remote_purchase_detail_page",
+        )
+        self.assertEqual(
+            refund, "storefront_api_bridge.remote_refund_item_page",
+        )
+        self.assertEqual([row[0] for row in rendered], [
+            "storefront_api_bridge.remote_purchase_detail_page",
+            "storefront_api_bridge.remote_refund_item_page",
+        ])
+        self.assertEqual([entry.args[0] for entry in fake_client.get.call_args_list], [
+            "/api/v1/orders/erp-order-id",
+            "/api/v1/orders/erp-order-id/refund-requests",
+            "/api/v1/orders/erp-order-id",
+            "/api/v1/orders/erp-order-id/refund-requests",
+        ])
+
+    def test_external_customer_can_render_owned_purchase_detail(self):
+        order = {
+            "id": "erp-order-id",
+            "number": "SO001",
+            "customer_id": "erp-customer-id",
+            "payment_state": "paid",
+            "state": "sale",
+            "items": [],
+        }
+        fake_client = MagicMock()
+        fake_client.get.side_effect = [order, []]
+        fake_user = MagicMock()
+        fake_user._is_public.return_value = False
+        fake_user._is_internal.return_value = False
+        fake_user.sudo.return_value.x_storefront_remote_customer_id = "erp-customer-id"
+        fake_env = MagicMock()
+        fake_env.user = fake_user
+        fake_env.__getitem__.return_value = fake_client
+        fake_request = SimpleNamespace(
+            env=fake_env,
+            lang=SimpleNamespace(code="en_US"),
+            render=lambda template, values: (template, values),
+            redirect=lambda target: ("redirect", target),
+        )
+        with patch.object(customer_portal_module, "request", fake_request):
+            result = StorefrontCustomerPortal()._render_remote_detail("erp-order-id")
+
+        self.assertEqual(
+            result[0], "storefront_api_bridge.remote_purchase_detail_page",
+        )
+        self.assertEqual(result[1]["order"]["id"], "erp-order-id")
+
     def test_inventory_snapshot_is_cached_and_indexes_templates_and_variants(self):
         client = self.env["storefront.erp.client"]
         client.clear_inventory_snapshot_cache()
