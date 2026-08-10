@@ -1,3 +1,4 @@
+import base64
 import json
 import hashlib
 import hmac
@@ -174,7 +175,7 @@ class TestStorefrontApiClient(TransactionCase):
             return_value=snapshot_map,
         ) as mocked:
             queue._cron_process_pending()
-        self.assertEqual(event.state, "done")
+        self.assertEqual(event.state, "done", event.last_error)
         mocked.assert_called_once()
 
     def test_full_catalog_refresh_replaces_cache_and_unpublishes_stale_rows(self):
@@ -241,7 +242,7 @@ class TestStorefrontApiClient(TransactionCase):
             ("external_id", "=", "stale-product-id"),
         ]))
 
-    def test_failed_event_is_not_automatically_retried(self):
+    def test_failed_event_is_retried_with_backoff(self):
         queue = self.env["storefront.webhook.event"]
         event, _created = queue.enqueue_document({
             "event_id": "inventory-event-error",
@@ -251,12 +252,94 @@ class TestStorefrontApiClient(TransactionCase):
         })
         with patch(
             "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.refresh_inventory_snapshot",
-            side_effect=StorefrontApiError("temporary", status=503),
+            side_effect=[StorefrontApiError("temporary", status=503), {"variant-error": {}}],
         ) as mocked:
             queue._cron_process_pending()
+            self.assertEqual(event.state, "error")
+            self.assertEqual(event.attempt_count, 1)
+            event.next_attempt_at = fields.Datetime.now() - timedelta(seconds=1)
             queue._cron_process_pending()
-        self.assertEqual(event.state, "error")
-        self.assertEqual(mocked.call_count, 1)
+        self.assertEqual(event.state, "done")
+        self.assertEqual(event.attempt_count, 2)
+        self.assertEqual(mocked.call_count, 2)
+
+    def test_product_update_event_refreshes_cover_media(self):
+        product = self.env["product.template"].create({
+            "name": "Old product name",
+            "website_published": True,
+            "sale_ok": True,
+            "shop_api_uuid": "media-product-id",
+        })
+        payload_zh = {
+            "id": "media-product-id", "version": "v2",
+            "name": "\u65b0\u4ea7\u54c1", "name_zh": "\u65b0\u4ea7\u54c1", "name_en": "New product",
+            "description_zh": "", "description_en": "",
+            "published": True, "sale_ok": True,
+            "price_cny": 10, "price_usd": 2,
+            "images": [{
+                "id": "media-product-id", "kind": "cover", "sequence": 0,
+                "url": "/api/v1/media/media-product-id",
+            }],
+        }
+        payload_en = dict(payload_zh, name="New product")
+        event, _created = self.env["storefront.webhook.event"].enqueue_document({
+            "event_id": "product-media-refresh-event",
+            "event_type": "product.updated",
+            "resource_id": "media-product-id",
+            "data": {"product_id": "media-product-id"},
+        })
+        tiny_png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+        )
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            side_effect=[payload_zh, payload_en],
+        ), patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get_binary",
+            return_value=tiny_png,
+        ) as media_get:
+            event._process_event()
+        product.invalidate_recordset()
+        self.assertTrue(product.image_1920)
+        media_get.assert_called_once_with("/api/v1/media/media-product-id")
+
+    def test_unpublished_product_event_removes_bilingual_catalogue_cache(self):
+        product = self.env["product.template"].create({
+            "name": "No longer public",
+            "website_published": True,
+            "sale_ok": True,
+            "shop_api_uuid": "unpublished-product-id",
+        })
+        cache = self.env["storefront.cache.entry"]
+        for language in ("zh_CN", "en_US"):
+            cache.upsert(
+                "product", "unpublished-product-id", {"published": True},
+                language=language,
+            )
+        event, _created = self.env["storefront.webhook.event"].enqueue_document({
+            "event_id": "product-unpublished-event",
+            "event_type": "product.updated",
+            "resource_id": "unpublished-product-id",
+            "data": {"product_id": "unpublished-product-id"},
+        })
+        payload = {
+            "id": "unpublished-product-id",
+            "published": False,
+            "sale_ok": True,
+            "images": [],
+        }
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            side_effect=[dict(payload), dict(payload)],
+        ):
+            event._process_event()
+
+        product.invalidate_recordset()
+        self.assertFalse(product.website_published)
+        self.assertFalse(cache.search_count([
+            ("namespace", "=", "product"),
+            ("external_id", "=", "unpublished-product-id"),
+        ]))
 
     def test_backend_routes_are_available_only_to_internal_users(self):
         ir_http = self.env["ir.http"]

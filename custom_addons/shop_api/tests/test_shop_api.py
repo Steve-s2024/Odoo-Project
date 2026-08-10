@@ -150,6 +150,45 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
         template.name = "Shop API Test Product Updated"
         self.assertEqual(template.shop_api_uuid, original_uuid)
 
+    def test_product_payload_language_is_independent_of_request_context(self):
+        template = self.product.product_tmpl_id
+        template.flush_recordset(["name"])
+        self.env.cr.execute(
+            "UPDATE product_template SET name = %s::jsonb WHERE id = %s",
+            [json.dumps({"zh_CN": "\u4e2d\u6587\u4ea7\u54c1", "en_US": "English Product"}), template.id],
+        )
+        template.invalidate_recordset(["name"])
+        payload = template.with_context(lang="en_US")._shop_api_payload(
+            language="zh_CN", detail=False,
+        )
+        self.assertEqual(payload["name"], "\u4e2d\u6587\u4ea7\u54c1")
+        self.assertEqual(payload["name_zh"], "\u4e2d\u6587\u4ea7\u54c1")
+
+    def test_gallery_image_changes_enqueue_product_media_event(self):
+        template = self.product.product_tmpl_id
+        before = self.env["shop.api.event"].search_count([
+            ("event_type", "=", "product.image.updated"),
+            ("resource_uuid", "=", template.shop_api_uuid),
+        ])
+        image = self.env["product.image"].create({
+            "name": "Gallery test",
+            "product_tmpl_id": template.id,
+        })
+        self.assertEqual(self.env["shop.api.event"].search_count([
+            ("event_type", "=", "product.image.updated"),
+            ("resource_uuid", "=", template.shop_api_uuid),
+        ]), before + 1)
+        image.write({"name": "Gallery test updated"})
+        self.assertEqual(self.env["shop.api.event"].search_count([
+            ("event_type", "=", "product.image.updated"),
+            ("resource_uuid", "=", template.shop_api_uuid),
+        ]), before + 2)
+        image.unlink()
+        self.assertEqual(self.env["shop.api.event"].search_count([
+            ("event_type", "=", "product.image.updated"),
+            ("resource_uuid", "=", template.shop_api_uuid),
+        ]), before + 3)
+
     def test_unpublished_product_still_has_integration_payload(self):
         template = self.product.product_tmpl_id
         template.website_published = False

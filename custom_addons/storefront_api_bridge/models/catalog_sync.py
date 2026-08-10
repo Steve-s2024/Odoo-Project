@@ -86,7 +86,7 @@ class StorefrontCatalogSync(models.AbstractModel):
     def _upsert_product(self, payload_zh, payload_en):
         external_id = payload_zh["id"]
         Product = self.env["product.template"].sudo().with_context(
-            active_test=False, shop_api_skip_event=True, tracking_disable=True,
+            lang="zh_CN", active_test=False, shop_api_skip_event=True, tracking_disable=True,
         )
         product = Product.search([("shop_api_uuid", "=", external_id)], limit=1)
         category = self._category(payload_zh)

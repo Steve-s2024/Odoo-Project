@@ -117,7 +117,10 @@ class ProductTemplate(models.Model):
     def _shop_api_payload(self, language="zh_CN", detail=True):
         self.ensure_one()
         self._shop_api_ensure_uuid()
-        is_english = language.lower().startswith("en")
+        language = "en_US" if str(language).lower().startswith("en") else "zh_CN"
+        is_english = language == "en_US"
+        chinese_product = self.with_context(lang="zh_CN")
+        english_product = self.with_context(lang="en_US")
         variants = []
         for variant in self.product_variant_ids:
             variant._shop_api_ensure_uuid()
@@ -134,8 +137,8 @@ class ProductTemplate(models.Model):
             "id": self.shop_api_uuid,
             "version": self._shop_api_version(),
             "name": self._get_website_display_name(is_english),
-            "name_zh": self.name,
-            "name_en": self.x_website_english_name or self.name,
+            "name_zh": chinese_product.name,
+            "name_en": self.x_website_english_name or english_product.name,
             "description": self.x_website_description_en if is_english else self.x_website_description_zh,
             "description_zh": self.x_website_description_zh or "",
             "description_en": self.x_website_description_en or "",
@@ -271,6 +274,42 @@ class ProductPricelist(models.Model):
 class ProductImage(models.Model):
     _name = "product.image"
     _inherit = ["product.image", "shop.api.uuid.mixin"]
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        images = super().create(vals_list)
+        if not self.env.context.get("shop_api_skip_event"):
+            for product in images.mapped("product_tmpl_id"):
+                self.env["shop.api.event"].enqueue(
+                    "product.image.updated", product,
+                    {"product_id": product.shop_api_uuid},
+                )
+        return images
+
+    def write(self, vals):
+        affected_products = self.mapped("product_tmpl_id")
+        result = super().write(vals)
+        if not self.env.context.get("shop_api_skip_event") and {
+            "image_1920", "name", "sequence", "product_tmpl_id",
+        }.intersection(vals):
+            affected_products |= self.mapped("product_tmpl_id")
+            for product in affected_products:
+                self.env["shop.api.event"].enqueue(
+                    "product.image.updated", product,
+                    {"product_id": product.shop_api_uuid},
+                )
+        return result
+
+    def unlink(self):
+        products = self.mapped("product_tmpl_id")
+        result = super().unlink()
+        if not self.env.context.get("shop_api_skip_event"):
+            for product in products.exists():
+                self.env["shop.api.event"].enqueue(
+                    "product.image.updated", product,
+                    {"product_id": product.shop_api_uuid},
+                )
+        return result
 
 
 class ProductAttribute(models.Model):
