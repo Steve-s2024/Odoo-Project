@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="remote_portal_style" name="Remote portal shared style">
+        <style>
+            .x_remote_portal { min-height: 68vh; background: #fff; color: #111; }
+            .x_remote_inner { padding: 52px clamp(18px, 6vw, 96px) 76px; }
+            .x_remote_title { font-size: clamp(2rem, 4vw, 3.5rem); font-weight: 900; margin: 0 0 28px; }
+            .x_remote_row { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 20px; align-items: center; padding: 18px 0; border-bottom: 1px solid #ddd; color: inherit; text-decoration: none; }
+            .x_remote_row:first-child { border-top: 2px solid #111; }
+            .x_remote_status { padding: 5px 9px; background: #f1f1f1; font-weight: 700; }
+            .x_remote_money { font-weight: 800; white-space: nowrap; }
+            .x_remote_card { border: 1px solid #ddd; padding: 22px; }
+            .x_remote_grid { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(260px,.7fr); gap: 36px; }
+            .x_remote_back { display: inline-block; margin-bottom: 24px; color: #555; text-decoration: none; font-weight: 700; }
+            .x_remote_error { padding: 14px 18px; background: #ffe6e6; color: #8a1111; }
+            @media (max-width: 760px) { .x_remote_grid { display: block; } .x_remote_card { margin-top: 24px; } .x_remote_row { grid-template-columns: 1fr auto; } }
+        </style>
+    </template>
+
+    <template id="remote_purchase_history_page" name="Remote Purchase History">
+        <t t-call="website.layout"><main id="wrap" class="x_remote_portal"><t t-call="storefront_api_bridge.remote_portal_style"/>
+            <section class="x_remote_inner"><h1 class="x_remote_title" t-out="'Purchase History' if is_english else '购买记录'"/>
+                <p t-if="portal_error" class="x_remote_error" t-out="portal_error"/>
+                <a t-foreach="orders" t-as="order" t-attf-href="/purchase-detail/#{order['id']}" class="x_remote_row">
+                    <div><strong t-out="order.get('number')"/><small class="d-block text-muted" t-out="order.get('created_at')"/></div>
+                    <span class="x_remote_status" t-out="status_label(order, is_english)"/>
+                    <span class="x_remote_money"><t t-out="order.get('currency')"/> <t t-out="'{:,.2f}'.format(order.get('amount_total') or 0)"/></span>
+                </a>
+                <p t-if="not orders and not portal_error" class="text-muted py-5" t-out="'There are no purchases yet.' if is_english else '暂无购买记录。'"/>
+            </section>
+        </main></t>
+    </template>
+
+    <template id="remote_refund_history" name="Remote Refund History">
+        <section class="mt-5" t-if="refunds"><h2 class="h4" t-out="'Refund history' if is_english else '退款记录'"/>
+            <article t-foreach="refunds" t-as="refund" class="x_remote_card mt-3">
+                <div class="d-flex justify-content-between gap-3"><strong t-out="refund_label(refund, is_english)"/><span class="x_remote_money"><t t-out="refund.get('currency')"/> <t t-out="'{:,.2f}'.format(refund.get('amount') or 0)"/></span></div>
+                <div class="mt-3"><div t-foreach="refund.get('items') or []" t-as="item" class="x_remote_row"><span t-out="item.get('name')"/><span>× <t t-out="item.get('quantity')"/></span><span class="x_remote_money"><t t-out="refund.get('currency')"/> <t t-out="'{:,.2f}'.format(item.get('amount') or 0)"/></span></div></div>
+                <div t-if="refund.get('return_required') and refund.get('state') == 'returning'" class="alert alert-warning mt-3 mb-0"><strong t-out="'Product return required' if is_english else '需要退回商品'"/><div t-out="refund.get('return_location')"/></div>
+            </article>
+        </section>
+    </template>
+
+    <template id="remote_purchase_detail_page" name="Remote Purchase Detail">
+        <t t-call="website.layout"><main id="wrap" class="x_remote_portal"><t t-call="storefront_api_bridge.remote_portal_style"/>
+            <section class="x_remote_inner"><a href="/purchase-history" class="x_remote_back" t-out="'← Purchase History' if is_english else '← 购买记录'"/>
+                <div class="d-flex justify-content-between align-items-end gap-3 mb-4"><h1 class="x_remote_title mb-0" t-out="order.get('number')"/><span class="x_remote_status" t-out="status"/></div>
+                <div class="x_remote_grid"><section><h2 class="h4" t-out="'Items' if is_english else '商品明细'"/>
+                    <div><div t-foreach="order.get('items') or []" t-as="item" class="x_remote_row"><span t-out="item.get('name')"/><span>× <t t-out="item.get('quantity')"/></span><span class="x_remote_money"><t t-out="order.get('currency')"/> <t t-out="'{:,.2f}'.format(item.get('total') or 0)"/></span></div></div>
+                </section><aside class="x_remote_card"><dl class="row mb-0"><dt class="col-7" t-out="'Order date' if is_english else '下单时间'"/><dd class="col-5 text-end" t-out="order.get('created_at')"/><dt class="col-7" t-out="'Payment status' if is_english else '支付状态'"/><dd class="col-5 text-end" t-out="payment_status"/><dt class="col-7" t-out="'Total' if is_english else '订单总额'"/><dd class="col-5 text-end x_remote_money"><t t-out="order.get('currency')"/> <t t-out="'{:,.2f}'.format(order.get('amount_total') or 0)"/></dd></dl>
+                    <a t-attf-href="/refund-item/#{order['id']}" class="btn btn-outline-dark w-100 mt-4" t-out="'Request a refund' if is_english else '申请退款'"/>
+                </aside></div><t t-call="storefront_api_bridge.remote_refund_history"/>
+            </section>
+        </main></t>
+    </template>
+
+    <template id="remote_refund_item_page" name="Remote Refund Item">
+        <t t-call="website.layout"><main id="wrap" class="x_remote_portal"><t t-call="storefront_api_bridge.remote_portal_style"/>
+            <section class="x_remote_inner"><a t-attf-href="/purchase-detail/#{order['id']}" class="x_remote_back" t-out="'← Purchase details' if is_english else '← 购买详情'"/><h1 class="x_remote_title" t-out="'Request a refund' if is_english else '申请退款'"/>
+                <form t-attf-action="/refund-item/#{order['id']}/submit" method="post"><input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <div><div t-foreach="order.get('items') or []" t-as="item" t-if="item.get('refundable')" class="x_remote_row"><div><strong t-out="item.get('name')"/><small class="d-block text-muted"><t t-out="'Purchased quantity: ' if is_english else '购买数量：'"/><t t-out="item.get('quantity')"/></small></div><span class="x_remote_money"><t t-out="order.get('currency')"/> <t t-out="'{:,.2f}'.format(item.get('unit_price') or 0)"/></span><input type="number" min="0" t-att-max="item.get('quantity')" step="1" value="0" t-att-name="'quantity_' + item.get('product_id')" class="form-control"/></div></div>
+                    <button type="submit" class="btn btn-dark mt-4" t-out="'Submit refund request' if is_english else '提交退款申请'"/>
+                </form><t t-call="storefront_api_bridge.remote_refund_history"/>
+            </section>
+        </main></t>
+    </template>
+</odoo>

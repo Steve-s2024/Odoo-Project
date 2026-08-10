@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_shop_api_configuration_list" model="ir.ui.view">
+        <field name="name">shop.api.configuration.list</field>
+        <field name="model">shop.api.configuration</field>
+        <field name="arch" type="xml">
+            <list string="商城 API 配置" multi_edit="1">
+                <field name="name" string="配置名称"/>
+                <field name="company_id" string="公司" groups="base.group_multi_company"/>
+                <field name="website_id" string="Odoo 网站"/>
+                <field name="environment" string="环境" decoration-danger="environment == 'production'"/>
+                <field name="api_version" string="API 版本"/>
+                <field name="shop_base_url" string="商城地址"/>
+                <field name="active" string="启用"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_shop_api_configuration_form" model="ir.ui.view">
+        <field name="name">shop.api.configuration.form</field>
+        <field name="model">shop.api.configuration</field>
+        <field name="arch" type="xml">
+            <form string="商城 API 配置">
+                <sheet>
+                    <widget name="web_ribbon" title="已停用" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title"><label for="name"/><h1><field name="name"/></h1></div>
+                    <group>
+                        <group string="连接信息">
+                            <field name="active" string="启用"/>
+                            <field name="company_id" string="公司" groups="base.group_multi_company"/>
+                            <field name="website_id" string="Odoo 网站"/>
+                            <field name="environment" string="环境"/>
+                            <field name="api_version" string="API 版本"/>
+                            <field name="api_base_path" string="API 基础路径"/>
+                            <field name="public_erp_base_url" string="ERP 公共地址" placeholder="https://erp.example.com"/>
+                            <field name="shop_base_url" string="商城地址" placeholder="http://127.0.0.1:8070"/>
+                            <field name="allowed_shop_return_origins" string="允许的支付返回来源" placeholder="http://127.0.0.1:8071"/>
+                        </group>
+                        <group string="库存与支付">
+                            <field name="reservation_ttl_minutes" string="库存预留分钟数"/>
+                            <field name="reservation_max_extension_minutes" string="最大延长分钟数"/>
+                            <field name="allow_payment_simulators" string="允许支付模拟器"/>
+                            <field name="chinese_pricelist_id" string="中文价目表"/>
+                            <field name="english_pricelist_id" string="英文价目表"/>
+                            <field name="media_cache_ttl_seconds" string="媒体缓存秒数"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Webhook 与签名">
+                            <group>
+                                <field name="request_timeout_seconds" string="Webhook 超时秒数"/>
+                                <field name="webhook_retry_count" string="Webhook 最大重试次数"/>
+                                <field name="webhook_retry_backoff_seconds" string="Webhook 初始退避秒数"/>
+                                <field name="allowed_clock_skew_seconds" string="签名时间允许偏差秒数"/>
+                            </group>
+                        </page>
+                        <page string="分页与保留策略">
+                            <group>
+                                <field name="default_page_size" string="默认分页数量"/>
+                                <field name="maximum_page_size" string="最大分页数量"/>
+                                <field name="event_retention_days" string="事件保留天数"/>
+                                <field name="request_log_retention_days" string="请求记录保留天数"/>
+                            </group>
+                        </page>
+                        <page string="备注"><field name="notes" string="备注" placeholder="记录迁移、网络或环境说明……"/></page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_shop_api_configuration_search" model="ir.ui.view">
+        <field name="name">shop.api.configuration.search</field>
+        <field name="model">shop.api.configuration</field>
+        <field name="arch" type="xml"><search string="搜索商城 API 配置"><field name="name"/><field name="website_id"/><field name="environment"/><filter name="active" string="已启用" domain="[('active','=',True)]"/><filter name="archived" string="已停用" domain="[('active','=',False)]"/></search></field>
+    </record>
+
+    <record id="view_shop_api_client_list" model="ir.ui.view">
+        <field name="name">shop.api.client.list</field><field name="model">shop.api.client</field>
+        <field name="arch" type="xml"><list string="API 客户端" multi_edit="1"><field name="name"/><field name="code"/><field name="user_id"/><field name="company_ids" widget="many2many_tags" optional="show"/><field name="rate_limit_per_minute" string="每分钟请求上限" optional="hide"/><field name="last_used_at" string="最后使用时间"/><field name="last_used_ip" string="最后来源 IP" optional="hide"/><field name="active" string="启用"/></list></field>
+    </record>
+    <record id="view_shop_api_client_form" model="ir.ui.view">
+        <field name="name">shop.api.client.form</field><field name="model">shop.api.client</field>
+        <field name="arch" type="xml">
+            <form string="API 客户端">
+                <header><button name="action_open_key_wizard" type="object" string="生成新密钥" class="btn-primary" icon="fa-key" groups="shop_api.group_shop_api_admin" invisible="not id"/></header>
+                <sheet>
+                    <widget name="web_ribbon" title="已停用" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title"><label for="name"/><h1><field name="name"/></h1></div>
+                    <group><group><field name="active" string="启用"/><field name="code"/><field name="user_id"/><field name="rate_limit_per_minute"/></group><group><field name="last_used_at" readonly="1"/><field name="last_used_ip" readonly="1"/><field name="company_ids" widget="many2many_tags"/><field name="website_ids" widget="many2many_tags"/></group></group>
+                    <notebook><page string="API 权限"><field name="scope_ids" widget="many2many_tags" options="{'no_create': True}"/></page><page string="备注"><field name="notes"/></page></notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_shop_api_client_search" model="ir.ui.view"><field name="name">shop.api.client.search</field><field name="model">shop.api.client</field><field name="arch" type="xml"><search string="搜索 API 客户端"><field name="name"/><field name="code"/><field name="user_id"/><filter name="active" string="已启用" domain="[('active','=',True)]"/><filter name="archived" string="已停用" domain="[('active','=',False)]"/></search></field></record>
+
+    <record id="view_shop_api_endpoint_list" model="ir.ui.view"><field name="name">shop.api.endpoint.list</field><field name="model">shop.api.endpoint</field><field name="arch" type="xml"><list string="接口目录" multi_edit="1"><field name="name"/><field name="method" decoration-info="method == 'GET'" decoration-success="method == 'POST'" decoration-warning="method in ('PATCH','PUT')" decoration-danger="method == 'DELETE'"/><field name="path"/><field name="version"/><field name="scope_id"/><field name="authentication_required" string="需要认证"/><field name="idempotency_required" string="需要幂等键"/><field name="active" string="启用"/></list></field></record>
+    <record id="view_shop_api_endpoint_form" model="ir.ui.view"><field name="name">shop.api.endpoint.form</field><field name="model">shop.api.endpoint</field><field name="arch" type="xml"><form string="接口详情"><sheet><widget name="web_ribbon" title="已停用" bg_color="text-bg-danger" invisible="active"/><div class="oe_title"><label for="name"/><h1><field name="name"/></h1></div><group><group><field name="active" string="启用"/><field name="code"/><field name="version"/><field name="method"/><field name="path"/></group><group><field name="scope_id"/><field name="authentication_required"/><field name="idempotency_required"/><field name="rate_limit_per_minute"/><field name="log_request_body"/><field name="log_response_body"/></group></group><notebook><page string="英文说明"><field name="summary_en"/></page><page string="请求示例"><field name="request_example" widget="text"/></page><page string="响应示例"><field name="response_example" widget="text"/></page></notebook></sheet></form></field></record>
+    <record id="view_shop_api_endpoint_search" model="ir.ui.view"><field name="name">shop.api.endpoint.search</field><field name="model">shop.api.endpoint</field><field name="arch" type="xml"><search string="搜索接口"><field name="name"/><field name="code"/><field name="path"/><field name="scope_id"/><filter name="public" string="公开接口" domain="[('authentication_required','=',False)]"/><filter name="idempotent" string="要求幂等键" domain="[('idempotency_required','=',True)]"/><group><filter name="group_method" string="HTTP 方法" context="{'group_by':'method'}"/><filter name="group_scope" string="权限" context="{'group_by':'scope_id'}"/></group></search></field></record>
+
+    <record id="view_shop_api_scope_list" model="ir.ui.view"><field name="name">shop.api.scope.list</field><field name="model">shop.api.scope</field><field name="arch" type="xml"><list string="权限范围" multi_edit="1"><field name="name"/><field name="code"/><field name="description" optional="show"/><field name="active" string="启用"/></list></field></record>
+    <record id="view_shop_api_scope_form" model="ir.ui.view"><field name="name">shop.api.scope.form</field><field name="model">shop.api.scope</field><field name="arch" type="xml"><form string="权限范围"><sheet><div class="oe_title"><label for="name"/><h1><field name="name"/></h1></div><group><field name="active" string="启用"/><field name="code"/><field name="description"/></group></sheet></form></field></record>
+
+    <record id="view_shop_api_event_type_list" model="ir.ui.view"><field name="name">shop.api.event.type.list</field><field name="model">shop.api.event.type</field><field name="arch" type="xml"><list string="事件类型" multi_edit="1"><field name="name"/><field name="code"/><field name="description"/><field name="active" string="启用"/></list></field></record>
+    <record id="view_shop_api_event_type_form" model="ir.ui.view"><field name="name">shop.api.event.type.form</field><field name="model">shop.api.event.type</field><field name="arch" type="xml"><form string="事件类型"><sheet><div class="oe_title"><label for="name"/><h1><field name="name"/></h1></div><group><field name="active" string="启用"/><field name="code"/><field name="description"/></group></sheet></form></field></record>
+
+    <record id="view_shop_api_webhook_list" model="ir.ui.view"><field name="name">shop.api.webhook.list</field><field name="model">shop.api.webhook</field><field name="arch" type="xml"><list string="Webhook 订阅" multi_edit="1"><field name="name"/><field name="client_id"/><field name="url"/><field name="event_type_ids" widget="many2many_tags" optional="hide"/><field name="last_success_at"/><field name="last_failure_at"/><field name="active" string="启用"/></list></field></record>
+    <record id="view_shop_api_webhook_form" model="ir.ui.view"><field name="name">shop.api.webhook.form</field><field name="model">shop.api.webhook</field><field name="arch" type="xml"><form string="Webhook 订阅"><header><button name="action_rotate_secret" type="object" string="轮换签名密钥" icon="fa-refresh" groups="shop_api.group_shop_api_admin" confirm="旧密钥将立即失效，商城必须同步更新新密钥。确定继续吗？"/></header><sheet><widget name="web_ribbon" title="已停用" bg_color="text-bg-danger" invisible="active"/><div class="oe_title"><label for="name"/><h1><field name="name"/></h1></div><group><group><field name="active" string="启用"/><field name="client_id"/><field name="url" widget="url"/><field name="timeout_seconds"/></group><group><field name="secret" password="True" groups="shop_api.group_shop_api_admin"/><field name="last_success_at" readonly="1"/><field name="last_failure_at" readonly="1"/></group></group><notebook><page string="订阅事件"><field name="event_type_ids" widget="many2many_tags"/></page><page string="最近错误"><field name="last_error" readonly="1"/></page></notebook></sheet></form></field></record>
+
+    <record id="view_shop_api_key_wizard_form" model="ir.ui.view">
+        <field name="name">shop.api.key.wizard.form</field><field name="model">shop.api.key.wizard</field>
+        <field name="arch" type="xml"><form string="生成 API 密钥"><group><field name="client_id"/><field name="key_name" readonly="generated"/><field name="expiration_date" readonly="generated"/><field name="generated" invisible="1"/><field name="generated_key" invisible="not generated" widget="CopyClipboardChar"/></group><div class="alert alert-warning" role="alert" invisible="not generated">请立即复制并妥善保存此密钥。关闭窗口后无法再次查看。</div><footer><button name="action_generate" type="object" string="生成密钥" class="btn-primary" invisible="generated"/><button string="关闭" special="cancel" class="btn-secondary"/></footer></form></field>
+    </record>
+
+    <record id="action_shop_api_configurations" model="ir.actions.act_window"><field name="name">API 配置</field><field name="res_model">shop.api.configuration</field><field name="view_mode">list,form</field></record>
+    <record id="action_shop_api_clients" model="ir.actions.act_window"><field name="name">API 客户端</field><field name="res_model">shop.api.client</field><field name="view_mode">list,form</field></record>
+    <record id="action_shop_api_endpoints" model="ir.actions.act_window"><field name="name">接口目录</field><field name="res_model">shop.api.endpoint</field><field name="view_mode">list,form</field><field name="context">{'search_default_group_method': 1}</field></record>
+    <record id="action_shop_api_scopes" model="ir.actions.act_window"><field name="name">权限范围</field><field name="res_model">shop.api.scope</field><field name="view_mode">list,form</field></record>
+    <record id="action_shop_api_event_types" model="ir.actions.act_window"><field name="name">事件类型</field><field name="res_model">shop.api.event.type</field><field name="view_mode">list,form</field></record>
+    <record id="action_shop_api_webhooks" model="ir.actions.act_window"><field name="name">Webhook 订阅</field><field name="res_model">shop.api.webhook</field><field name="view_mode">list,form</field></record>
+</odoo>

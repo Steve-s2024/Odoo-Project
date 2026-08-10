@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_shop_api_root" name="Shop APIs" action="action_shop_api_endpoints" sequence="5" web_icon="sales_team,static/description/icon.png" groups="shop_api.group_shop_api_auditor"/>
+
+    <menuitem id="menu_shop_api_overview" name="接口总览" parent="menu_shop_api_root" sequence="10" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_endpoints" name="接口目录" parent="menu_shop_api_overview" action="action_shop_api_endpoints" sequence="10" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_scopes" name="权限范围" parent="menu_shop_api_overview" action="action_shop_api_scopes" sequence="20" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_event_types" name="事件类型" parent="menu_shop_api_overview" action="action_shop_api_event_types" sequence="30" groups="shop_api.group_shop_api_auditor"/>
+
+    <menuitem id="menu_shop_api_access" name="连接与安全" parent="menu_shop_api_root" sequence="20" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_configurations" name="API 配置" parent="menu_shop_api_access" action="action_shop_api_configurations" sequence="10" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_clients" name="API 客户端" parent="menu_shop_api_access" action="action_shop_api_clients" sequence="20" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_webhooks" name="Webhook 订阅" parent="menu_shop_api_access" action="action_shop_api_webhooks" sequence="30" groups="shop_api.group_shop_api_auditor"/>
+
+    <menuitem id="menu_shop_api_operations" name="业务运行" parent="menu_shop_api_root" sequence="30" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_reservations" name="库存预留" parent="menu_shop_api_operations" action="action_shop_api_reservations" sequence="10" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_events" name="事件队列" parent="menu_shop_api_operations" action="action_shop_api_events" sequence="20" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_deliveries" name="Webhook 投递" parent="menu_shop_api_operations" action="action_shop_api_deliveries" sequence="30" groups="shop_api.group_shop_api_auditor"/>
+
+    <menuitem id="menu_shop_api_audit" name="审计与追踪" parent="menu_shop_api_root" sequence="40" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_request_logs" name="请求日志" parent="menu_shop_api_audit" action="action_shop_api_request_logs" sequence="10" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_idempotency" name="幂等记录" parent="menu_shop_api_audit" action="action_shop_api_idempotency" sequence="20" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_external_references" name="外部编号映射" parent="menu_shop_api_audit" action="action_shop_api_external_references" sequence="30" groups="shop_api.group_shop_api_auditor"/>
+
+    <menuitem id="menu_shop_api_sync" name="同步与对账" parent="menu_shop_api_root" sequence="50" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_checkpoints" name="同步检查点" parent="menu_shop_api_sync" action="action_shop_api_checkpoints" sequence="10" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_reconciliations" name="对账任务" parent="menu_shop_api_sync" action="action_shop_api_reconciliations" sequence="20" groups="shop_api.group_shop_api_auditor"/>
+</odoo>

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="remote_payment_methods" inherit_id="website_sale.payment" name="ERP API payment methods">
+        <xpath expr="//div[@id='payment_method']" position="replace">
+            <div id="payment_method" class="o_not_editable mb-3">
+                <div t-if="x_storefront_payment_error" class="alert alert-danger" role="alert">
+                    <t t-out="x_storefront_payment_error"/>
+                </div>
+                <div t-elif="x_storefront_payment_methods" class="d-grid gap-2">
+                    <form t-foreach="x_storefront_payment_methods" t-as="provider"
+                          t-att-action="'/shop/erp-payment/start/%s' % provider['code']" method="post">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <button class="btn btn-outline-secondary w-100 d-flex align-items-center gap-3 px-3 py-3 text-start"
+                                type="submit">
+                            <i t-att-class="'fa %s fa-lg' % provider['icon_class']" aria-hidden="true"/>
+                            <span class="flex-grow-1 fw-semibold" t-out="provider['display_name']"/>
+                            <i class="fa fa-chevron-right text-muted" aria-hidden="true"/>
+                        </button>
+                    </form>
+                </div>
+                <div t-else="" class="alert alert-warning" role="alert">
+                    <t t-out="'No payment method is currently available.' if request.lang.code == 'en_US' else '暂无可用支付方式。'"/>
+                </div>
+            </div>
+        </xpath>
+    </template>
+
+    <template id="payment_handoff" name="ERP payment handoff">
+        <t t-call="website.layout">
+            <main class="container py-5 text-center">
+                <h1 t-out="'Opening payment...' if request.lang.code == 'en_US' else '正在打开支付...'"/>
+                <form id="x_storefront_payment_handoff" t-att-action="action" method="post">
+                    <input t-foreach="form_values.items()" t-as="item" type="hidden"
+                           t-att-name="item[0]" t-att-value="item[1]"/>
+                    <button class="btn btn-primary mt-3" type="submit">
+                        <t t-out="'Continue' if request.lang.code == 'en_US' else '继续'"/>
+                    </button>
+                </form>
+                <script>document.getElementById('x_storefront_payment_handoff').submit();</script>
+            </main>
+        </t>
+    </template>
+
+    <template id="payment_error" name="ERP payment error">
+        <t t-call="website.layout">
+            <main class="container py-5">
+                <div class="alert alert-danger" role="alert" t-out="message"/>
+                <a class="btn btn-primary" href="/shop/payment">
+                    <t t-out="'Try again' if request.lang.code == 'en_US' else '重试'"/>
+                </a>
+            </main>
+        </t>
+    </template>
+
+    <template id="payment_status" name="ERP payment status">
+        <t t-call="website.layout">
+            <main class="container py-5 text-center">
+                <t t-set="is_english" t-value="request.lang.code == 'en_US'"/>
+                <h1 t-out="'Payment status' if is_english else '支付状态'"/>
+                <p class="fs-4" t-out="('Completed' if is_english else '支付成功') if payment and payment.get('state') == 'done' else ('Pending' if is_english else '等待支付')"/>
+                <form t-if="payment and payment.get('state') == 'pending' and payment.get('provider') in ('alipay', 'wechatpay')"
+                      action="/shop/payment/simulate-success" method="post" class="mb-3">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <button class="btn btn-primary" type="submit"
+                            t-out="'Simulate successful payment' if is_english else '模拟支付成功'"/>
+                </form>
+                <a class="btn btn-primary" href="/purchase-history">
+                    <t t-out="'Purchase history' if is_english else '购买记录'"/>
+                </a>
+            </main>
+        </t>
+    </template>
+</odoo>
