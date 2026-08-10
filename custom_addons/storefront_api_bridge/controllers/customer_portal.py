@@ -70,12 +70,26 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
             return None
         return order if order.get("customer_id") == customer_id else None
 
+    def _render_purchase_history_page(self, orders, error=False):
+        is_english = self._is_english()
+        return request.render("storefront_api_bridge.remote_purchase_history_page", {
+            "orders": orders,
+            "is_english": is_english,
+            "portal_error": error,
+            "status_label": self._status_label,
+            "additional_title": "Purchase History" if is_english else "购买记录",
+        })
+
     @route()
     def purchase_history(self, **kwargs):
         customer_id = self._remote_customer_id()
         if not customer_id:
+            # Internal accounts are ERP-authorized website editors, not shop
+            # customers. Render an empty editable page instead of redirecting
+            # them back and forth between /purchase-history and /web/login.
+            if request.env.user._is_internal():
+                return self._render_purchase_history_page([])
             return self._login_redirect()
-        is_english = self._is_english()
         try:
             orders = request.env["storefront.erp.client"].get(
                 f"/api/v1/customers/{customer_id}/orders",
@@ -85,13 +99,7 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         except StorefrontApiError as exc:
             orders = []
             error = str(exc)
-        return request.render("storefront_api_bridge.remote_purchase_history_page", {
-            "orders": orders,
-            "is_english": is_english,
-            "portal_error": error,
-            "status_label": self._status_label,
-            "additional_title": "Purchase History" if is_english else "购买记录",
-        })
+        return self._render_purchase_history_page(orders, error=error)
 
     @route()
     def purchase_detail(self, order_id, **kwargs):

@@ -2,6 +2,7 @@ import json
 import hashlib
 import hmac
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from odoo import Command, fields
@@ -11,6 +12,8 @@ from odoo.tests import TransactionCase, tagged
 from odoo.addons.storefront_api_bridge.models.api_client import StorefrontApiError
 from odoo.addons.storefront_api_bridge.models import api_client as api_client_module
 from odoo.addons.storefront_api_bridge.controllers.webhook import StorefrontWebhookController
+from odoo.addons.storefront_api_bridge.controllers.customer_portal import StorefrontCustomerPortal
+from odoo.addons.storefront_api_bridge.controllers import customer_portal as customer_portal_module
 
 
 class _Response:
@@ -29,6 +32,24 @@ class _Response:
 
 @tagged("post_install", "-at_install")
 class TestStorefrontApiClient(TransactionCase):
+    def test_internal_editor_purchase_history_renders_without_login_redirect(self):
+        rendered = object()
+        fake_request = SimpleNamespace(
+            env=SimpleNamespace(user=self.env.user),
+            lang=SimpleNamespace(code="zh_CN"),
+            render=lambda template, values: (rendered, template, values),
+        )
+        with patch.object(customer_portal_module, "request", fake_request):
+            result = StorefrontCustomerPortal.purchase_history.__wrapped__(
+                StorefrontCustomerPortal()
+            )
+        self.assertIs(result[0], rendered)
+        self.assertEqual(
+            result[1], "storefront_api_bridge.remote_purchase_history_page",
+        )
+        self.assertEqual(result[2]["orders"], [])
+        self.assertFalse(result[2]["portal_error"])
+
     def test_inventory_snapshot_is_cached_and_indexes_templates_and_variants(self):
         client = self.env["storefront.erp.client"]
         client.clear_inventory_snapshot_cache()
