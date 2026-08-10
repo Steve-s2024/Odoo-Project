@@ -722,6 +722,14 @@ class ShopApiController(Controller):
             return {
                 **customer._shop_api_payload(),
                 "login": user.login,
+                "is_internal": user._is_internal(),
+                "website_editor": bool(
+                    user._is_internal()
+                    and (
+                        user.has_group("website.group_website_designer")
+                        or user.has_group("website.group_website_restricted_editor")
+                    )
+                ),
             }, 200, None
 
         return self._run("customer_authenticate", handler)

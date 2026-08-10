@@ -306,6 +306,52 @@ class TestStorefrontApiClient(TransactionCase):
                 "https://shop.example.test/shop/payment/status",
             )
 
+    def test_product_grouping_uses_code_family_not_translated_name(self):
+        first = self.env["product.template"].create({
+            "name": "双板滑雪鞋",
+            "default_code": "012307S2-MA100-H001260",
+            "sale_ok": True,
+        })
+        second = self.env["product.template"].create({
+            "name": "Ski Boots 100 flex",
+            "default_code": "012307S2-MA100-BG01260",
+            "sale_ok": True,
+        })
+        self.assertEqual(first._normalize_shop_group_name(), second._normalize_shop_group_name())
+        self.assertEqual(len((first | second)._get_shop_grouped_products()), 1)
+
+    def test_existing_internal_editor_can_use_erp_verified_password(self):
+        editor_uuid = "erp-editor-id"
+        editor_partner = self.env["res.partner"].create({
+            "name": "Storefront Editor",
+            "shop_api_uuid": editor_uuid,
+        })
+        editor = self.env["res.users"].with_context(no_reset_password=True).create({
+            "name": "Storefront Editor",
+            "login": "storefront-disabled-editor",
+            "partner_id": editor_partner.id,
+            "group_ids": [Command.set([
+                self.env.ref("base.group_user").id,
+                self.env.ref("website.group_website_designer").id,
+            ])],
+        })
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
+            return_value={
+                "id": editor_uuid,
+                "login": "erp-editor@example.test",
+                "website_editor": True,
+                "is_internal": True,
+            },
+        ):
+            auth_info = self.env["res.users"].authenticate({
+                "type": "password",
+                "login": "erp-editor@example.test",
+                "password": "erp-only-password",
+            }, {"interactive": True})
+        self.assertEqual(auth_info["uid"], editor.id)
+        self.assertTrue(editor._is_internal())
+
     def test_erp_customer_login_provisions_portal_without_copying_password(self):
         profile = {
             "id": "erp-customer-id",

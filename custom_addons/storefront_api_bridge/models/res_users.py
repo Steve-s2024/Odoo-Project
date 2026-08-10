@@ -29,10 +29,13 @@ class ResUsers(models.Model):
         local_user = self.sudo().with_context(active_test=False).search([
             ("login", "=", login), ("active", "=", True),
         ], limit=1)
-        # Website editors and other local internal accounts remain strictly
-        # local. Only customer/portal authentication is delegated to ERP.
+        # Keep local editor authorization, but allow its password to be verified
+        # by ERP so cloned internal accounts do not drift after separation.
         if local_user and local_user._is_internal():
-            return super().authenticate(credential, user_agent_env)
+            try:
+                return super().authenticate(credential, user_agent_env)
+            except AccessDenied:
+                pass
 
         try:
             profile = self.env["storefront.erp.client"].post(
@@ -45,6 +48,30 @@ class ResUsers(models.Model):
                     "This account requires two-factor authentication and cannot yet sign in here."
                 )) from None
             raise AccessDenied() from None
+
+        if not local_user and profile.get("website_editor"):
+            remote_id = str(profile.get("id") or "").strip()
+            mapped_users = self.sudo().with_context(active_test=False).search([
+                ("active", "=", True),
+                ("partner_id.shop_api_uuid", "=", remote_id),
+            ]) if remote_id else self.browse()
+            mapped_editors = mapped_users.filtered(
+                lambda user: user._is_internal() and (
+                    user.has_group("website.group_website_designer")
+                    or user.has_group("website.group_website_restricted_editor")
+                )
+            )
+            local_user = mapped_editors if len(mapped_editors) == 1 else self.browse()
+
+        if local_user and local_user._is_internal():
+            if not profile.get("website_editor"):
+                raise AccessDenied(_("This ERP account is not authorized to edit the website."))
+            local_user._update_last_login()
+            return {
+                "uid": local_user.id,
+                "auth_method": "password",
+                "mfa": "skip",
+            }
 
         user = self._storefront_provision_portal_user(profile, local_user=local_user)
         user._update_last_login()

@@ -58,7 +58,13 @@
                 <t t-set="is_english" t-value="request.lang.code == 'en_US'"/>
                 <h1 t-out="'Payment status' if is_english else '支付状态'"/>
                 <p class="fs-4" t-out="('Completed' if is_english else '支付成功') if payment and payment.get('state') == 'done' else ('Pending' if is_english else '等待支付')"/>
-                <form t-if="payment and payment.get('state') == 'pending' and payment.get('provider') in ('alipay', 'wechatpay')"
+                <div t-if="payment and payment.get('state') == 'pending' and payment.get('provider') == 'wechatpay' and payment.get('qr_code_data_uri')"
+                     class="my-4">
+                    <p t-out="'Scan with WeChat to pay' if is_english else '请使用微信扫码支付'"/>
+                    <img t-att-src="payment.get('qr_code_data_uri')" alt="WeChat Pay QR code"
+                         style="width: min(280px, 80vw); height: auto;"/>
+                </div>
+                <form t-if="payment and payment.get('state') == 'pending' and payment.get('simulation_mode')"
                       action="/shop/payment/simulate-success" method="post" class="mb-3">
                     <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                     <button class="btn btn-primary" type="submit"

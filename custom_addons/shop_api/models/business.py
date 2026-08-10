@@ -402,7 +402,7 @@ class PaymentTransaction(models.Model):
     def _shop_api_payload(self):
         self.ensure_one()
         self._shop_api_ensure_uuid()
-        return {
+        payload = {
             "id": self.shop_api_uuid,
             "version": self._shop_api_version(),
             "reference": self.reference,
@@ -413,6 +413,13 @@ class PaymentTransaction(models.Model):
             "amount": self.amount,
             "currency": self.currency_id.name,
         }
+        if self.provider_code == "wechatpay":
+            payload["simulation_mode"] = bool(
+                getattr(self.provider_id, "wechatpay_simulation_mode", False)
+            )
+            qr_method = getattr(self, "_get_wechatpay_qr_data_uri", None)
+            payload["qr_code_data_uri"] = qr_method() if qr_method else None
+        return payload
 
     def _set_done(self, *, state_message=None, extra_allowed_states=()):
         transactions = super()._set_done(

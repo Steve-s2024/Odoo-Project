@@ -132,9 +132,18 @@ class StorefrontWebsiteSale(WebsiteSaleStockSource):
             result = order.sudo()._storefront_create_payment(provider_code)
         except StorefrontApiError as exc:
             return request.render("storefront_api_bridge.payment_error", {"message": str(exc)})
+        payment = result.get("payment") or {}
+        if payment.get("provider") == "wechatpay":
+            return request.render("storefront_api_bridge.payment_status", {
+                "order": order,
+                "payment": payment,
+            })
         processing = result.get("processing") or {}
         action = processing.get("api_url") or processing.get("action_url") or processing.get("url")
-        values = processing.get("form_values") or processing.get("data") or {}
+        values = processing.get("form_values") or processing.get("data") or {
+            key: value for key, value in processing.items()
+            if key not in ("api_url", "action_url", "url")
+        }
         if not action:
             return request.redirect("/shop/payment/status")
         if action.startswith("/"):
