@@ -19,6 +19,12 @@ class StorefrontProductImage(models.Model):
     shop_api_uuid = fields.Char(copy=False, index=True)
 
 
+class StorefrontProductCategory(models.Model):
+    _inherit = "product.category"
+
+    shop_api_uuid = fields.Char(copy=False, index=True)
+
+
 class StorefrontDeliveryCarrier(models.Model):
     _inherit = "delivery.carrier"
 

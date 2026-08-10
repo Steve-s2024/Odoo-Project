@@ -29,14 +29,6 @@ class ResUsers(models.Model):
         local_user = self.sudo().with_context(active_test=False).search([
             ("login", "=", login), ("active", "=", True),
         ], limit=1)
-        # Keep local editor authorization, but allow its password to be verified
-        # by ERP so cloned internal accounts do not drift after separation.
-        if local_user and local_user._is_internal():
-            try:
-                return super().authenticate(credential, user_agent_env)
-            except AccessDenied:
-                pass
-
         try:
             profile = self.env["storefront.erp.client"].post(
                 "/api/v1/customers/authenticate",
@@ -48,6 +40,12 @@ class ResUsers(models.Model):
                     "This account requires two-factor authentication and cannot yet sign in here."
                 )) from None
             raise AccessDenied() from None
+
+        # Interactive storefront login is fail-closed. Even a local internal
+        # account must be authenticated and authorized by ERP for this login
+        # attempt; cloned/local passwords are never an availability fallback.
+        if not profile or profile.get("authoritative") is not True:
+            raise AccessDenied(_("ERP did not authoritatively confirm this login."))
 
         if profile.get("website_editor") and profile.get("is_internal"):
             remote_id = str(profile.get("id") or "").strip()

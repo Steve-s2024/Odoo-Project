@@ -721,6 +721,7 @@ class ShopApiController(Controller):
             )
             return {
                 **customer._shop_api_payload(),
+                "authoritative": True,
                 "login": user.login,
                 "is_internal": user._is_internal(),
                 "website_editor": bool(
@@ -1015,6 +1016,7 @@ class ShopApiController(Controller):
                 if key not in {"provider_id", "currency_id", "partner_id"}
             }
             return {
+                "authoritative": True,
                 "payment": transaction._shop_api_payload(),
                 "processing": safe_processing,
             }, 201, None

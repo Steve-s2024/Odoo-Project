@@ -4,6 +4,8 @@ import json
 from odoo import _, fields, models
 from odoo.exceptions import ValidationError
 
+from .api_client import StorefrontApiError
+
 
 class SaleOrder(models.Model):
     _inherit = "sale.order"
@@ -65,6 +67,43 @@ class SaleOrder(models.Model):
                     "x_storefront_quote_fingerprint": False,
                 })
 
+    def _storefront_confirm_reservation(self):
+        """Require a current ERP read-after-write confirmation of the hold."""
+        self.ensure_one()
+        if not self.x_storefront_reservation_id:
+            raise StorefrontApiError(
+                _("ERP has not confirmed an inventory reservation."),
+                code="reservation_required", status=409,
+            )
+        reservation = self.env["storefront.erp.client"].get(
+            f"/api/v1/reservations/{self.x_storefront_reservation_id}"
+        ) or {}
+        expires_at = fields.Datetime.to_datetime(reservation.get("expires_at"))
+        remote_items = {
+            str(item.get("product_id")): float(item.get("quantity") or 0.0)
+            for item in reservation.get("items") or []
+            if item.get("product_id")
+        }
+        local_items = {
+            str(item["product_id"]): float(item["quantity"])
+            for item in self._storefront_api_items()
+        }
+        if (
+            reservation.get("authoritative") is not True
+            or reservation.get("id") != self.x_storefront_reservation_id
+            or reservation.get("state") != "active"
+            or not expires_at
+            or expires_at <= fields.Datetime.now()
+            or remote_items != local_items
+        ):
+            raise StorefrontApiError(
+                _("ERP rejected or expired the inventory reservation."),
+                code="reservation_not_confirmed", status=409,
+                details={"reservation_id": self.x_storefront_reservation_id},
+            )
+        self.x_storefront_reservation_expires_at = expires_at
+        return reservation
+
     def _storefront_ensure_quote(self):
         self.ensure_one()
         fingerprint = self._storefront_fingerprint()
@@ -75,6 +114,7 @@ class SaleOrder(models.Model):
             and self.x_storefront_reservation_expires_at
             and self.x_storefront_reservation_expires_at > now
         ):
+            self._storefront_confirm_reservation()
             return self.x_storefront_reservation_id
         if self.x_storefront_reservation_id:
             self._storefront_release_reservation()
@@ -87,6 +127,16 @@ class SaleOrder(models.Model):
             },
             idempotency_key=f"quote-{self.access_token}-{fingerprint}",
         )
+        if (
+            not quote
+            or quote.get("authoritative") is not True
+            or not quote.get("reservation_id")
+            or not quote.get("expires_at")
+        ):
+            raise StorefrontApiError(
+                _("ERP did not authoritatively confirm the inventory reservation."),
+                code="invalid_reservation_confirmation", status=502,
+            )
         self.write({
             "x_storefront_reservation_id": quote["reservation_id"],
             "x_storefront_reservation_expires_at": fields.Datetime.to_datetime(quote["expires_at"]),
@@ -225,6 +275,15 @@ class SaleOrder(models.Model):
             idempotency_key=f"payment-{self.access_token}-{provider_code}",
         )
         payment = response.get("payment") or {}
+        if (
+            response.get("authoritative") is not True
+            or not payment.get("id")
+            or payment.get("state") not in {"draft", "pending", "authorized", "done"}
+        ):
+            raise StorefrontApiError(
+                _("ERP did not authoritatively confirm payment initiation."),
+                code="invalid_payment_confirmation", status=502,
+            )
         self.write({
             "x_storefront_remote_payment_id": payment.get("id"),
             "x_storefront_remote_state": payment.get("state"),

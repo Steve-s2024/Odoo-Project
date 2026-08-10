@@ -5,7 +5,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from odoo import Command, fields
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessDenied, ValidationError
 from odoo.tests import TransactionCase, tagged
 
 from odoo.addons.storefront_api_bridge.models.api_client import StorefrontApiError
@@ -32,6 +32,9 @@ class TestStorefrontApiClient(TransactionCase):
     def test_inventory_snapshot_is_cached_and_indexes_templates_and_variants(self):
         client = self.env["storefront.erp.client"]
         client.clear_inventory_snapshot_cache()
+        self.env["storefront.cache.entry"].search([
+            ("namespace", "=", "inventory"),
+        ]).unlink()
         document = {
             "generated_at": "2026-08-08 00:00:00",
             "products": [{
@@ -61,6 +64,9 @@ class TestStorefrontApiClient(TransactionCase):
     def test_inventory_snapshot_uses_postgresql_cache_after_memory_expiry(self):
         client = self.env["storefront.erp.client"]
         client.clear_inventory_snapshot_cache()
+        self.env["storefront.cache.entry"].search([
+            ("namespace", "=", "inventory"),
+        ]).unlink()
         document = {
             "products": [{
                 "id": "template-stale",
@@ -139,6 +145,70 @@ class TestStorefrontApiClient(TransactionCase):
             queue._cron_process_pending()
         self.assertEqual(event.state, "done")
         mocked.assert_called_once()
+
+    def test_full_catalog_refresh_replaces_cache_and_unpublishes_stale_rows(self):
+        current = self.env["product.template"].create({
+            "name": "Old cached name",
+            "website_published": True,
+            "sale_ok": True,
+            "shop_api_uuid": "erp-product-id",
+        })
+        current.product_variant_id.shop_api_uuid = "erp-variant-id"
+        stale = self.env["product.template"].create({
+            "name": "Stale cached product",
+            "website_published": True,
+            "sale_ok": True,
+            "shop_api_uuid": "stale-product-id",
+        })
+        self.env["storefront.cache.entry"].upsert(
+            "product", "stale-product-id", {"name": "stale"}, language="zh_CN",
+        )
+        payload = {
+            "id": "erp-product-id",
+            "version": "v2",
+            "name": "ERP product",
+            "name_zh": "ERP 产品",
+            "name_en": "ERP product",
+            "description_zh": "中文描述",
+            "description_en": "English description",
+            "published": True,
+            "sale_ok": True,
+            "price_cny": 99,
+            "price_usd": 15,
+            "variants": [{
+                "id": "erp-variant-id", "sku": "ERP-SKU", "name": "ERP product",
+            }],
+            "images": [],
+        }
+
+        def catalog_response(_client, method, path, payload=None, params=None, **_kwargs):
+            self.assertEqual((method, path), ("GET", "/api/v1/products"))
+            row = dict(payload_template)
+            if params["language"] == "en_US":
+                row["name"] = "ERP product"
+            return [row], {"page": 1, "page_size": 100, "total": 1}
+
+        payload_template = payload
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.call",
+            autospec=True, side_effect=catalog_response,
+        ), patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.refresh_inventory_snapshot",
+            return_value={"erp-product-id": {"available": True}},
+        ):
+            result = self.env["storefront.catalog.sync"].full_refresh_from_erp()
+
+        current.invalidate_recordset()
+        stale.invalidate_recordset()
+        self.assertEqual(result["products"], 1)
+        self.assertEqual(current.with_context(lang="zh_CN").name, "ERP 产品")
+        self.assertEqual(current.with_context(lang="en_US").name, "ERP product")
+        self.assertEqual(current.default_code, "ERP-SKU")
+        self.assertTrue(current.website_published)
+        self.assertFalse(stale.website_published)
+        self.assertFalse(self.env["storefront.cache.entry"].search_count([
+            ("external_id", "=", "stale-product-id"),
+        ]))
 
     def test_failed_event_is_not_automatically_retried(self):
         queue = self.env["storefront.webhook.event"]
@@ -246,6 +316,18 @@ class TestStorefrontApiClient(TransactionCase):
         })
         return order
 
+    @staticmethod
+    def _reservation_confirmation(order):
+        return {
+            "id": order.x_storefront_reservation_id,
+            "authoritative": True,
+            "state": "active",
+            "expires_at": fields.Datetime.to_string(
+                fields.Datetime.now() + timedelta(minutes=10)
+            ),
+            "items": order._storefront_api_items(),
+        }
+
     def test_remote_order_handoff_includes_address_carrier_and_matching_total(self):
         order = self._checkout_order()
         responses = [
@@ -259,7 +341,10 @@ class TestStorefrontApiClient(TransactionCase):
         with patch(
             "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
             side_effect=responses,
-        ) as mocked:
+        ) as mocked, patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            return_value=self._reservation_confirmation(order),
+        ):
             order._storefront_sync_remote_order()
 
         order_payload = mocked.call_args_list[2].args[1]
@@ -280,8 +365,33 @@ class TestStorefrontApiClient(TransactionCase):
         with patch(
             "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
             side_effect=responses,
+        ), patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            return_value=self._reservation_confirmation(order),
         ), self.assertRaises(ValidationError):
             order._storefront_sync_remote_order()
+
+    def test_existing_reservation_requires_current_authoritative_erp_confirmation(self):
+        order = self._checkout_order()
+        invalid = self._reservation_confirmation(order)
+        invalid["authoritative"] = False
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            return_value=invalid,
+        ), self.assertRaises(StorefrontApiError):
+            order._storefront_ensure_quote()
+
+    def test_payment_initiation_rejects_non_authoritative_response(self):
+        order = self._checkout_order()
+        order.x_storefront_remote_order_id = "remote-order-id"
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
+            return_value={"payment": {"id": "payment-id", "state": "pending"}},
+        ), patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            return_value={"shop_base_url": "https://shop.example.test"},
+        ), self.assertRaises(StorefrontApiError):
+            order._storefront_create_payment("wechatpay")
 
     def test_payment_methods_use_checkout_language(self):
         order = self._checkout_order()
@@ -339,6 +449,7 @@ class TestStorefrontApiClient(TransactionCase):
             "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
             return_value={
                 "id": editor_uuid,
+                "authoritative": True,
                 "login": "erp-editor@example.test",
                 "website_editor": True,
                 "is_internal": True,
@@ -369,6 +480,7 @@ class TestStorefrontApiClient(TransactionCase):
             "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
             return_value={
                 "id": "erp-editor-id",
+                "authoritative": True,
                 "login": "future-editor@example.test",
                 "website_editor": True,
                 "is_internal": True,
@@ -414,6 +526,7 @@ class TestStorefrontApiClient(TransactionCase):
             "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
             return_value={
                 "id": remote_id,
+                "authoritative": True,
                 "login": "mapped-editor@example.test",
                 "website_editor": True,
                 "is_internal": True,
@@ -432,6 +545,7 @@ class TestStorefrontApiClient(TransactionCase):
     def test_erp_customer_login_provisions_portal_without_copying_password(self):
         profile = {
             "id": "erp-customer-id",
+            "authoritative": True,
             "login": "customer@example.test",
             "name": "ERP Customer",
             "email": "customer@example.test",
@@ -466,6 +580,28 @@ class TestStorefrontApiClient(TransactionCase):
         self.assertEqual(user.partner_id.child_ids.shop_api_uuid, "erp-address-id")
         self.assertEqual(mocked.call_args.args[0], "/api/v1/customers/authenticate")
 
+    def test_local_internal_password_is_not_an_erp_outage_fallback(self):
+        partner = self.env["res.partner"].create({"name": "Local-only editor"})
+        self.env["res.users"].with_context(no_reset_password=True).create({
+            "name": "Local-only editor",
+            "login": "local-only-editor@example.test",
+            "password": "local-password",
+            "partner_id": partner.id,
+            "group_ids": [Command.set([
+                self.env.ref("base.group_user").id,
+                self.env.ref("website.group_website_designer").id,
+            ])],
+        })
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
+            side_effect=StorefrontApiError("ERP unavailable", status=503),
+        ), self.assertRaises(AccessDenied):
+            self.env["res.users"].authenticate({
+                "type": "password",
+                "login": "local-only-editor@example.test",
+                "password": "local-password",
+            }, {"interactive": True})
+
     def test_authenticated_customer_order_reuses_erp_customer_and_address(self):
         order = self._checkout_order()
         order.partner_id.shop_api_uuid = "erp-customer-id"
@@ -483,7 +619,10 @@ class TestStorefrontApiClient(TransactionCase):
         with patch(
             "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
             return_value=remote_order,
-        ) as mocked:
+        ) as mocked, patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            return_value=self._reservation_confirmation(order),
+        ):
             order._storefront_sync_remote_order()
 
         self.assertEqual(mocked.call_count, 1)
@@ -510,6 +649,7 @@ class TestStorefrontApiClient(TransactionCase):
             {"id": "anonymous-order-id", "state": "cancel"},
             {
                 "reservation_id": "new-reservation-id",
+                "authoritative": True,
                 "expires_at": fields.Datetime.to_string(
                     fields.Datetime.now() + timedelta(minutes=10)
                 ),

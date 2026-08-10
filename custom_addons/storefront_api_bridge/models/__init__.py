@@ -1,4 +1,5 @@
 from . import api_client
+from . import catalog_sync
 from . import external_ids
 from . import sync_cache
 from . import ir_http

@@ -160,6 +160,7 @@ class ShopApiReservation(models.Model):
         self.ensure_one()
         return {
             "id": self.name,
+            "authoritative": True,
             "external_id": self.external_id,
             "state": self.state,
             "expires_at": fields.Datetime.to_string(self.expires_at),
