@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- The generic Alipay method ships archived until a provider module enables it. -->
+    <record id="payment.payment_method_alipay" model="payment.method">
+        <field name="active">True</field>
+    </record>
+</odoo>

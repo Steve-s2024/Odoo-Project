@@ -1,0 +1,25 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# * payment_alipay
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Language: zh_CN\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+#. module: payment_alipay
+msgid "Alipay"
+msgstr "支付宝"
+
+#. module: payment_alipay
+msgid "Complete payment in Alipay. The order is confirmed only after signed payment confirmation."
+msgstr "请在支付宝中完成付款。系统仅在收到签名支付确认后确认订单。"
+
+#. module: payment_alipay
+msgid "Alipay payment completed."
+msgstr "支付宝支付已完成。"
+
+#. module: payment_alipay
+msgid "Alipay payment cancelled."
+msgstr "支付宝支付已取消。"

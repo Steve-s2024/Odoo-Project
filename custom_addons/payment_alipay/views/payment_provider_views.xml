@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="payment_provider_form" model="ir.ui.view">
+        <field name="name">Alipay Provider Form</field>
+        <field name="model">payment.provider</field>
+        <field name="inherit_id" ref="payment.payment_provider_form"/>
+        <field name="arch" type="xml">
+            <page name="credentials" position="inside">
+                <group invisible="code != 'alipay'">
+                    <group string="Testing">
+                        <field name="alipay_simulation_mode"/>
+                        <field name="alipay_official_sandbox" invisible="alipay_simulation_mode"/>
+                    </group>
+                    <group string="Merchant configuration" invisible="alipay_simulation_mode">
+                        <field name="alipay_app_id" required="code == 'alipay' and state != 'disabled' and not alipay_simulation_mode"/>
+                        <field name="alipay_seller_id"/>
+                        <field name="alipay_private_key" password="True" required="code == 'alipay' and state != 'disabled' and not alipay_simulation_mode"/>
+                        <field name="alipay_public_key" password="True" required="code == 'alipay' and state != 'disabled' and not alipay_simulation_mode"/>
+                    </group>
+                </group>
+            </page>
+            <field name="payment_method_ids" position="attributes">
+                <attribute name="invisible" separator="or" add="code == 'alipay'"/>
+            </field>
+            <a name="action_view_payment_methods" position="attributes">
+                <attribute name="invisible" separator="or" add="code == 'alipay'"/>
+            </a>
+        </field>
+    </record>
+</odoo>

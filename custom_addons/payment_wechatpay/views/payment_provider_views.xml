@@ -16,10 +16,11 @@
                         <field name="wechatpay_api_v3_key" password="True" required="code == 'wechatpay' and state != 'disabled' and not wechatpay_simulation_mode"/>
                         <field name="wechatpay_merchant_serial_no" required="code == 'wechatpay' and state != 'disabled' and not wechatpay_simulation_mode"/>
                     </group>
-                    <group string="证书和私钥">
-                        <field name="wechatpay_platform_serial_no" required="code == 'wechatpay' and state != 'disabled' and not wechatpay_simulation_mode"/>
+                    <group string="SDK 管理的证书和私钥">
                         <field name="wechatpay_private_key" password="True" required="code == 'wechatpay' and state != 'disabled' and not wechatpay_simulation_mode"/>
-                        <field name="wechatpay_platform_certificate" password="True" required="code == 'wechatpay' and state != 'disabled' and not wechatpay_simulation_mode"/>
+                        <div class="alert alert-info" role="alert" colspan="2">
+                            微信支付平台证书由 wechatpayv3 SDK 自动下载、验证及轮换，不再由 Odoo 自行处理。
+                        </div>
                     </group>
                 </group>
             </page>
