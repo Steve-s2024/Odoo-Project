@@ -49,7 +49,7 @@ class ResUsers(models.Model):
                 )) from None
             raise AccessDenied() from None
 
-        if not local_user and profile.get("website_editor"):
+        if profile.get("website_editor") and profile.get("is_internal"):
             remote_id = str(profile.get("id") or "").strip()
             mapped_users = self.sudo().with_context(active_test=False).search([
                 ("active", "=", True),
@@ -61,7 +61,32 @@ class ResUsers(models.Model):
                     or user.has_group("website.group_website_restricted_editor")
                 )
             )
-            local_user = mapped_editors if len(mapped_editors) == 1 else self.browse()
+            if len(mapped_editors) == 1:
+                local_user = mapped_editors
+
+            # A customer may have signed in before the same ERP account was
+            # granted website-editor access. Promote that existing local portal
+            # copy only after ERP has authenticated it and explicitly confirmed
+            # both internal-user and website-editor authorization.
+            if local_user and not local_user._is_internal():
+                canonical_login = str(
+                    profile.get("login") or profile.get("email") or login
+                ).strip()
+                local_user = local_user.sudo()
+                local_user.write({
+                    "login": canonical_login,
+                    "x_storefront_remote_customer_id": remote_id or False,
+                    "group_ids": [Command.set([
+                        self.env.ref("base.group_user").id,
+                        self.env.ref("website.group_website_designer").id,
+                    ])],
+                })
+                if remote_id:
+                    uuid_owner = self.env["res.partner"].sudo().search([
+                        ("shop_api_uuid", "=", remote_id),
+                    ], limit=1)
+                    if not uuid_owner or uuid_owner == local_user.partner_id:
+                        local_user.partner_id.sudo().shop_api_uuid = remote_id
 
         if local_user and local_user._is_internal():
             if not profile.get("website_editor"):

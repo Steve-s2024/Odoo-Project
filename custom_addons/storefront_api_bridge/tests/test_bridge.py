@@ -352,6 +352,83 @@ class TestStorefrontApiClient(TransactionCase):
         self.assertEqual(auth_info["uid"], editor.id)
         self.assertTrue(editor._is_internal())
 
+    def test_existing_portal_is_promoted_only_after_erp_editor_authorization(self):
+        partner = self.env["res.partner"].create({
+            "name": "Future Website Editor",
+            "shop_api_uuid": "old-customer-id",
+        })
+        editor = self.env["res.users"].with_context(no_reset_password=True).create({
+            "name": "Future Website Editor",
+            "login": "future-editor@example.test",
+            "partner_id": partner.id,
+            "group_ids": [Command.set([self.env.ref("base.group_portal").id])],
+        })
+        self.assertFalse(editor._is_internal())
+
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
+            return_value={
+                "id": "erp-editor-id",
+                "login": "future-editor@example.test",
+                "website_editor": True,
+                "is_internal": True,
+            },
+        ):
+            auth_info = self.env["res.users"].authenticate({
+                "type": "password",
+                "login": "future-editor@example.test",
+                "password": "erp-only-password",
+            }, {"interactive": True})
+
+        editor.invalidate_recordset()
+        self.assertEqual(auth_info["uid"], editor.id)
+        self.assertTrue(editor._is_internal())
+        self.assertTrue(editor.has_group("website.group_website_designer"))
+        self.assertEqual(editor.partner_id.shop_api_uuid, "erp-editor-id")
+        self.assertEqual(editor.x_storefront_remote_customer_id, "erp-editor-id")
+
+    def test_uuid_mapped_editor_takes_priority_over_existing_login_portal(self):
+        remote_id = "mapped-erp-editor-id"
+        editor_partner = self.env["res.partner"].create({
+            "name": "Mapped Website Editor",
+            "shop_api_uuid": remote_id,
+        })
+        mapped_editor = self.env["res.users"].with_context(no_reset_password=True).create({
+            "name": "Mapped Website Editor",
+            "login": "storefront-disabled-mapped-editor",
+            "partner_id": editor_partner.id,
+            "group_ids": [Command.set([
+                self.env.ref("base.group_user").id,
+                self.env.ref("website.group_website_restricted_editor").id,
+            ])],
+        })
+        portal_partner = self.env["res.partner"].create({"name": "Old Portal Copy"})
+        portal = self.env["res.users"].with_context(no_reset_password=True).create({
+            "name": "Old Portal Copy",
+            "login": "mapped-editor@example.test",
+            "partner_id": portal_partner.id,
+            "group_ids": [Command.set([self.env.ref("base.group_portal").id])],
+        })
+
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
+            return_value={
+                "id": remote_id,
+                "login": "mapped-editor@example.test",
+                "website_editor": True,
+                "is_internal": True,
+            },
+        ):
+            auth_info = self.env["res.users"].authenticate({
+                "type": "password",
+                "login": "mapped-editor@example.test",
+                "password": "erp-only-password",
+            }, {"interactive": True})
+
+        self.assertEqual(auth_info["uid"], mapped_editor.id)
+        self.assertTrue(mapped_editor._is_internal())
+        self.assertFalse(portal._is_internal())
+
     def test_erp_customer_login_provisions_portal_without_copying_password(self):
         profile = {
             "id": "erp-customer-id",
