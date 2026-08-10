@@ -164,6 +164,32 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
         self.assertEqual(payload["name"], "\u4e2d\u6587\u4ea7\u54c1")
         self.assertEqual(payload["name_zh"], "\u4e2d\u6587\u4ea7\u54c1")
 
+    def test_same_name_group_uses_available_english_website_name(self):
+        products = self.env["product.template"].create([
+            {
+                "name": "\u6d4b\u8bd5\u5355\u677f\u6ed1\u96ea\u978b\u5206\u7ec4",
+                "default_code": "012307S1-MA007-H001250",
+                "sale_ok": True,
+                "website_published": True,
+                "x_website_english_name": "Test Snowboard Boots Group",
+            },
+            {
+                "name": "\u6d4b\u8bd5\u5355\u677f\u6ed1\u96ea\u978b\u5206\u7ec4",
+                "default_code": "012307S1-MA010-W001250",
+                "sale_ok": True,
+                "website_published": True,
+            },
+        ])
+
+        payload = products[1]._shop_api_payload(language="en_US", detail=True)
+
+        self.assertEqual(payload["name"], "Test Snowboard Boots Group")
+        self.assertEqual(payload["name_en"], "Test Snowboard Boots Group")
+        self.assertEqual(
+            {row["name"] for row in payload["group_variants"]},
+            {"Test Snowboard Boots Group"},
+        )
+
     def test_gallery_image_changes_enqueue_product_media_event(self):
         template = self.product.product_tmpl_id
         before = self.env["shop.api.event"].search_count([

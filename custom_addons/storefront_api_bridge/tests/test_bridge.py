@@ -700,19 +700,32 @@ class TestStorefrontApiClient(TransactionCase):
                 "https://shop.example.test/shop/payment/status",
             )
 
-    def test_product_grouping_uses_code_family_not_translated_name(self):
+    def test_product_grouping_uses_name_not_flex_or_style_code(self):
         first = self.env["product.template"].create({
             "name": "双板滑雪鞋",
-            "default_code": "012307S2-MA100-H001260",
+            "default_code": "012307S1-MA007-H001260",
             "sale_ok": True,
         })
         second = self.env["product.template"].create({
             "name": "Ski Boots 100 flex",
-            "default_code": "012307S2-MA100-BG01260",
+            "default_code": "012307S1-MA010-BG01260",
+            "sale_ok": True,
+        })
+        second.with_context(lang="zh_CN").name = first.with_context(lang="zh_CN").name
+        different_name = self.env["product.template"].create({
+            "name": "Different boots",
+            "default_code": "012307S1-MA007-W001260",
             "sale_ok": True,
         })
         self.assertEqual(first._normalize_shop_group_name(), second._normalize_shop_group_name())
         self.assertEqual(len((first | second)._get_shop_grouped_products()), 1)
+        self.assertNotEqual(
+            first._normalize_shop_group_name(),
+            different_name._normalize_shop_group_name(),
+        )
+        self.assertEqual(
+            len((first | second | different_name)._get_shop_grouped_products()), 2,
+        )
 
     def test_existing_internal_editor_can_use_erp_verified_password(self):
         editor_uuid = "erp-editor-id"

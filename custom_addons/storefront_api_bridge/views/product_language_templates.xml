@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template
+        id="products_item_language_detection"
+        inherit_id="stock_subwarehouse_hierarchy.products_item_international_mapping"
+        name="Storefront product card language detection"
+    >
+        <xpath expr="//span[contains(@t-out, '_get_website_display_name')]" position="attributes">
+            <attribute name="t-out">product._get_website_display_name(bool(request.lang and (request.lang.code or '').lower().startswith('en')))</attribute>
+        </xpath>
+        <xpath expr="//span[contains(@t-out, '_get_website_display_price_label')]" position="attributes">
+            <attribute name="t-out">product._get_website_display_price_label(bool(request.lang and (request.lang.code or '').lower().startswith('en')))</attribute>
+        </xpath>
+    </template>
+
+    <template
+        id="product_price_language_detection"
+        inherit_id="stock_subwarehouse_hierarchy.product_price_international_mapping"
+        name="Storefront product price language detection"
+    >
+        <xpath expr="//t[@t-if=&quot;request.lang and request.lang.code == 'en_US'&quot;]" position="attributes">
+            <attribute name="t-if">bool(request.lang and (request.lang.code or '').lower().startswith('en'))</attribute>
+        </xpath>
+    </template>
+
+    <template
+        id="product_selector_language_detection"
+        inherit_id="stock_subwarehouse_hierarchy.product_page_shop_group_siblings"
+        name="Storefront product selector language detection"
+    >
+        <xpath expr="//t[@t-set='is_english']" position="attributes">
+            <attribute name="t-value">bool(request.lang and (request.lang.code or '').lower().startswith('en'))</attribute>
+        </xpath>
+    </template>
+</odoo>

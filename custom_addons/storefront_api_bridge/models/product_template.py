@@ -1,5 +1,3 @@
-import re
-
 from odoo import models
 from odoo.http import request
 
@@ -10,12 +8,8 @@ class ProductTemplate(models.Model):
     _inherit = "product.template"
 
     def _storefront_stable_group_key(self):
-        """Group variants by product-code family, independent of translations."""
+        """Group sellable SKUs by their stable Chinese website name."""
         self.ensure_one()
-        code = (self.default_code or "").strip().strip("[]")
-        parts = [part.strip().upper() for part in code.split("-") if part.strip()]
-        if len(parts) >= 2 and re.match(r"^\d{6}[A-Z0-9]+$", parts[0]):
-            return "code:%s-%s" % (parts[0], parts[1])
         return "name:%s" % super()._normalize_shop_group_name()
 
     def _normalize_shop_group_name(self):

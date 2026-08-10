@@ -1,3 +1,4 @@
+import re
 import uuid
 
 from odoo import api, fields, models
@@ -120,7 +121,7 @@ class ProductTemplate(models.Model):
         language = "en_US" if str(language).lower().startswith("en") else "zh_CN"
         is_english = language == "en_US"
         chinese_product = self.with_context(lang="zh_CN")
-        english_product = self.with_context(lang="en_US")
+        english_name = self._shop_api_group_english_name()
         variants = []
         for variant in self.product_variant_ids:
             variant._shop_api_ensure_uuid()
@@ -128,7 +129,7 @@ class ProductTemplate(models.Model):
             variants.append({
                 "id": variant.shop_api_uuid,
                 "sku": variant.default_code or self.default_code or "",
-                "name": self._get_website_display_name(is_english),
+                "name": english_name if is_english else chinese_product.name,
                 "attributes": values,
                 "available_quantity": self._get_shop_available_quantity(),
                 "available": self._is_shop_available(),
@@ -136,9 +137,9 @@ class ProductTemplate(models.Model):
         payload = {
             "id": self.shop_api_uuid,
             "version": self._shop_api_version(),
-            "name": self._get_website_display_name(is_english),
+            "name": english_name if is_english else chinese_product.name,
             "name_zh": chinese_product.name,
-            "name_en": self.x_website_english_name or english_product.name,
+            "name_en": english_name,
             "description": self.x_website_description_en if is_english else self.x_website_description_zh,
             "description_zh": self.x_website_description_zh or "",
             "description_en": self.x_website_description_en or "",
@@ -186,12 +187,30 @@ class ProductTemplate(models.Model):
                         "id": variant.shop_api_uuid,
                         "product_id": sibling.shop_api_uuid,
                         "sku": variant.default_code or sibling.default_code or "",
-                        "name": sibling._get_website_display_name(is_english),
+                        "name": english_name if is_english else sibling.with_context(lang="zh_CN").name,
                         "attributes": values,
                         "available_quantity": sibling._get_shop_available_quantity(),
                         "available": sibling._is_shop_available(),
                     })
         return payload
+
+    @staticmethod
+    def _shop_api_is_english_name(value):
+        return bool(re.search(r"[A-Za-z]", str(value or "")))
+
+    def _shop_api_group_english_name(self):
+        """Use one reliable English website name for every same-name SKU."""
+        self.ensure_one()
+        siblings = self._get_all_shop_group_siblings()
+        explicit_names = siblings.mapped("x_website_english_name")
+        translated_names = [
+            sibling.with_context(lang="en_US").name for sibling in siblings
+        ]
+        for candidate in [*explicit_names, *translated_names]:
+            normalized = " ".join(str(candidate or "").split())
+            if self._shop_api_is_english_name(normalized):
+                return normalized
+        return self.x_website_english_name or self.with_context(lang="en_US").name
 
     def _shop_api_image_payloads(self):
         self.ensure_one()

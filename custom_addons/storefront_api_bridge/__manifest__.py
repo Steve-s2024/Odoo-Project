@@ -1,7 +1,7 @@
 {
     "name": "Storefront ERP API Bridge",
     "summary": "Keep Odoo website presentation local while ERP remains transaction authority",
-    "version": "19.0.2.3.1",
+    "version": "19.0.2.3.2",
     "category": "Website/Website",
     "author": "Local",
     "license": "LGPL-3",
@@ -11,6 +11,7 @@
         "data/ir_cron_data.xml",
         "views/payment_templates.xml",
         "views/remote_portal_templates.xml",
+        "views/product_language_templates.xml",
     ],
     "assets": {
         "web.assets_frontend": [
