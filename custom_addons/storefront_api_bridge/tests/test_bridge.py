@@ -456,6 +456,29 @@ class TestStorefrontApiClient(TransactionCase):
         self.assertEqual(sent.get_header("Authorization"), "Bearer server-only-secret")
         self.assertNotIn("server-only-secret", sent.full_url)
 
+    def test_payment_command_uses_dedicated_bounded_timeout(self):
+        with patch.dict("os.environ", {
+            "STOREFRONT_ERP_BASE_URL": "https://erp.example.test",
+            "STOREFRONT_ERP_API_KEY": "server-only-secret",
+        }), patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.urlrequest.urlopen",
+            return_value=_Response({"data": {"authoritative": True}}),
+        ) as mocked:
+            self.env["storefront.erp.client"].post(
+                "/api/v1/orders/order-id/payments", {}, timeout_seconds=27,
+            )
+        self.assertEqual(mocked.call_args.kwargs["timeout"], 27)
+
+    def test_remote_portal_pages_expose_full_width_editor_top_blocks(self):
+        purchase_arch = self.env.ref(
+            "storefront_api_bridge.remote_purchase_detail_page"
+        ).arch_db
+        refund_arch = self.env.ref(
+            "storefront_api_bridge.remote_refund_item_page"
+        ).arch_db
+        self.assertIn("oe_structure_remote_purchase_detail_page_top", purchase_arch)
+        self.assertIn("oe_structure_remote_refund_item_page_top", refund_arch)
+
     def test_order_shortage_lines_use_remote_variant_identifiers(self):
         partner = self.env["res.partner"].create({"name": "Storefront test"})
         product = self.env["product.product"].create({
@@ -630,6 +653,38 @@ class TestStorefrontApiClient(TransactionCase):
                 confirmed,
             ],
         ):
+            result = order._storefront_create_payment("wechatpay")
+        self.assertTrue(result["authoritative"])
+        self.assertEqual(result["payment"], confirmed)
+        self.assertEqual(order.x_storefront_remote_payment_id, "payment-id")
+
+    def test_payment_timeout_recovers_only_from_authoritative_erp_read(self):
+        order = self._checkout_order()
+        order.x_storefront_remote_order_id = "remote-order-id"
+        confirmed = {
+            "id": "payment-id",
+            "authoritative": True,
+            "order_ids": ["remote-order-id"],
+            "provider": "wechatpay",
+            "currency": order.currency_id.name,
+            "amount": order.amount_total,
+            "state": "pending",
+            "qr_code_data_uri": "data:image/png;base64,AA==",
+        }
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
+            side_effect=StorefrontApiError(
+                "timeout", code="erp_unavailable", status=503,
+            ),
+        ), patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            side_effect=[
+                self._remote_order(order),
+                {"shop_base_url": "https://shop.example.test"},
+                [confirmed],
+                confirmed,
+            ],
+        ), patch("odoo.addons.storefront_api_bridge.models.sale_order.time.sleep"):
             result = order._storefront_create_payment("wechatpay")
         self.assertTrue(result["authoritative"])
         self.assertEqual(result["payment"], confirmed)

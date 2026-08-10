@@ -5,9 +5,12 @@ import uuid
 from datetime import timedelta
 from urllib.parse import urlparse
 
+from psycopg2.errors import LockNotAvailable
+
 from odoo import Command, fields
 from odoo.exceptions import AccessDenied, AccessError, MissingError, UserError, ValidationError
 from odoo.http import Controller, request, route
+from odoo.tools import SQL
 from odoo.tools.mimetypes import guess_mimetype
 
 
@@ -997,7 +1000,37 @@ class ShopApiController(Controller):
     def payment_create(self, order_uuid):
         def handler(body, client):
             order = self._order_record(order_uuid, client)
+            try:
+                request.env.cr.execute(
+                    SQL(
+                        "SELECT 1 FROM sale_order WHERE id = %s "
+                        "FOR NO KEY UPDATE NOWAIT",
+                        order.id,
+                    )
+                )
+            except LockNotAvailable as error:
+                raise ShopApiError(
+                    "payment_already_processing",
+                    "Payment is already being processed.",
+                    409,
+                ) from error
+            if order.state == "cancel":
+                raise ShopApiError("order_cancelled", "The order has been cancelled.", 409)
+
+            # Keep the same readiness and stock gates as Odoo's native
+            # /shop/payment/transaction route. The only difference is that the
+            # caller is authenticated through the Shop API instead of an Odoo
+            # browser session.
+            order._check_cart_is_ready_to_be_paid()
             order._prepare_website_stock_for_payment()
+            if order.currency_id.compare_amounts(
+                order.amount_paid, order.amount_total,
+            ) == 0:
+                raise ShopApiError(
+                    "order_already_paid",
+                    "The order has already been paid. Please refresh the page.",
+                    409,
+                )
             provider = request.env["payment.provider"].sudo().search([
                 ("code", "=", body.get("provider")),
                 ("state", "in", ("enabled", "test")),
@@ -1032,6 +1065,7 @@ class ShopApiController(Controller):
                 "currency_id": order.currency_id.id,
                 "partner_id": order.partner_invoice_id.id,
                 "operation": "online_redirect",
+                "tokenize": False,
                 "sale_order_ids": [Command.set(order.ids)],
                 "landing_route": return_url or f"/shop/payment/status/{order.shop_api_uuid}",
             })
@@ -1063,7 +1097,6 @@ class ShopApiController(Controller):
                 raise ShopApiError("payment_simulator_disabled", "支付模拟器未启用。", 403)
             provider = transaction.provider_id.sudo()
             if transaction.state == "done":
-                transaction._post_process()
                 return transaction._shop_api_payload(), 200, None
             if transaction.state not in ("draft", "pending"):
                 raise ShopApiError("payment_not_simulatable", "当前支付状态不能模拟成功。", 409)
@@ -1084,7 +1117,6 @@ class ShopApiController(Controller):
                 })
             else:
                 raise ShopApiError("payment_not_simulatable", "该支付方式未处于模拟模式。", 409)
-            transaction._post_process()
             return transaction._shop_api_payload(), 200, None
         return self._run("payment_simulate_success", handler)
 

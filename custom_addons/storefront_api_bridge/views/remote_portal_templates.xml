@@ -82,6 +82,7 @@
 
     <template id="remote_purchase_detail_page" name="Remote Purchase Detail">
         <t t-call="website.layout"><main id="wrap" class="x_purchase_page"><t t-call="storefront_api_bridge.remote_portal_style"/>
+            <div id="oe_structure_remote_purchase_detail_page_top" class="oe_structure oe_empty"/>
             <section class="x_purchase_inner x_purchase_detail"><div id="oe_structure_purchase_detail_top" class="oe_structure oe_empty"/><a href="/purchase-history" class="x_purchase_back" t-out="'← Purchase History' if is_english else '← 购买记录'"/>
                 <div class="x_purchase_detail_head"><div><p class="text-muted mb-2" t-out="'Order' if is_english else '订单'"/><h1 t-out="order.get('number')"/></div><span class="x_purchase_status" t-out="status"/></div>
                 <div class="x_purchase_grid"><section><h2 class="h4 mb-3" t-out="'Items' if is_english else '商品明细'"/>
@@ -96,6 +97,7 @@
 
     <template id="remote_refund_item_page" name="Remote Refund Item">
         <t t-call="website.layout"><main id="wrap" class="x_purchase_page"><t t-call="storefront_api_bridge.remote_portal_style"/>
+            <div id="oe_structure_remote_refund_item_page_top" class="oe_structure oe_empty"/>
             <section class="x_purchase_inner x_refund_form"><div id="oe_structure_refund_item_top" class="oe_structure oe_empty"/><a t-attf-href="/purchase-detail/#{order['id']}" class="x_purchase_back" t-out="'← Purchase details' if is_english else '← 购买详情'"/><h1 t-out="'Request a refund' if is_english else '申请退款'"/>
                 <p t-out="'Select the purchased items and quantities you want reviewed for refund.' if is_english else '选择需要申请退款的商品与数量。审核通过后处理退款。'"/>
                 <form t-attf-action="/refund-item/#{order['id']}/submit" method="post"><input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>

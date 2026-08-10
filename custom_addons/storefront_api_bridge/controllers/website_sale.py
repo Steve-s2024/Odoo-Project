@@ -111,7 +111,7 @@ class StorefrontWebsiteSale(WebsiteSaleStockSource):
         except StorefrontApiError as exc:
             return request.render("storefront_api_bridge.payment_error", {"message": str(exc)})
         payment = result.get("payment") or {}
-        if payment.get("provider") == "wechatpay":
+        if payment.get("provider") in {"wechatpay", "alipay"}:
             return request.render("storefront_api_bridge.payment_status", {
                 "order": order,
                 "payment": payment,

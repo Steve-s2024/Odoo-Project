@@ -370,6 +370,33 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
         payload = transaction._shop_api_payload()
         self.assertTrue(payload["authoritative"])
         self.assertEqual(payload["order_ids"], [order.shop_api_uuid])
+        self.assertFalse(payload["post_processed"])
+
+    def test_alipay_payment_payload_contains_shop_rendering_fields(self):
+        reservation = self.env["shop.api.reservation"].create_reservation(self.client, {
+            "external_id": "alipay-payload-reservation",
+            "items": [{"product_id": self.product.shop_api_uuid, "quantity": 1}],
+        })
+        order = reservation.create_order(
+            self.customer, "SHOP-ORDER-ALIPAY-PAYLOAD", language="zh_CN",
+        )
+        provider = self.env.ref("payment_alipay.payment_provider_alipay")
+        provider.write({"state": "test", "alipay_simulation_mode": True})
+        transaction = self.env["payment.transaction"].create({
+            "provider_id": provider.id,
+            "payment_method_id": provider.payment_method_ids[:1].id,
+            "reference": "SHOP-API-ALIPAY",
+            "amount": order.amount_total,
+            "currency_id": order.currency_id.id,
+            "partner_id": order.partner_id.id,
+            "operation": "online_redirect",
+            "sale_order_ids": [Command.set(order.ids)],
+        })
+        transaction._get_processing_values()
+        payload = transaction._shop_api_payload()
+        self.assertEqual(payload["provider"], "alipay")
+        self.assertTrue(payload["simulation_mode"])
+        self.assertIn("qr_code_data_uri", payload)
 
     def test_expired_reservation_releases_stock_and_creates_event(self):
         reservation = self.env["shop.api.reservation"].create_reservation(self.client, {

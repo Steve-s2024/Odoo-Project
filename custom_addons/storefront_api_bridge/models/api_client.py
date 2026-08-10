@@ -96,8 +96,14 @@ class StorefrontErpClient(models.AbstractModel):
         return items
 
     @api.model
-    def call(self, method, path, payload=None, params=None, idempotency_key=None):
-        base_url, api_key, timeout = self._settings()
+    def call(
+        self, method, path, payload=None, params=None, idempotency_key=None,
+        timeout_seconds=None,
+    ):
+        base_url, api_key, default_timeout = self._settings()
+        timeout = default_timeout if timeout_seconds is None else max(
+            1, min(int(timeout_seconds), 60)
+        )
         query = f"?{parse.urlencode(params)}" if params else ""
         body = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
         headers = {
@@ -154,8 +160,18 @@ class StorefrontErpClient(models.AbstractModel):
         return self.call("GET", path, params=params)[0]
 
     @api.model
-    def post(self, path, payload, idempotency_key=None):
-        return self.call("POST", path, payload=payload, idempotency_key=idempotency_key)[0]
+    def post(self, path, payload, idempotency_key=None, timeout_seconds=None):
+        return self.call(
+            "POST", path, payload=payload, idempotency_key=idempotency_key,
+            timeout_seconds=timeout_seconds,
+        )[0]
+
+    @api.model
+    def payment_timeout_seconds(self):
+        return max(
+            1,
+            min(int(os.environ.get("STOREFRONT_ERP_PAYMENT_TIMEOUT_SECONDS", "30")), 60),
+        )
 
     @api.model
     def get_binary(self, path):

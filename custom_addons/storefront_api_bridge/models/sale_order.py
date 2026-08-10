@@ -1,5 +1,6 @@
 import hashlib
 import json
+import time
 
 from odoo import _, fields, models
 from odoo.exceptions import ValidationError
@@ -324,29 +325,36 @@ class SaleOrder(models.Model):
     def _storefront_create_payment(self, provider_code):
         self.ensure_one()
         remote_order_id = self._storefront_sync_remote_order()
-        response = self.env["storefront.erp.client"].post(
-            f"/api/v1/orders/{remote_order_id}/payments",
-            {
-                "provider": provider_code,
-                "return_url": self._storefront_payment_return_url(),
-            },
-            idempotency_key=f"payment-{remote_order_id}-{provider_code}",
-        )
+        client = self.env["storefront.erp.client"]
+        try:
+            response = client.post(
+                f"/api/v1/orders/{remote_order_id}/payments",
+                {
+                    "provider": provider_code,
+                    "return_url": self._storefront_payment_return_url(),
+                },
+                idempotency_key=f"payment-{remote_order_id}-{provider_code}",
+                timeout_seconds=client.payment_timeout_seconds(),
+            )
+        except StorefrontApiError as error:
+            if error.code != "erp_unavailable":
+                raise
+            # A network timeout is ambiguous: ERP may have committed the
+            # idempotent command even though its HTTP response did not reach
+            # the shop. Recover only from an authoritative ERP read and never
+            # create a second charge locally.
+            response = {}
+            confirmed = self._storefront_recover_payment(
+                client, remote_order_id, provider_code,
+            )
+            if not confirmed:
+                raise
+            response = {"authoritative": True, "payment": confirmed}
         payment = response.get("payment") or {}
         payment_id = payment.get("id")
-        confirmed = self.env["storefront.erp.client"].get(
-            f"/api/v1/payments/{payment_id}"
-        ) if payment_id else {}
-        if (
-            confirmed.get("authoritative") is not True
-            or confirmed.get("id") != payment_id
-            or remote_order_id not in (confirmed.get("order_ids") or [])
-            or confirmed.get("provider") != provider_code
-            or confirmed.get("currency") != self.currency_id.name
-            or self.currency_id.compare_amounts(
-                confirmed.get("amount") or 0.0, self.amount_total,
-            )
-            or confirmed.get("state") not in {"draft", "pending", "authorized", "done"}
+        confirmed = client.get(f"/api/v1/payments/{payment_id}") if payment_id else {}
+        if not self._storefront_payment_is_authoritative(
+            confirmed, remote_order_id, provider_code, payment_id=payment_id,
         ):
             raise StorefrontApiError(
                 _("ERP did not authoritatively confirm payment initiation."),
@@ -358,6 +366,40 @@ class SaleOrder(models.Model):
             "x_storefront_remote_state": confirmed["state"],
         })
         return response
+
+    def _storefront_payment_is_authoritative(
+        self, payment, remote_order_id, provider_code, payment_id=None,
+    ):
+        self.ensure_one()
+        return bool(
+            payment.get("authoritative") is True
+            and (not payment_id or payment.get("id") == payment_id)
+            and remote_order_id in (payment.get("order_ids") or [])
+            and payment.get("provider") == provider_code
+            and payment.get("currency") == self.currency_id.name
+            and not self.currency_id.compare_amounts(
+                payment.get("amount") or 0.0, self.amount_total,
+            )
+            and payment.get("state") in {"draft", "pending", "authorized", "done"}
+        )
+
+    def _storefront_recover_payment(self, client, remote_order_id, provider_code):
+        self.ensure_one()
+        for delay in (0, 0.25, 0.75, 1.5):
+            if delay:
+                time.sleep(delay)
+            try:
+                payments = client.get(
+                    f"/api/v1/orders/{remote_order_id}/payments"
+                ) or []
+            except StorefrontApiError:
+                continue
+            for payment in reversed(payments):
+                if self._storefront_payment_is_authoritative(
+                    payment, remote_order_id, provider_code,
+                ):
+                    return payment
+        return {}
 
     def _storefront_simulate_payment_success(self):
         self.ensure_one()

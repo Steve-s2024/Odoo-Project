@@ -481,6 +481,13 @@ class PaymentTransaction(models.Model):
             )
             qr_method = getattr(self, "_get_wechatpay_qr_data_uri", None)
             payload["qr_code_data_uri"] = qr_method() if qr_method else None
+        elif self.provider_code == "alipay":
+            payload["simulation_mode"] = bool(
+                getattr(self.provider_id, "alipay_simulation_mode", False)
+            )
+            qr_method = getattr(self, "_get_alipay_qr_data_uri", None)
+            payload["qr_code_data_uri"] = qr_method() if qr_method else None
+        payload["post_processed"] = bool(self.is_post_processed)
         return payload
 
     def _set_done(self, *, state_message=None, extra_allowed_states=()):
@@ -491,6 +498,13 @@ class PaymentTransaction(models.Model):
             self.env["shop.api.event"].enqueue(
                 "payment.completed", transaction, transaction._shop_api_payload(),
             )
+        post_processing_cron = self.env.ref(
+            "payment.cron_post_process_payment_tx", raise_if_not_found=False,
+        )
+        if post_processing_cron:
+            # Match Odoo's standard payment lifecycle without keeping the API
+            # request open while invoices, PDFs, and email are generated.
+            post_processing_cron.sudo()._trigger()
         return transactions
 
     def _set_pending(self, *, state_message=None, extra_allowed_states=()):
