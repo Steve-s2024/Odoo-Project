@@ -80,15 +80,35 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
             "additional_title": "Purchase History" if is_english else "购买记录",
         })
 
+    @staticmethod
+    def _all_storefront_orders():
+        client = request.env["storefront.erp.client"]
+        page = 1
+        orders = []
+        while True:
+            rows, meta = client.call("GET", "/api/v1/orders", params={
+                "page": page, "page_size": 100,
+            })
+            orders.extend(rows or [])
+            if len(orders) >= int((meta or {}).get("total") or len(orders)):
+                return orders
+            page += 1
+
     @route()
     def purchase_history(self, **kwargs):
         customer_id = self._remote_customer_id()
         if not customer_id:
             # Internal accounts are ERP-authorized website editors, not shop
-            # customers. Render an empty editable page instead of redirecting
+            # customers. Load the client-wide ERP history instead of redirecting
             # them back and forth between /purchase-history and /web/login.
             if request.env.user._is_internal():
-                return self._render_purchase_history_page([])
+                try:
+                    orders = self._all_storefront_orders()
+                    error = False
+                except StorefrontApiError as exc:
+                    orders = []
+                    error = str(exc)
+                return self._render_purchase_history_page(orders, error=error)
             return self._login_redirect()
         try:
             orders = request.env["storefront.erp.client"].get(

@@ -74,6 +74,7 @@ BUILTIN_ENDPOINTS = [
     ("address_update", "PATCH", "/api/v1/customers/{uuid}/addresses/{address_uuid}", "customer:write", True, "更新客户地址", "Update customer address"),
     ("address_delete", "DELETE", "/api/v1/customers/{uuid}/addresses/{address_uuid}", "customer:write", True, "停用客户地址", "Archive customer address"),
     ("order_create", "POST", "/api/v1/orders", "order:write", True, "创建订单", "Create order"),
+    ("order_list", "GET", "/api/v1/orders", "order:read", False, "商城订单列表", "Storefront order list"),
     ("order_detail", "GET", "/api/v1/orders/{uuid}", "order:read", False, "订单详情", "Order detail"),
     ("order_external", "GET", "/api/v1/orders/by-external-id/{id}", "order:read", False, "按外部编号查询订单", "Order by external ID"),
     ("order_changes", "GET", "/api/v1/orders/changes", "order:read", False, "订单变更", "Order changes"),

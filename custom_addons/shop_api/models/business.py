@@ -402,8 +402,11 @@ class PaymentTransaction(models.Model):
     def _shop_api_payload(self):
         self.ensure_one()
         self._shop_api_ensure_uuid()
+        orders = self.sale_order_ids or self.source_transaction_id.sale_order_ids
+        orders._shop_api_ensure_uuid()
         payload = {
             "id": self.shop_api_uuid,
+            "authoritative": True,
             "version": self._shop_api_version(),
             "reference": self.reference,
             "provider": self.provider_code,
@@ -412,6 +415,7 @@ class PaymentTransaction(models.Model):
             "state": self.state,
             "amount": self.amount,
             "currency": self.currency_id.name,
+            "order_ids": orders.mapped("shop_api_uuid"),
         }
         if self.provider_code == "wechatpay":
             payload["simulation_mode"] = bool(

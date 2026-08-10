@@ -29,6 +29,49 @@ class SaleOrder(models.Model):
             items.append({"product_id": product_uuid, "quantity": line.product_uom_qty})
         return items
 
+    @staticmethod
+    def _storefront_aggregate_items(items):
+        """Compare carts by product totals, independent of split sale lines."""
+        aggregated = {}
+        for item in items or []:
+            if item.get("is_delivery"):
+                continue
+            product_id = str(item.get("product_id") or "")
+            if not product_id:
+                continue
+            aggregated[product_id] = aggregated.get(product_id, 0.0) + float(
+                item.get("quantity") or 0.0
+            )
+        return aggregated
+
+    def _storefront_remote_order_matches(self, remote, desired_customer_id=False):
+        self.ensure_one()
+        if not remote or remote.get("id") != self.x_storefront_remote_order_id:
+            return False
+        if remote.get("state") == "cancel":
+            return False
+        if desired_customer_id and remote.get("customer_id") != desired_customer_id:
+            return False
+        if remote.get("currency") != self.currency_id.name:
+            return False
+        if self.currency_id.compare_amounts(remote.get("amount_total") or 0.0, self.amount_total):
+            return False
+        return self._storefront_aggregate_items(remote.get("items")) == (
+            self._storefront_aggregate_items(self._storefront_api_items())
+        )
+
+    def _storefront_clear_remote_checkout(self):
+        self.ensure_one()
+        self.write({
+            "x_storefront_reservation_id": False,
+            "x_storefront_reservation_expires_at": False,
+            "x_storefront_quote_fingerprint": False,
+            "x_storefront_remote_customer_id": False,
+            "x_storefront_remote_order_id": False,
+            "x_storefront_remote_payment_id": False,
+            "x_storefront_remote_state": False,
+        })
+
     def _storefront_fingerprint(self):
         payload = json.dumps({
             "language": self.x_website_checkout_language or "zh_CN",
@@ -79,15 +122,8 @@ class SaleOrder(models.Model):
             f"/api/v1/reservations/{self.x_storefront_reservation_id}"
         ) or {}
         expires_at = fields.Datetime.to_datetime(reservation.get("expires_at"))
-        remote_items = {
-            str(item.get("product_id")): float(item.get("quantity") or 0.0)
-            for item in reservation.get("items") or []
-            if item.get("product_id")
-        }
-        local_items = {
-            str(item["product_id"]): float(item["quantity"])
-            for item in self._storefront_api_items()
-        }
+        remote_items = self._storefront_aggregate_items(reservation.get("items"))
+        local_items = self._storefront_aggregate_items(self._storefront_api_items())
         if (
             reservation.get("authoritative") is not True
             or reservation.get("id") != self.x_storefront_reservation_id
@@ -153,27 +189,29 @@ class SaleOrder(models.Model):
             lambda user: user.active and user.x_storefront_remote_customer_id
         )[:1]
         desired_customer_id = account.x_storefront_remote_customer_id if account else False
-        if (
-            self.x_storefront_remote_order_id
-            and desired_customer_id
-            and self.x_storefront_remote_customer_id != desired_customer_id
-        ):
-            client.post(
-                f"/api/v1/orders/{self.x_storefront_remote_order_id}/cancel",
-                {},
-                idempotency_key=f"reassign-cancel-{self.access_token}-{self.x_storefront_remote_order_id}",
+        if self.x_storefront_remote_order_id:
+            old_remote_order_id = self.x_storefront_remote_order_id
+            remote = client.get(f"/api/v1/orders/{old_remote_order_id}") or {}
+            if self._storefront_remote_order_matches(remote, desired_customer_id):
+                return old_remote_order_id
+
+            payment_states = {
+                payment.get("state") for payment in remote.get("payments") or []
+            }
+            completed = remote.get("state") in {"sale", "done"} or bool(
+                payment_states & {"authorized", "done"}
             )
-            self.write({
-                "x_storefront_reservation_id": False,
-                "x_storefront_reservation_expires_at": False,
-                "x_storefront_quote_fingerprint": False,
-                "x_storefront_remote_customer_id": False,
-                "x_storefront_remote_order_id": False,
-                "x_storefront_remote_payment_id": False,
-                "x_storefront_remote_state": False,
-            })
-        elif self.x_storefront_remote_order_id:
-            return self.x_storefront_remote_order_id
+            if not completed and remote.get("state") in {"draft", "sent"}:
+                client.post(
+                    f"/api/v1/orders/{old_remote_order_id}/cancel",
+                    {},
+                    idempotency_key=(
+                        f"stale-cancel-{self.access_token}-{old_remote_order_id}"
+                    ),
+                )
+            # Completed ERP orders are immutable history. Detach the changed local
+            # cart instead of cancelling or reusing the completed transaction.
+            self._storefront_clear_remote_checkout()
 
         self._storefront_ensure_quote()
         if account:
@@ -221,6 +259,14 @@ class SaleOrder(models.Model):
             shipping_method_id = self.carrier_id.shop_api_uuid
             if not shipping_method_id:
                 raise ValidationError(_("The selected delivery method has no ERP API identifier."))
+        order_fingerprint = hashlib.sha256(json.dumps({
+            "customer_id": customer["id"],
+            "shipping_address_id": remote_address_id,
+            "shipping_method_id": shipping_method_id,
+            "currency": self.currency_id.name,
+            "amount_total": float(self.amount_total),
+            "items": self._storefront_aggregate_items(self._storefront_api_items()),
+        }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
         remote = client.post(
             "/api/v1/orders",
             {
@@ -228,10 +274,10 @@ class SaleOrder(models.Model):
                 "customer_id": customer["id"],
                 "shipping_address_id": remote_address_id,
                 "shipping_method_id": shipping_method_id,
-                "external_id": f"storefront-{self.access_token}",
+                "external_id": f"storefront-{self.access_token}-{order_fingerprint[:24]}",
                 "language": self.x_website_checkout_language or "zh_CN",
             },
-            idempotency_key=f"order-{self.access_token}",
+            idempotency_key=f"order-{self.access_token}-{order_fingerprint[:24]}",
         )
         if remote.get("currency") != self.currency_id.name:
             raise ValidationError(_(
@@ -272,21 +318,32 @@ class SaleOrder(models.Model):
                 "provider": provider_code,
                 "return_url": self._storefront_payment_return_url(),
             },
-            idempotency_key=f"payment-{self.access_token}-{provider_code}",
+            idempotency_key=f"payment-{remote_order_id}-{provider_code}",
         )
         payment = response.get("payment") or {}
+        payment_id = payment.get("id")
+        confirmed = self.env["storefront.erp.client"].get(
+            f"/api/v1/payments/{payment_id}"
+        ) if payment_id else {}
         if (
-            response.get("authoritative") is not True
-            or not payment.get("id")
-            or payment.get("state") not in {"draft", "pending", "authorized", "done"}
+            confirmed.get("authoritative") is not True
+            or confirmed.get("id") != payment_id
+            or remote_order_id not in (confirmed.get("order_ids") or [])
+            or confirmed.get("provider") != provider_code
+            or confirmed.get("currency") != self.currency_id.name
+            or self.currency_id.compare_amounts(
+                confirmed.get("amount") or 0.0, self.amount_total,
+            )
+            or confirmed.get("state") not in {"draft", "pending", "authorized", "done"}
         ):
             raise StorefrontApiError(
                 _("ERP did not authoritatively confirm payment initiation."),
                 code="invalid_payment_confirmation", status=502,
             )
+        response = {**response, "authoritative": True, "payment": confirmed}
         self.write({
-            "x_storefront_remote_payment_id": payment.get("id"),
-            "x_storefront_remote_state": payment.get("state"),
+            "x_storefront_remote_payment_id": confirmed["id"],
+            "x_storefront_remote_state": confirmed["state"],
         })
         return response
 

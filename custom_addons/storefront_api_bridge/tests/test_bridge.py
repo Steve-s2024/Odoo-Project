@@ -3,7 +3,7 @@ import hashlib
 import hmac
 from datetime import timedelta
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from odoo import Command, fields
 from odoo.exceptions import AccessDenied, ValidationError
@@ -34,8 +34,15 @@ class _Response:
 class TestStorefrontApiClient(TransactionCase):
     def test_internal_editor_purchase_history_renders_without_login_redirect(self):
         rendered = object()
+        fake_client = MagicMock()
+        fake_client.call.return_value = ([{
+            "id": "erp-order-id", "number": "SO001",
+        }], {"page": 1, "page_size": 100, "total": 1})
+        fake_env = MagicMock()
+        fake_env.user = self.env.user
+        fake_env.__getitem__.return_value = fake_client
         fake_request = SimpleNamespace(
-            env=SimpleNamespace(user=self.env.user),
+            env=fake_env,
             lang=SimpleNamespace(code="zh_CN"),
             render=lambda template, values: (rendered, template, values),
         )
@@ -47,8 +54,11 @@ class TestStorefrontApiClient(TransactionCase):
         self.assertEqual(
             result[1], "storefront_api_bridge.remote_purchase_history_page",
         )
-        self.assertEqual(result[2]["orders"], [])
+        self.assertEqual(result[2]["orders"][0]["id"], "erp-order-id")
         self.assertFalse(result[2]["portal_error"])
+        fake_client.call.assert_called_once_with(
+            "GET", "/api/v1/orders", params={"page": 1, "page_size": 100},
+        )
 
     def test_inventory_snapshot_is_cached_and_indexes_templates_and_variants(self):
         client = self.env["storefront.erp.client"]
@@ -349,6 +359,20 @@ class TestStorefrontApiClient(TransactionCase):
             "items": order._storefront_api_items(),
         }
 
+    @staticmethod
+    def _remote_order(order, remote_id="remote-order-id", **values):
+        payload = {
+            "id": remote_id,
+            "state": "draft",
+            "customer_id": values.pop("customer_id", "customer-id"),
+            "currency": order.currency_id.name,
+            "amount_total": order.amount_total,
+            "items": order._storefront_api_items(),
+            "payments": [],
+        }
+        payload.update(values)
+        return payload
+
     def test_remote_order_handoff_includes_address_carrier_and_matching_total(self):
         order = self._checkout_order()
         responses = [
@@ -410,9 +434,87 @@ class TestStorefrontApiClient(TransactionCase):
             return_value={"payment": {"id": "payment-id", "state": "pending"}},
         ), patch(
             "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
-            return_value={"shop_base_url": "https://shop.example.test"},
+            side_effect=[
+                self._remote_order(order),
+                {"shop_base_url": "https://shop.example.test"},
+                {},
+            ],
         ), self.assertRaises(StorefrontApiError):
             order._storefront_create_payment("wechatpay")
+
+    def test_payment_initiation_accepts_legacy_replay_after_erp_read_confirmation(self):
+        order = self._checkout_order()
+        order.x_storefront_remote_order_id = "remote-order-id"
+        legacy_response = {
+            "payment": {"id": "payment-id", "state": "pending"},
+            "processing": {"api_url": "/payment/wechatpay/qr/payment-id"},
+        }
+        confirmed = {
+            "id": "payment-id",
+            "authoritative": True,
+            "order_ids": ["remote-order-id"],
+            "provider": "wechatpay",
+            "currency": order.currency_id.name,
+            "amount": order.amount_total,
+            "state": "pending",
+        }
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
+            return_value=legacy_response,
+        ), patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            side_effect=[
+                self._remote_order(order),
+                {"shop_base_url": "https://shop.example.test"},
+                confirmed,
+            ],
+        ):
+            result = order._storefront_create_payment("wechatpay")
+        self.assertTrue(result["authoritative"])
+        self.assertEqual(result["payment"], confirmed)
+        self.assertEqual(order.x_storefront_remote_payment_id, "payment-id")
+
+    def test_changed_cart_detaches_completed_erp_order_and_creates_new_order(self):
+        order = self._checkout_order()
+        order.write({
+            "x_storefront_remote_order_id": "paid-order-id",
+            "x_storefront_remote_payment_id": "paid-payment-id",
+        })
+        old_remote = self._remote_order(
+            order,
+            remote_id="paid-order-id",
+            state="sale",
+            amount_total=order.amount_total - 1,
+            payments=[{"id": "paid-payment-id", "state": "done"}],
+        )
+        responses = [
+            {
+                "reservation_id": "new-reservation-id",
+                "authoritative": True,
+                "expires_at": fields.Datetime.to_string(
+                    fields.Datetime.now() + timedelta(minutes=10)
+                ),
+            },
+            {"id": "new-customer-id"},
+            {"id": "new-address-id"},
+            self._remote_order(order, remote_id="new-order-id", customer_id="new-customer-id"),
+        ]
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            return_value=old_remote,
+        ), patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
+            side_effect=responses,
+        ) as mocked:
+            self.assertEqual(order._storefront_sync_remote_order(), "new-order-id")
+
+        paths = [call.args[0] for call in mocked.call_args_list]
+        self.assertNotIn("/api/v1/orders/paid-order-id/cancel", paths)
+        self.assertEqual(paths[-1], "/api/v1/orders")
+        self.assertEqual(order.x_storefront_remote_order_id, "new-order-id")
+        order_call = mocked.call_args_list[-1]
+        self.assertIn("storefront-", order_call.args[1]["external_id"])
+        self.assertNotEqual(order.x_storefront_remote_payment_id, "paid-payment-id")
 
     def test_payment_methods_use_checkout_language(self):
         order = self._checkout_order()
@@ -683,11 +785,18 @@ class TestStorefrontApiClient(TransactionCase):
         with patch(
             "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
             side_effect=responses,
-        ) as mocked:
+        ) as post_mock, patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            return_value=self._remote_order(
+                order,
+                remote_id="anonymous-order-id",
+                customer_id="anonymous-customer-id",
+            ),
+        ):
             order._storefront_sync_remote_order()
 
         self.assertEqual(
-            [call.args[0] for call in mocked.call_args_list],
+            [call.args[0] for call in post_mock.call_args_list],
             [
                 "/api/v1/orders/anonymous-order-id/cancel",
                 "/api/v1/checkout/quote",

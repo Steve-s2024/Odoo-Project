@@ -283,6 +283,29 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
         self.assertEqual(order.order_line.filtered("is_delivery").price_unit, 12.0)
         self.assertEqual(order.amount_total, 112.0)
 
+    def test_payment_payload_is_authoritative_and_bound_to_order(self):
+        reservation = self.env["shop.api.reservation"].create_reservation(self.client, {
+            "external_id": "payment-payload-reservation",
+            "items": [{"product_id": self.product.shop_api_uuid, "quantity": 1}],
+        })
+        order = reservation.create_order(
+            self.customer, "SHOP-ORDER-PAYMENT-PAYLOAD", language="zh_CN",
+        )
+        provider = self.env.ref("payment.payment_provider_transfer")
+        transaction = self.env["payment.transaction"].create({
+            "provider_id": provider.id,
+            "payment_method_id": provider.payment_method_ids[:1].id,
+            "reference": "SHOP-API-AUTHORITY",
+            "amount": order.amount_total,
+            "currency_id": order.currency_id.id,
+            "partner_id": order.partner_id.id,
+            "operation": "online_redirect",
+            "sale_order_ids": [Command.set(order.ids)],
+        })
+        payload = transaction._shop_api_payload()
+        self.assertTrue(payload["authoritative"])
+        self.assertEqual(payload["order_ids"], [order.shop_api_uuid])
+
     def test_expired_reservation_releases_stock_and_creates_event(self):
         reservation = self.env["shop.api.reservation"].create_reservation(self.client, {
             "external_id": "expiring-cart",
@@ -402,3 +425,28 @@ class TestShopApiHttp(ShopApiTestMixin, HttpCase):
         )
         self.assertEqual(product_row["available_quantity"], 5.0)
         self.assertTrue(product_row["available"])
+
+    def test_internal_order_list_endpoint_returns_client_orders(self):
+        reservation = self.env["shop.api.reservation"].create_reservation(self.client, {
+            "external_id": "http-order-list-reservation",
+            "items": [{"product_id": self.product.shop_api_uuid, "quantity": 1}],
+        })
+        order = reservation.create_order(
+            self.customer, "HTTP-ORDER-LIST", language="zh_CN",
+        )
+        response = self.url_open(
+            "/api/v1/orders?page_size=100", headers=self._headers(),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(order.shop_api_uuid, {
+            item["id"] for item in response.json()["data"]
+        })
+
+    def test_payment_methods_are_api_readable_and_unique_by_provider_code(self):
+        response = self.url_open(
+            "/api/v1/payment-methods?lang=en_US", headers=self._headers(),
+        )
+        self.assertEqual(response.status_code, 200)
+        methods = response.json()["data"]
+        codes = [method["code"] for method in methods]
+        self.assertEqual(len(codes), len(set(codes)))

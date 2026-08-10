@@ -164,6 +164,9 @@ class StorefrontWebsiteSale(WebsiteSaleStockSource):
                     f"/api/v1/payments/{order.x_storefront_remote_payment_id}"
                 )
                 order.sudo().x_storefront_remote_state = payment.get("state")
+                if payment.get("authoritative") is True and payment.get("state") == "done":
+                    request.session["sale_last_order_id"] = order.id
+                    request.website.sale_reset()
             except StorefrontApiError:
                 payment = None
         return request.render("storefront_api_bridge.payment_status", {

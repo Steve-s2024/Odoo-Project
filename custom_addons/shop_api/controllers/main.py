@@ -376,7 +376,17 @@ class ShopApiController(Controller):
             }
             providers = request.env["payment.provider"].sudo().search([
                 ("state", "in", ("enabled", "test")),
-            ])
+            ], order="state asc, id desc")
+            # A database may retain an older test provider beside the enabled
+            # provider. Expose one deterministic choice per provider code.
+            providers_by_code = {}
+            for provider in providers:
+                existing = providers_by_code.get(provider.code)
+                if not existing or (existing.state != "enabled" and provider.state == "enabled"):
+                    providers_by_code[provider.code] = provider
+            providers = providers.browse(
+                [provider.id for provider in providers_by_code.values()]
+            )
             return [{
                 "code": provider.code,
                 "name": standard_names.get(provider.code, {}).get(language)
@@ -856,6 +866,22 @@ class ShopApiController(Controller):
             )
             return order._shop_api_payload(), 201, None
         return self._run("order_create", handler)
+
+    @route("/api/v1/orders", type="http", auth="bearer", methods=["GET"], csrf=False)
+    def order_list(self):
+        def handler(_body, client):
+            page, page_size = self._pagination()
+            domain = [("x_channel", "=", client.code)]
+            Order = request.env["sale.order"].sudo()
+            total = Order.search_count(domain)
+            orders = Order.search(
+                domain, order="date_order desc, id desc",
+                offset=(page - 1) * page_size, limit=page_size,
+            )
+            return [order._shop_api_payload() for order in orders], 200, {
+                "page": page, "page_size": page_size, "total": total,
+            }
+        return self._run("order_list", handler)
 
     def _order_record(self, order_uuid, client=None):
         order = self._record("sale.order", order_uuid)
