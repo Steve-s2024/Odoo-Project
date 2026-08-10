@@ -12,34 +12,14 @@ from ..models.api_client import StorefrontApiError
 
 
 class StorefrontCart(WebsiteCartStockSource):
-    @staticmethod
-    def _refresh_remote_inventory(order):
-        if not order:
-            return []
-        return order.sudo()._storefront_check_inventory()
-
-    @route()
-    def cart(self, id=None, access_token=None, revive_method="", **post):
-        try:
-            self._refresh_remote_inventory(request.cart)
-        except StorefrontApiError:
-            request.session["x_stock_quantity_warning"] = True
-        return super().cart(id=id, access_token=access_token, revive_method=revive_method, **post)
-
-    @route()
-    def add_to_cart(self, *args, **kwargs):
-        result = super().add_to_cart(*args, **kwargs)
-        try:
-            self._refresh_remote_inventory(request.cart)
-        except StorefrontApiError:
-            pass
-        return result
-
     @route()
     def update_cart(self, line_id, quantity, product_id=None, **kwargs):
+        order = request.cart
+        line = request.env["sale.order.line"].sudo().browse(int(line_id)).exists()
+        product = line.product_id if line and line.order_id == order else False
         result = super().update_cart(line_id, quantity, product_id=product_id, **kwargs)
-        try:
-            self._refresh_remote_inventory(request.cart)
+        if order and product:
+            order.sudo()._storefront_clear_shortage_for_product(product)
             result["website_sale.cart_lines"] = request.env["ir.ui.view"]._render_template(
                 "website_sale.cart_lines", {
                     "website_sale_order": request.cart,
@@ -47,8 +27,6 @@ class StorefrontCart(WebsiteCartStockSource):
                     "suggested_products": request.cart._cart_accessories(),
                 },
             )
-        except StorefrontApiError:
-            pass
         return result
 
     @route()

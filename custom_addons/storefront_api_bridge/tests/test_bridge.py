@@ -310,6 +310,9 @@ class TestStorefrontApiClient(TransactionCase):
         })
         order.x_storefront_shortage_product_uuids = ["variant-remote-id"]
         self.assertEqual(order._get_source_inventory_shortage_lines(), order.order_line)
+        order._storefront_clear_shortage_for_product(product)
+        self.assertFalse(order.x_storefront_shortage_product_uuids)
+        self.assertFalse(order._get_source_inventory_shortage_lines())
 
     def _checkout_order(self):
         partner = self.env["res.partner"].create({

@@ -95,6 +95,18 @@ class SaleOrder(models.Model):
         shortages = set(self.x_storefront_shortage_product_uuids or [])
         return self.order_line.filtered(lambda line: line.product_id.shop_api_uuid in shortages)
 
+    def _storefront_clear_shortage_for_product(self, product):
+        """Invalidate only the ERP shortage marker whose quantity was edited."""
+        self.ensure_one()
+        product_uuid = product.shop_api_uuid
+        if not product_uuid:
+            return
+        shortages = list(self.x_storefront_shortage_product_uuids or [])
+        if product_uuid in shortages:
+            self.x_storefront_shortage_product_uuids = [
+                item for item in shortages if item != product_uuid
+            ]
+
     def _storefront_release_reservation(self):
         self.ensure_one()
         if self.x_storefront_reservation_id:
