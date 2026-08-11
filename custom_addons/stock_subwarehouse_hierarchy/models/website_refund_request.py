@@ -7,7 +7,7 @@ from odoo.exceptions import ValidationError
 class WebsiteRefundRequest(models.Model):
     _name = "stock.subwarehouse.website.refund.request"
     _inherit = ["mail.thread", "mail.activity.mixin"]
-    _description = "Website Refund Request"
+    _description = "网站退款申请"
     _order = "create_date desc, id desc"
 
     name = fields.Char(related="order_id.name", store=True, readonly=True)

@@ -748,6 +748,18 @@ class TestStorefrontApiClient(TransactionCase):
         ).arch_db
         self.assertIn("selected_options", subtitle_arch)
 
+    def test_cart_checkout_and_payment_share_localized_product_option_subtitles(self):
+        arch = self.env.ref(
+            "storefront_api_bridge.cart_product_option_subtitle"
+        ).arch_db
+        self.assertIn("_storefront_selected_options", arch)
+        self.assertIn("x_cart_product_option_subtitle", arch)
+        self.assertIn("option.get('label')", arch)
+        self.assertEqual(
+            self.env["stock.subwarehouse.website.refund.request"]._description,
+            "网站退款申请",
+        )
+
     def test_order_shortage_lines_use_remote_variant_identifiers(self):
         partner = self.env["res.partner"].create({"name": "Storefront test"})
         product = self.env["product.product"].create({

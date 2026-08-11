@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import time
 import uuid
 
@@ -534,3 +535,80 @@ class SaleOrder(models.Model):
         )
         self.x_storefront_remote_state = payment.get("state")
         return payment
+
+
+class SaleOrderLine(models.Model):
+    _inherit = "sale.order.line"
+
+    @staticmethod
+    def _storefront_option_semantic_key(label):
+        normalized = re.sub(r"[\s_\-/]+", "", str(label or "").casefold())
+        aliases = {
+            "color": "color", "colour": "color", "颜色": "color", "颜色分类": "color",
+            "size": "size", "尺寸": "size", "尺码": "size", "鞋码": "size",
+            "flex": "flex", "硬度": "flex", "款型": "flex",
+            "type": "type", "类型": "type", "款式": "type",
+        }
+        return aliases.get(normalized, normalized)
+
+    def _storefront_selected_options(self, language=None):
+        """Return the localized non-colour choices shown beside cart product names."""
+        self.ensure_one()
+        if self.is_delivery or not self.product_id:
+            return []
+        language = language or self.env.context.get("lang") or "zh_CN"
+        language = "en_US" if str(language).lower().startswith("en") else "zh_CN"
+        is_english = language == "en_US"
+        product_template = self.product_id.product_tmpl_id
+        raw_values = product_template._get_shop_variant_display_values(is_english=False)
+        display_values = product_template._get_shop_variant_display_values(
+            is_english=is_english
+        )
+        options = []
+        seen_keys = set()
+
+        def add_option(key, label, value):
+            semantic_key = self._storefront_option_semantic_key(key or label)
+            value = str(value or "").strip()
+            if not value or semantic_key == "color" or semantic_key in seen_keys:
+                return
+            options.append({"key": semantic_key, "label": label, "value": value})
+            seen_keys.add(semantic_key)
+
+        type_code = str(raw_values.get("type_code") or "").strip()
+        if type_code:
+            add_option("type", "Type" if is_english else "类型", type_code)
+
+        raw_size = str(raw_values.get("size") or "").strip()
+        if raw_size not in {"", "未识别", "默认"}:
+            add_option("size", "Size" if is_english else "尺码", display_values.get("size"))
+
+        raw_flex = product_template._normalize_website_mapping_flex(raw_values.get("flex"))
+        if raw_flex not in {"", "000", "无", "无硬度", "未识别", "默认"}:
+            add_option("flex", "Flex" if is_english else "硬度", display_values.get("flex"))
+
+        selected_ptavs = (
+            self.product_template_attribute_value_ids
+            | self.product_no_variant_attribute_value_ids
+        ).sorted()
+        custom_values = {
+            value.custom_product_template_attribute_value_id.id: value.custom_value
+            for value in self.product_custom_attribute_value_ids
+        }
+        grouped_values = {}
+        for ptav in selected_ptavs:
+            translated = ptav.with_context(lang=language)
+            label = translated.attribute_id.name
+            semantic_key = self._storefront_option_semantic_key(label)
+            if semantic_key == "color" or semantic_key in seen_keys:
+                continue
+            value = custom_values.get(ptav.id) or translated.name
+            group = grouped_values.setdefault(
+                semantic_key or f"attribute_{ptav.attribute_id.id}",
+                {"label": label, "values": []},
+            )
+            if value and value not in group["values"]:
+                group["values"].append(value)
+        for key, group in grouped_values.items():
+            add_option(key, group["label"], " / ".join(group["values"]))
+        return options

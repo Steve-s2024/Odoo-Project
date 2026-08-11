@@ -41,6 +41,23 @@
     animation: x_erp_confirmation_spin 720ms linear infinite;
 }
 
+.x_cart_product_option_subtitle {
+    align-self: center;
+    color: #6b6b6b;
+    font-size: 0.84rem;
+    font-weight: 400;
+    line-height: 1.35;
+    white-space: normal;
+}
+
+@media (max-width: 767.98px) {
+    .x_cart_product_option_subtitle {
+        display: block;
+        width: 100%;
+        margin-top: 0.15rem;
+    }
+}
+
 @media (max-height: 50rem) {
     .x_erp_confirmation_overlay { padding-top: 18vh; }
 }
