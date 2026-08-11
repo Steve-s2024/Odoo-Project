@@ -398,6 +398,50 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
         self.assertTrue(payload["simulation_mode"])
         self.assertIn("qr_code_data_uri", payload)
 
+    def test_refund_request_payload_is_authoritative_and_enqueues_event(self):
+        order = self.env["sale.order"].create({
+            "partner_id": self.customer.id,
+            "x_channel": self.client.code,
+            "order_line": [Command.create({
+                "product_id": self.product.id,
+                "product_uom_qty": 1,
+                "product_uom_id": self.product.uom_id.id,
+                "price_unit": 100,
+            })],
+        })
+        provider = self.env.ref("payment.payment_provider_transfer")
+        transaction = self.env["payment.transaction"].create({
+            "provider_id": provider.id,
+            "payment_method_id": provider.payment_method_ids[:1].id,
+            "reference": "SHOP-API-REFUND-EVENT",
+            "amount": order.amount_total,
+            "currency_id": order.currency_id.id,
+            "partner_id": order.partner_id.id,
+            "operation": "online_redirect",
+            "sale_order_ids": [Command.set(order.ids)],
+        })
+
+        refund_request = self.env[
+            "stock.subwarehouse.website.refund.request"
+        ].create({
+            "order_id": order.id,
+            "source_transaction_id": transaction.id,
+            "line_ids": [Command.create({
+                "sale_line_id": order.order_line.id,
+                "quantity": 1,
+            })],
+        })
+
+        payload = refund_request._shop_api_payload()
+        self.assertTrue(payload["authoritative"])
+        self.assertEqual(payload["order_id"], order.shop_api_uuid)
+        event = self.env["shop.api.event"].search([
+            ("event_type", "=", "refund.requested"),
+            ("resource_uuid", "=", refund_request.shop_api_uuid),
+        ], order="id desc", limit=1)
+        self.assertTrue(event)
+        self.assertEqual(event.payload["review_state"], "requested")
+
     def test_expired_reservation_releases_stock_and_creates_event(self):
         reservation = self.env["shop.api.reservation"].create_reservation(self.client, {
             "external_id": "expiring-cart",

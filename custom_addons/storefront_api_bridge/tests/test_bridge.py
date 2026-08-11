@@ -2,6 +2,7 @@ import base64
 import json
 import hashlib
 import hmac
+import uuid
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -137,6 +138,120 @@ class TestStorefrontApiClient(TransactionCase):
             result[0], "storefront_api_bridge.remote_purchase_detail_page",
         )
         self.assertEqual(result[1]["order"]["id"], "erp-order-id")
+
+    def _refund_submission_request(self, client):
+        fake_env = MagicMock()
+        fake_env.user = self.env.user
+        fake_env.__getitem__.return_value = client
+        return SimpleNamespace(
+            env=fake_env,
+            session={},
+            redirect=lambda target: ("redirect", target),
+        )
+
+    @staticmethod
+    def _refund_remote_order():
+        return {
+            "id": "erp-order-id",
+            "number": "SO001",
+            "customer_id": "another-customer-id",
+            "items": [{
+                "product_id": "erp-product-id",
+                "name": "Refund product",
+                "quantity": 2.0,
+                "refundable": True,
+            }],
+        }
+
+    def test_refund_submission_requires_authoritative_erp_readback(self):
+        attempt_id = str(uuid.uuid4())
+        client = MagicMock()
+        client.get.side_effect = [
+            self._refund_remote_order(),
+            {
+                "id": "erp-refund-id",
+                "order_id": "erp-order-id",
+                "authoritative": True,
+                "review_state": "requested",
+                "items": [{"product_id": "erp-product-id", "quantity": 1.0}],
+            },
+        ]
+        client.post.return_value = {
+            "id": "erp-refund-id",
+            "order_id": "erp-order-id",
+            "authoritative": True,
+        }
+        fake_request = self._refund_submission_request(client)
+
+        with patch.object(customer_portal_module, "request", fake_request):
+            result = StorefrontCustomerPortal()._submit_remote_refund(
+                "erp-order-id",
+                {"quantity_erp-product-id": "1", "refund_attempt_id": attempt_id},
+            )
+
+        self.assertEqual(result, ("redirect", "/refund-item/erp-order-id"))
+        self.assertEqual(fake_request.session["x_storefront_refund_flash"], "success")
+        self.assertEqual(
+            client.post.call_args.kwargs["idempotency_key"],
+            f"portal-refund-erp-order-id-{attempt_id}",
+        )
+        client.get.assert_any_call("/api/v1/refund-requests/erp-refund-id")
+
+    def test_refund_submission_fails_closed_when_erp_rejects(self):
+        client = MagicMock()
+        client.get.return_value = self._refund_remote_order()
+        client.post.side_effect = StorefrontApiError(
+            "ERP unavailable", code="erp_unavailable", status=503,
+        )
+        fake_request = self._refund_submission_request(client)
+
+        with patch.object(customer_portal_module, "request", fake_request):
+            result = StorefrontCustomerPortal()._submit_remote_refund(
+                "erp-order-id",
+                {
+                    "quantity_erp-product-id": "1",
+                    "refund_attempt_id": str(uuid.uuid4()),
+                },
+            )
+
+        self.assertEqual(result, ("redirect", "/refund-item/erp-order-id"))
+        self.assertEqual(fake_request.session["x_storefront_refund_flash"], "failure")
+
+    def test_refund_submission_fails_closed_on_readback_mismatch(self):
+        client = MagicMock()
+        client.get.side_effect = [
+            self._refund_remote_order(),
+            {
+                "id": "erp-refund-id",
+                "order_id": "erp-order-id",
+                "authoritative": True,
+                "review_state": "requested",
+                "items": [{"product_id": "erp-product-id", "quantity": "invalid"}],
+            },
+        ]
+        client.post.return_value = {
+            "id": "erp-refund-id",
+            "order_id": "erp-order-id",
+            "authoritative": True,
+        }
+        fake_request = self._refund_submission_request(client)
+
+        with patch.object(customer_portal_module, "request", fake_request):
+            StorefrontCustomerPortal()._submit_remote_refund(
+                "erp-order-id",
+                {
+                    "quantity_erp-product-id": "1",
+                    "refund_attempt_id": str(uuid.uuid4()),
+                },
+            )
+
+        self.assertEqual(fake_request.session["x_storefront_refund_flash"], "failure")
+
+    def test_remote_currency_symbols_are_customer_facing(self):
+        controller = StorefrontCustomerPortal()
+        self.assertEqual(controller._currency_symbol("CNY"), "￥")
+        self.assertEqual(controller._currency_symbol("USD"), "$")
+        self.assertEqual(controller._currency_symbol("EUR"), "EUR")
 
     def test_inventory_snapshot_is_cached_and_indexes_templates_and_variants(self):
         client = self.env["storefront.erp.client"]

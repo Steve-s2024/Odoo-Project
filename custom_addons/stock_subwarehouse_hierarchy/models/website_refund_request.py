@@ -6,6 +6,7 @@ from odoo.exceptions import ValidationError
 
 class WebsiteRefundRequest(models.Model):
     _name = "stock.subwarehouse.website.refund.request"
+    _inherit = ["mail.thread", "mail.activity.mixin"]
     _description = "Website Refund Request"
     _order = "create_date desc, id desc"
 
@@ -64,6 +65,7 @@ class WebsiteRefundRequest(models.Model):
         [("requested", "待审核"), ("approved", "已通过"), ("rejected", "已拒绝")],
         default="requested",
         required=True,
+        tracking=True,
     )
 
     @api.model_create_multi
@@ -73,7 +75,68 @@ class WebsiteRefundRequest(models.Model):
             original_locations = refund_request._get_original_return_locations()
             if len(original_locations) == 1:
                 refund_request.return_location_id = original_locations
+        refund_requests._notify_refund_reviewers()
         return refund_requests
+
+    def write(self, vals):
+        result = super().write(vals)
+        if "review_state" in vals:
+            self.filtered(lambda request: request.review_state != "requested")._complete_review_activities()
+        return result
+
+    def _refund_reviewer_users(self):
+        sales_managers = self.env.ref(
+            "sales_team.group_sale_manager", raise_if_not_found=False,
+        )
+        users = sales_managers.all_user_ids if sales_managers else self.env["res.users"]
+        users = users.filtered(lambda user: user.active and not user.share)
+        if users:
+            return users
+        administrator = self.env.ref("base.user_admin", raise_if_not_found=False)
+        return administrator if administrator and administrator.active else self.env.user
+
+    def _notify_refund_reviewers(self):
+        activity_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
+        if not activity_type:
+            return
+        summary = _("新退款申请待审核")
+        for refund_request in self.filtered(lambda request: request.review_state == "requested"):
+            reviewers = refund_request._refund_reviewer_users().filtered(
+                lambda user: not user.company_ids or refund_request.order_id.company_id in user.company_ids
+            )
+            for reviewer in reviewers:
+                existing = refund_request.activity_ids.filtered(
+                    lambda activity: activity.activity_type_id == activity_type
+                    and activity.user_id == reviewer
+                    and activity.summary == summary
+                )
+                if not existing:
+                    refund_request.activity_schedule(
+                        act_type_xmlid="mail.mail_activity_data_todo",
+                        user_id=reviewer.id,
+                        summary=summary,
+                        note=_(
+                            "订单 %(order)s 收到一项新退款申请。请按申请时间顺序审核。",
+                            order=refund_request.order_id.name,
+                        ),
+                    )
+            refund_request.order_id.message_post(
+                body=_(
+                    "收到新的退款申请：%(refund)s。该申请已加入待处理退款队列。",
+                    refund=refund_request.display_name,
+                ),
+                message_type="comment",
+                subtype_xmlid="mail.mt_note",
+                partner_ids=reviewers.partner_id.ids,
+            )
+
+    def _complete_review_activities(self):
+        summary = _("新退款申请待审核")
+        activities = self.activity_ids.filtered(
+            lambda activity: activity.summary == summary
+        )
+        if activities:
+            activities.sudo().action_feedback(feedback=_("退款申请已完成审核。"))
 
     @api.depends("return_picking_ids")
     def _compute_return_picking_count(self):

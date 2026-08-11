@@ -21,6 +21,14 @@ class TestWebsiteRefundReturn(TransactionCase):
         cls.customer = cls.env["res.partner"].create({
             "name": "Website Refund Return Customer",
         })
+        cls.refund_reviewer = cls.env["res.users"].with_context(no_reset_password=True).create({
+            "name": "Website Refund Reviewer",
+            "login": "website-refund-reviewer@example.test",
+            "group_ids": [Command.set([
+                cls.env.ref("base.group_user").id,
+                cls.env.ref("sales_team.group_sale_manager").id,
+            ])],
+        })
         cls.alternate_return_location = cls.env["stock.location"].create({
             "name": "Alternate Website Return Location",
             "usage": "internal",
@@ -184,3 +192,36 @@ class TestWebsiteRefundReturn(TransactionCase):
             refund_request.return_picking_ids.move_ids.location_dest_id,
             self.alternate_return_location,
         )
+
+    def test_new_refund_is_visible_to_reviewers_and_pending_queue(self):
+        order, line = self._create_order(delivered=False)
+        transaction = self._create_paid_transaction(order, "REFUND-REVIEW-NOTICE")
+
+        refund_request = self._create_refund_request(order, line, transaction)
+
+        reviewer_activity = self.env["mail.activity"].search([
+            ("res_model", "=", refund_request._name),
+            ("res_id", "=", refund_request.id),
+            ("user_id", "=", self.refund_reviewer.id),
+            ("summary", "=", "新退款申请待审核"),
+        ])
+        self.assertTrue(reviewer_activity)
+        self.assertEqual(order.x_pending_website_refund_request_count, 1)
+        self.assertTrue(order.message_ids.filtered(
+            lambda message: "待处理退款队列" in (message.body or "")
+        ))
+
+        refund_request.review_state = "rejected"
+
+        self.assertFalse(self.env["mail.activity"].search([
+            ("res_model", "=", refund_request._name),
+            ("res_id", "=", refund_request.id),
+            ("summary", "=", "新退款申请待审核"),
+        ]))
+        self.assertEqual(order.x_pending_website_refund_request_count, 0)
+
+    def test_pending_refund_queue_is_oldest_first(self):
+        queue_arch = self.env.ref(
+            "stock_subwarehouse_hierarchy.view_website_refund_request_queue"
+        ).arch_db
+        self.assertIn('default_order="create_date asc,id asc"', queue_arch)

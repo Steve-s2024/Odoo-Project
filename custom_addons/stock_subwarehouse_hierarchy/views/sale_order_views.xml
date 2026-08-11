@@ -23,7 +23,10 @@
                     icon="fa-undo"
                     invisible="x_website_payment_state != 'paid' or x_website_payment_count != 1"
                     groups="account.group_account_invoice"/>
-                <button name="action_view_website_refund_requests" type="object" class="oe_stat_button" icon="fa-undo" invisible="x_website_refund_request_count == 0" groups="account.group_account_invoice">
+                <button name="action_view_website_refund_requests" type="object" class="oe_stat_button text-danger" icon="fa-exclamation-circle" invisible="x_pending_website_refund_request_count == 0" groups="sales_team.group_sale_manager,account.group_account_invoice">
+                    <field name="x_pending_website_refund_request_count" widget="statinfo" string="待处理退款"/>
+                </button>
+                <button name="action_view_website_refund_requests" type="object" class="oe_stat_button" icon="fa-undo" invisible="x_website_refund_request_count == 0" groups="sales_team.group_sale_manager,account.group_account_invoice">
                     <field name="x_website_refund_request_count" widget="statinfo" string="退款申请"/>
                 </button>
             </xpath>
@@ -112,6 +115,23 @@
                     optional="show"/>
                 <field name="x_source_can_fulfill" column_invisible="1"/>
             </xpath>
+        </field>
+    </record>
+    <record id="view_sale_order_list_pending_refund" model="ir.ui.view">
+        <field name="name">sale.order.list.pending.website.refund</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.sale_order_tree"/>
+        <field name="arch" type="xml">
+            <field name="amount_total" position="after">
+                <field
+                    name="x_pending_website_refund_request_count"
+                    string="待处理退款"
+                    widget="badge"
+                    decoration-danger="x_pending_website_refund_request_count &gt; 0"
+                    optional="show"
+                    groups="sales_team.group_sale_manager,account.group_account_invoice"
+                />
+            </field>
         </field>
     </record>
 </odoo>

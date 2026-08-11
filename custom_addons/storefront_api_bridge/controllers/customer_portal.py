@@ -1,5 +1,5 @@
-import hashlib
-import json
+import logging
+import uuid
 
 from odoo.http import request, route
 from odoo.addons.stock_subwarehouse_hierarchy.controllers.purchase_history import (
@@ -7,6 +7,9 @@ from odoo.addons.stock_subwarehouse_hierarchy.controllers.purchase_history impor
 )
 
 from ..models.api_client import StorefrontApiError
+
+
+_logger = logging.getLogger(__name__)
 
 
 class StorefrontCustomerPortal(WebsitePurchaseHistory):
@@ -56,6 +59,13 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         }
         return labels.get(refund.get("state"), ("Unknown", "未知"))[0 if is_english else 1]
 
+    @staticmethod
+    def _currency_symbol(currency_code):
+        return {
+            "CNY": "￥",
+            "USD": "$",
+        }.get((currency_code or "").upper(), currency_code or "")
+
     def _login_redirect(self):
         target = request.httprequest.full_path.rstrip("?")
         return request.redirect(f"/web/login?redirect={target}")
@@ -89,6 +99,7 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
             "is_english": is_english,
             "portal_error": error,
             "status_label": self._status_label,
+            "currency_symbol": self._currency_symbol,
             "additional_title": "Purchase History" if is_english else "购买记录",
         })
 
@@ -164,6 +175,7 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
             "status": self._status_label(order, is_english),
             "payment_status": self._payment_label(order, is_english),
             "refund_label": self._refund_label,
+            "currency_symbol": self._currency_symbol,
             "additional_title": "Purchase Details" if is_english else "购买详情",
         })
 
@@ -191,11 +203,15 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         except StorefrontApiError:
             refunds = []
         is_english = self._is_english()
+        session = getattr(request, "session", {})
         return request.render("storefront_api_bridge.remote_refund_item_page", {
             "order": order,
             "refunds": refunds,
             "is_english": is_english,
             "refund_label": self._refund_label,
+            "currency_symbol": self._currency_symbol,
+            "refund_attempt_id": str(uuid.uuid4()),
+            "refund_flash": session.pop("x_storefront_refund_flash", False),
             "additional_title": "Refund Items" if is_english else "申请退款",
         })
 
@@ -230,18 +246,64 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
                     "product_id": item["product_id"],
                     "quantity": min(quantity, float(item.get("quantity") or 0)),
                 })
+        session = getattr(request, "session", {})
         if not items:
-            return request.redirect(f"/refund-item/{order_id}?error=items")
-        fingerprint = hashlib.sha256(
-            json.dumps(items, sort_keys=True, separators=(",", ":")).encode()
-        ).hexdigest()[:24]
+            session["x_storefront_refund_flash"] = "failure"
+            return request.redirect(f"/refund-item/{order_id}")
+        attempt_id = post.get("refund_attempt_id")
         try:
-            request.env["storefront.erp.client"].post(
+            attempt_id = str(uuid.UUID(str(attempt_id)))
+        except (TypeError, ValueError, AttributeError):
+            session["x_storefront_refund_flash"] = "failure"
+            return request.redirect(f"/refund-item/{order_id}")
+        expected_quantities = {
+            item["product_id"]: float(item["quantity"])
+            for item in items
+        }
+        client = request.env["storefront.erp.client"]
+        try:
+            created = client.post(
                 f"/api/v1/orders/{order_id}/refund-requests",
                 {"items": items},
-                idempotency_key=f"portal-refund-{order_id}-{fingerprint}",
+                idempotency_key=f"portal-refund-{order_id}-{attempt_id}",
             )
-        except StorefrontApiError as exc:
-            request.session["x_storefront_refund_error"] = str(exc)
-            return request.redirect(f"/refund-item/{order_id}?error=api")
-        return request.redirect(f"/purchase-detail/{order_id}?refund_requested=1")
+            refund_id = created.get("id") if isinstance(created, dict) else False
+            if (
+                not refund_id
+                or created.get("authoritative") is not True
+                or created.get("order_id") != order_id
+            ):
+                raise StorefrontApiError(
+                    "ERP did not authoritatively confirm the refund request.",
+                    code="refund_confirmation_invalid",
+                    status=502,
+                )
+            confirmed = client.get(f"/api/v1/refund-requests/{refund_id}")
+            confirmed_quantities = {
+                item.get("product_id"): float(item.get("quantity") or 0)
+                for item in (confirmed.get("items") or [])
+            } if isinstance(confirmed, dict) else {}
+            if (
+                not isinstance(confirmed, dict)
+                or confirmed.get("authoritative") is not True
+                or confirmed.get("id") != refund_id
+                or confirmed.get("order_id") != order_id
+                or confirmed.get("review_state") != "requested"
+                or confirmed_quantities != expected_quantities
+            ):
+                raise StorefrontApiError(
+                    "ERP refund confirmation could not be verified.",
+                    code="refund_readback_mismatch",
+                    status=502,
+                )
+        except (StorefrontApiError, TypeError, ValueError, AttributeError) as exc:
+            _logger.warning(
+                "ERP refund request was not confirmed for order %s: %s (%s)",
+                order_id,
+                getattr(exc, "code", "refund_response_invalid"),
+                getattr(exc, "status", 502),
+            )
+            session["x_storefront_refund_flash"] = "failure"
+            return request.redirect(f"/refund-item/{order_id}")
+        session["x_storefront_refund_flash"] = "success"
+        return request.redirect(f"/refund-item/{order_id}")

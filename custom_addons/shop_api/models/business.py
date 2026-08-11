@@ -574,9 +574,12 @@ class WebsiteRefundRequest(models.Model):
     def _shop_api_payload(self):
         self.ensure_one()
         self._shop_api_ensure_uuid()
+        self.order_id._shop_api_ensure_uuid()
         return {
             "id": self.shop_api_uuid,
+            "order_id": self.order_id.shop_api_uuid,
             "version": self._shop_api_version(),
+            "authoritative": True,
             "state": self.state,
             "review_state": self.review_state,
             "amount": self.amount_total,

@@ -82,11 +82,19 @@ class SaleOrder(models.Model):
     x_website_refund_request_count = fields.Integer(
         compute="_compute_website_refund_request_count", string="退款申请数量"
     )
+    x_pending_website_refund_request_count = fields.Integer(
+        compute="_compute_website_refund_request_count", string="待处理退款"
+    )
 
-    @api.depends("x_website_refund_request_ids")
+    @api.depends("x_website_refund_request_ids.review_state")
     def _compute_website_refund_request_count(self):
         for order in self:
             order.x_website_refund_request_count = len(order.x_website_refund_request_ids)
+            order.x_pending_website_refund_request_count = len(
+                order.x_website_refund_request_ids.filtered(
+                    lambda request: request.review_state == "requested"
+                )
+            )
 
     @api.depends("order_line.x_website_stock_reserved_until")
     def _compute_website_stock_reservation_expiry(self):
