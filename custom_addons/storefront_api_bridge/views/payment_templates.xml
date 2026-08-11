@@ -25,6 +25,19 @@
         </xpath>
     </template>
 
+    <template
+        id="remote_payment_reservation_timer"
+        inherit_id="stock_subwarehouse_hierarchy.website_sale_payment_stock_hold"
+        name="ERP-confirmed payment reservation timer"
+    >
+        <xpath expr="//t[@t-if='website_sale_order.x_website_stock_reservation_expiry_epoch']" position="attributes">
+            <attribute name="t-if">website_sale_order.x_storefront_reservation_expiry_epoch</attribute>
+        </xpath>
+        <xpath expr="//section[@id='x_website_stock_hold']" position="attributes">
+            <attribute name="t-att-data-expiry-epoch">website_sale_order.x_storefront_reservation_expiry_epoch</attribute>
+        </xpath>
+    </template>
+
     <template id="payment_handoff" name="ERP payment handoff">
         <t t-call="website.layout">
             <main class="container py-5 text-center">

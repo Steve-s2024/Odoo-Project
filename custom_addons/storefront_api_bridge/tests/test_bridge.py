@@ -3,6 +3,7 @@ import json
 import hashlib
 import hmac
 import uuid
+from calendar import timegm
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -758,6 +759,24 @@ class TestStorefrontApiClient(TransactionCase):
         self.assertEqual(
             self.env["stock.subwarehouse.website.refund.request"]._description,
             "网站退款申请",
+        )
+
+    def test_payment_timer_uses_authoritative_erp_reservation_expiry(self):
+        partner = self.env["res.partner"].create({"name": "Timer test customer"})
+        expiry = fields.Datetime.now() + timedelta(minutes=15)
+        order = self.env["sale.order"].create({
+            "partner_id": partner.id,
+            "x_storefront_reservation_expires_at": expiry,
+        })
+        self.assertEqual(
+            order.x_storefront_reservation_expiry_epoch,
+            timegm(expiry.timetuple()) * 1000,
+        )
+        timer_arch = self.env.ref(
+            "storefront_api_bridge.remote_payment_reservation_timer"
+        ).arch_db
+        self.assertGreaterEqual(
+            timer_arch.count("x_storefront_reservation_expiry_epoch"), 2
         )
 
     def test_order_shortage_lines_use_remote_variant_identifiers(self):

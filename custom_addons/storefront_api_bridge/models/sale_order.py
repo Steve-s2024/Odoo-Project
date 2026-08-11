@@ -3,6 +3,7 @@ import json
 import re
 import time
 import uuid
+from calendar import timegm
 
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
@@ -15,6 +16,9 @@ class SaleOrder(models.Model):
 
     x_storefront_reservation_id = fields.Char(copy=False, readonly=True)
     x_storefront_reservation_expires_at = fields.Datetime(copy=False, readonly=True)
+    x_storefront_reservation_expiry_epoch = fields.Integer(
+        compute="_compute_storefront_reservation_expiry_epoch"
+    )
     x_storefront_quote_fingerprint = fields.Char(copy=False, readonly=True)
     x_storefront_remote_customer_id = fields.Char(copy=False, readonly=True)
     x_storefront_remote_order_id = fields.Char(copy=False, readonly=True)
@@ -27,6 +31,16 @@ class SaleOrder(models.Model):
     x_storefront_attempt_id = fields.Char(copy=False, readonly=True, index=True)
     x_storefront_completed_attempt_id = fields.Char(copy=False, readonly=True)
     x_storefront_completed_at = fields.Datetime(copy=False, readonly=True)
+
+    @api.depends("x_storefront_reservation_expires_at")
+    def _compute_storefront_reservation_expiry_epoch(self):
+        for order in self:
+            expiry = fields.Datetime.to_datetime(
+                order.x_storefront_reservation_expires_at
+            )
+            order.x_storefront_reservation_expiry_epoch = (
+                timegm(expiry.timetuple()) * 1000 if expiry else 0
+            )
 
     @api.model_create_multi
     def create(self, vals_list):
