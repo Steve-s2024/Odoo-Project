@@ -223,6 +223,8 @@ class StorefrontWebhookEvent(models.Model):
 
     def _process_event(self):
         self.ensure_one()
+        if self.event_type == "payment.completed":
+            return self._process_payment_completed()
         if self.event_type in {
             "product.created", "product.updated", "product.image.updated",
         }:
@@ -253,6 +255,52 @@ class StorefrontWebhookEvent(models.Model):
             {"event_type": self.event_type, "data": self.payload},
             version=self.resource_version,
         )
+        return True
+
+    def _process_payment_completed(self):
+        """Confirm payment from ERP, then retire the matching local draft cart."""
+        self.ensure_one()
+        payment_id = self.resource_id or self.payload.get("id")
+        if not payment_id:
+            raise ValueError("Payment completion event has no resource identifier")
+        payment = self.env["storefront.erp.client"].get(
+            f"/api/v1/payments/{payment_id}"
+        ) or {}
+        remote_order_ids = [str(item) for item in payment.get("order_ids") or [] if item]
+        if (
+            payment.get("authoritative") is not True
+            or payment.get("id") != payment_id
+            or payment.get("state") != "done"
+            or not payment.get("provider")
+            or not payment.get("currency")
+            or not remote_order_ids
+        ):
+            raise ValueError("ERP did not authoritatively confirm the completed payment")
+
+        orders = self.env["sale.order"].sudo().search([
+            "|",
+            ("x_storefront_remote_payment_id", "=", payment_id),
+            ("x_storefront_remote_order_id", "in", remote_order_ids),
+        ])
+        orders = orders.filtered(
+            lambda order: (
+                order.x_storefront_remote_order_id in remote_order_ids
+                and order.x_storefront_remote_payment_id in (False, payment_id)
+            )
+        )
+        if not orders:
+            # The event can arrive before the storefront payment request commits.
+            # Retrying preserves causal ordering without guessing locally.
+            raise ValueError("The completed ERP payment has no matching storefront order yet")
+        for order in orders:
+            if not order.x_storefront_remote_payment_id:
+                order.write({
+                    "x_storefront_remote_payment_id": payment_id,
+                    "x_storefront_payment_provider": payment["provider"],
+                    "x_storefront_payment_currency": payment["currency"],
+                    "x_storefront_payment_amount": payment.get("amount") or 0.0,
+                })
+            order._storefront_finalize_completed_attempt(payment)
         return True
 
     def _sync_product(self):

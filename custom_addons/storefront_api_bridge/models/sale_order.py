@@ -1,8 +1,9 @@
 import hashlib
 import json
 import time
+import uuid
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
 from .api_client import StorefrontApiError
@@ -18,7 +19,26 @@ class SaleOrder(models.Model):
     x_storefront_remote_order_id = fields.Char(copy=False, readonly=True)
     x_storefront_remote_payment_id = fields.Char(copy=False, readonly=True)
     x_storefront_remote_state = fields.Char(copy=False, readonly=True)
+    x_storefront_payment_provider = fields.Char(copy=False, readonly=True)
+    x_storefront_payment_currency = fields.Char(copy=False, readonly=True)
+    x_storefront_payment_amount = fields.Float(copy=False, readonly=True)
     x_storefront_shortage_product_uuids = fields.Json(copy=False, default=list)
+    x_storefront_attempt_id = fields.Char(copy=False, readonly=True, index=True)
+    x_storefront_completed_attempt_id = fields.Char(copy=False, readonly=True)
+    x_storefront_completed_at = fields.Datetime(copy=False, readonly=True)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for values in vals_list:
+            values.setdefault("x_storefront_attempt_id", str(uuid.uuid4()))
+        return super().create(vals_list)
+
+    def _storefront_attempt_key(self):
+        """Return the stable key for this checkout attempt, creating it lazily for old carts."""
+        self.ensure_one()
+        if not self.x_storefront_attempt_id:
+            self.x_storefront_attempt_id = str(uuid.uuid4())
+        return self.x_storefront_attempt_id
 
     def _storefront_api_items(self):
         self.ensure_one()
@@ -49,7 +69,8 @@ class SaleOrder(models.Model):
         self.ensure_one()
         if not remote or remote.get("id") != self.x_storefront_remote_order_id:
             return False
-        if remote.get("state") == "cancel":
+        payment_states = {payment.get("state") for payment in remote.get("payments") or []}
+        if remote.get("state") not in {"draft", "sent"} or payment_states & {"authorized", "done"}:
             return False
         if desired_customer_id and remote.get("customer_id") != desired_customer_id:
             return False
@@ -71,6 +92,9 @@ class SaleOrder(models.Model):
             "x_storefront_remote_order_id": False,
             "x_storefront_remote_payment_id": False,
             "x_storefront_remote_state": False,
+            "x_storefront_payment_provider": False,
+            "x_storefront_payment_currency": False,
+            "x_storefront_payment_amount": 0.0,
         })
 
     def _storefront_fingerprint(self):
@@ -111,10 +135,13 @@ class SaleOrder(models.Model):
     def _storefront_release_reservation(self):
         self.ensure_one()
         if self.x_storefront_reservation_id:
+            reservation_id = self.x_storefront_reservation_id
             try:
                 self.env["storefront.erp.client"].post(
-                    f"/api/v1/reservations/{self.x_storefront_reservation_id}/release",
-                    {}, idempotency_key=f"release-{self.access_token}",
+                    f"/api/v1/reservations/{reservation_id}/release",
+                    {}, idempotency_key=(
+                        f"release-{self._storefront_attempt_key()}-{reservation_id}"
+                    ),
                 )
             finally:
                 self.write({
@@ -155,6 +182,7 @@ class SaleOrder(models.Model):
 
     def _storefront_ensure_quote(self):
         self.ensure_one()
+        attempt_id = self._storefront_attempt_key()
         fingerprint = self._storefront_fingerprint()
         now = fields.Datetime.now()
         if (
@@ -170,11 +198,11 @@ class SaleOrder(models.Model):
         quote = self.env["storefront.erp.client"].post(
             "/api/v1/checkout/quote",
             {
-                "external_id": f"quote-{self.access_token}-{fingerprint[:12]}",
+                "external_id": f"quote-{attempt_id}-{fingerprint[:12]}",
                 "language": self.x_website_checkout_language or "zh_CN",
                 "items": self._storefront_api_items(),
             },
-            idempotency_key=f"quote-{self.access_token}-{fingerprint}",
+            idempotency_key=f"quote-{attempt_id}-{fingerprint}",
         )
         if (
             not quote
@@ -196,6 +224,7 @@ class SaleOrder(models.Model):
 
     def _storefront_sync_remote_order(self):
         self.ensure_one()
+        attempt_id = self._storefront_attempt_key()
         client = self.env["storefront.erp.client"]
         partner = self.partner_invoice_id
         account = partner.commercial_partner_id.user_ids.filtered(
@@ -219,12 +248,14 @@ class SaleOrder(models.Model):
                     f"/api/v1/orders/{old_remote_order_id}/cancel",
                     {},
                     idempotency_key=(
-                        f"stale-cancel-{self.access_token}-{old_remote_order_id}"
+                        f"stale-cancel-{attempt_id}-{old_remote_order_id}"
                     ),
                 )
             # Completed ERP orders are immutable history. Detach the changed local
             # cart instead of cancelling or reusing the completed transaction.
             self._storefront_clear_remote_checkout()
+            attempt_id = str(uuid.uuid4())
+            self.x_storefront_attempt_id = attempt_id
 
         self._storefront_ensure_quote()
         if account:
@@ -240,7 +271,7 @@ class SaleOrder(models.Model):
                     "phone": partner.phone,
                     "language": self.x_website_checkout_language or "zh_CN",
                 },
-                idempotency_key=f"customer-{self.access_token}",
+                idempotency_key=f"customer-{attempt_id}",
             )
         shipping = self.partner_shipping_id
         remote_address_id = False
@@ -262,7 +293,7 @@ class SaleOrder(models.Model):
                     "country": shipping.country_id.code if shipping.country_id else None,
                     "type": "delivery",
                 },
-                idempotency_key=f"address-{self.access_token}",
+                idempotency_key=f"address-{attempt_id}",
             )
             remote_address_id = remote_address["id"]
             if account and not shipping.shop_api_uuid:
@@ -287,10 +318,10 @@ class SaleOrder(models.Model):
                 "customer_id": customer["id"],
                 "shipping_address_id": remote_address_id,
                 "shipping_method_id": shipping_method_id,
-                "external_id": f"storefront-{self.access_token}-{order_fingerprint[:24]}",
+                "external_id": f"storefront-{attempt_id}-{order_fingerprint[:24]}",
                 "language": self.x_website_checkout_language or "zh_CN",
             },
-            idempotency_key=f"order-{self.access_token}-{order_fingerprint[:24]}",
+            idempotency_key=f"order-{attempt_id}-{order_fingerprint[:24]}",
         )
         if remote.get("currency") != self.currency_id.name:
             raise ValidationError(_(
@@ -364,6 +395,9 @@ class SaleOrder(models.Model):
         self.write({
             "x_storefront_remote_payment_id": confirmed["id"],
             "x_storefront_remote_state": confirmed["state"],
+            "x_storefront_payment_provider": confirmed["provider"],
+            "x_storefront_payment_currency": confirmed["currency"],
+            "x_storefront_payment_amount": confirmed["amount"],
         })
         return response
 
@@ -371,17 +405,105 @@ class SaleOrder(models.Model):
         self, payment, remote_order_id, provider_code, payment_id=None,
     ):
         self.ensure_one()
+        is_recorded_payment = bool(
+            payment_id and payment_id == self.x_storefront_remote_payment_id
+        )
+        expected_provider = (
+            self.x_storefront_payment_provider if is_recorded_payment
+            and self.x_storefront_payment_provider else provider_code
+        )
+        expected_currency = (
+            self.x_storefront_payment_currency if is_recorded_payment
+            and self.x_storefront_payment_currency else self.currency_id.name
+        )
+        expected_amount = (
+            self.x_storefront_payment_amount if is_recorded_payment
+            and self.x_storefront_payment_currency else self.amount_total
+        )
         return bool(
             payment.get("authoritative") is True
             and (not payment_id or payment.get("id") == payment_id)
             and remote_order_id in (payment.get("order_ids") or [])
-            and payment.get("provider") == provider_code
-            and payment.get("currency") == self.currency_id.name
+            and payment.get("provider") == expected_provider
+            and payment.get("currency") == expected_currency
             and not self.currency_id.compare_amounts(
-                payment.get("amount") or 0.0, self.amount_total,
+                payment.get("amount") or 0.0, expected_amount,
             )
             and payment.get("state") in {"draft", "pending", "authorized", "done"}
         )
+
+    def _storefront_finalize_completed_attempt(self, payment=None):
+        """Close the local cart only after a current authoritative ERP payment read."""
+        self.ensure_one()
+        payment_id = self.x_storefront_remote_payment_id
+        remote_order_id = self.x_storefront_remote_order_id
+        if not payment_id or not remote_order_id:
+            raise StorefrontApiError(
+                _("The storefront order has no ERP payment to confirm."),
+                code="payment_required", status=409,
+            )
+        if payment is None:
+            payment = self.env["storefront.erp.client"].get(
+                f"/api/v1/payments/{payment_id}"
+            ) or {}
+        provider_code = payment.get("provider")
+        if (
+            not provider_code
+            or payment.get("state") != "done"
+            or not self._storefront_payment_is_authoritative(
+                payment, remote_order_id, provider_code, payment_id=payment_id,
+            )
+        ):
+            raise StorefrontApiError(
+                _("ERP did not authoritatively confirm order completion."),
+                code="payment_completion_not_confirmed", status=409,
+            )
+        if self.x_storefront_completed_at and self.state == "cancel":
+            return True
+
+        completed_attempt_id = self._storefront_attempt_key()
+        self.with_context(
+            shop_api_skip_event=True, tracking_disable=True,
+        ).write({
+            "x_storefront_completed_attempt_id": completed_attempt_id,
+            "x_storefront_attempt_id": str(uuid.uuid4()),
+            "x_storefront_completed_at": fields.Datetime.now(),
+            "x_storefront_remote_state": "done",
+            "x_storefront_reservation_id": False,
+            "x_storefront_reservation_expires_at": False,
+            "x_storefront_quote_fingerprint": False,
+            "x_storefront_shortage_product_uuids": [],
+            # ERP owns confirmation, delivery, accounting, and stock. Cancelling
+            # only the local presentation cart prevents Odoo from reviving it as
+            # an abandoned draft without duplicating those ERP operations.
+            "state": "cancel",
+        })
+        return True
+
+    def _storefront_refresh_payment_completion(self):
+        """Read the current ERP payment and finalize this attempt when it is done."""
+        self.ensure_one()
+        if not self.x_storefront_remote_payment_id:
+            return False
+        payment = self.env["storefront.erp.client"].get(
+            f"/api/v1/payments/{self.x_storefront_remote_payment_id}"
+        ) or {}
+        provider_code = payment.get("provider")
+        if not provider_code or not self._storefront_payment_is_authoritative(
+            payment,
+            self.x_storefront_remote_order_id,
+            provider_code,
+            payment_id=self.x_storefront_remote_payment_id,
+        ):
+            raise StorefrontApiError(
+                _("ERP returned an invalid payment status."),
+                code="invalid_payment_status", status=502,
+            )
+        if payment.get("state") == "done":
+            self._storefront_finalize_completed_attempt(payment)
+            return True
+        self.x_storefront_remote_state = payment.get("state")
+        return False
 
     def _storefront_recover_payment(self, client, remote_order_id, provider_code):
         self.ensure_one()

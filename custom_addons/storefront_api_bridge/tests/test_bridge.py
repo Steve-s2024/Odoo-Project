@@ -15,6 +15,8 @@ from odoo.addons.storefront_api_bridge.models import api_client as api_client_mo
 from odoo.addons.storefront_api_bridge.controllers.webhook import StorefrontWebhookController
 from odoo.addons.storefront_api_bridge.controllers.customer_portal import StorefrontCustomerPortal
 from odoo.addons.storefront_api_bridge.controllers import customer_portal as customer_portal_module
+from odoo.addons.storefront_api_bridge.controllers.website_sale import StorefrontWebsiteSale
+from odoo.addons.storefront_api_bridge.controllers import website_sale as website_sale_module
 
 
 class _Response:
@@ -557,6 +559,18 @@ class TestStorefrontApiClient(TransactionCase):
         payload.update(values)
         return payload
 
+    @staticmethod
+    def _completed_payment(order, payment_id="payment-id", remote_order_id="remote-order-id"):
+        return {
+            "id": payment_id,
+            "authoritative": True,
+            "order_ids": [remote_order_id],
+            "provider": "wechatpay",
+            "currency": order.currency_id.name,
+            "amount": order.amount_total,
+            "state": "done",
+        }
+
     def test_remote_order_handoff_includes_address_carrier_and_matching_total(self):
         order = self._checkout_order()
         responses = [
@@ -731,6 +745,207 @@ class TestStorefrontApiClient(TransactionCase):
         order_call = mocked.call_args_list[-1]
         self.assertIn("storefront-", order_call.args[1]["external_id"])
         self.assertNotEqual(order.x_storefront_remote_payment_id, "paid-payment-id")
+
+    def test_completed_payment_rotates_attempt_and_retires_local_cart(self):
+        order = self._checkout_order()
+        original_attempt = order.x_storefront_attempt_id
+        payment = self._completed_payment(order)
+        order.write({
+            "x_storefront_remote_order_id": "remote-order-id",
+            "x_storefront_remote_payment_id": "payment-id",
+            "x_storefront_payment_provider": payment["provider"],
+            "x_storefront_payment_currency": payment["currency"],
+            "x_storefront_payment_amount": payment["amount"],
+            "x_storefront_shortage_product_uuids": ["variant-checkout-id"],
+        })
+
+        self.assertTrue(order._storefront_finalize_completed_attempt(payment))
+
+        self.assertEqual(order.state, "cancel")
+        self.assertEqual(order.x_storefront_remote_state, "done")
+        self.assertEqual(order.x_storefront_completed_attempt_id, original_attempt)
+        self.assertNotEqual(order.x_storefront_attempt_id, original_attempt)
+        self.assertTrue(order.x_storefront_completed_at)
+        self.assertFalse(order.x_storefront_shortage_product_uuids)
+
+    def test_completion_requires_current_authoritative_erp_payment(self):
+        order = self._checkout_order()
+        original_attempt = order.x_storefront_attempt_id
+        order.write({
+            "x_storefront_remote_order_id": "remote-order-id",
+            "x_storefront_remote_payment_id": "payment-id",
+        })
+        payment = self._completed_payment(order)
+        payment["authoritative"] = False
+
+        with self.assertRaises(StorefrontApiError):
+            order._storefront_finalize_completed_attempt(payment)
+
+        self.assertEqual(order.state, "draft")
+        self.assertEqual(order.x_storefront_attempt_id, original_attempt)
+        self.assertFalse(order.x_storefront_completed_at)
+
+    def test_completion_uses_recorded_payment_amount_after_cart_changes(self):
+        order = self._checkout_order()
+        payment = self._completed_payment(order)
+        order.write({
+            "x_storefront_remote_order_id": "remote-order-id",
+            "x_storefront_remote_payment_id": "payment-id",
+            "x_storefront_payment_provider": payment["provider"],
+            "x_storefront_payment_currency": payment["currency"],
+            "x_storefront_payment_amount": payment["amount"],
+        })
+        order.order_line.filtered(lambda line: not line.is_delivery)[:1].product_uom_qty = 2
+
+        self.assertTrue(order._storefront_finalize_completed_attempt(payment))
+        self.assertEqual(order.state, "cancel")
+
+    def test_payment_completed_webhook_reads_erp_before_finalizing(self):
+        order = self._checkout_order()
+        payment = self._completed_payment(order)
+        order.write({
+            "x_storefront_remote_order_id": "remote-order-id",
+            "x_storefront_remote_payment_id": "payment-id",
+            "x_storefront_payment_provider": payment["provider"],
+            "x_storefront_payment_currency": payment["currency"],
+            "x_storefront_payment_amount": payment["amount"],
+        })
+        event, _created = self.env["storefront.webhook.event"].enqueue_document({
+            "event_id": "payment-completed-event",
+            "event_type": "payment.completed",
+            "resource_id": "payment-id",
+            "data": dict(payment),
+        })
+
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            return_value=payment,
+        ) as erp_get:
+            event._process_event()
+
+        erp_get.assert_called_once_with("/api/v1/payments/payment-id")
+        self.assertEqual(order.state, "cancel")
+
+    def test_payment_completed_webhook_payload_alone_cannot_finalize(self):
+        order = self._checkout_order()
+        payment = self._completed_payment(order)
+        order.write({
+            "x_storefront_remote_order_id": "remote-order-id",
+            "x_storefront_remote_payment_id": "payment-id",
+        })
+        event, _created = self.env["storefront.webhook.event"].enqueue_document({
+            "event_id": "payment-completed-no-read-event",
+            "event_type": "payment.completed",
+            "resource_id": "payment-id",
+            "data": dict(payment),
+        })
+
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            side_effect=StorefrontApiError("ERP unavailable", status=503),
+        ), self.assertRaises(StorefrontApiError):
+            event._process_event()
+
+        self.assertEqual(order.state, "draft")
+
+    def test_remote_order_idempotency_uses_checkout_attempt(self):
+        order = self._checkout_order()
+        attempt_id = order.x_storefront_attempt_id
+        responses = [
+            {"id": "customer-id"},
+            {"id": "address-id"},
+            {
+                "id": "order-id", "state": "draft",
+                "currency": order.currency_id.name, "amount_total": order.amount_total,
+            },
+        ]
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post",
+            side_effect=responses,
+        ) as mocked, patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            return_value=self._reservation_confirmation(order),
+        ):
+            order._storefront_sync_remote_order()
+
+        order_call = mocked.call_args_list[-1]
+        self.assertIn(attempt_id, order_call.kwargs["idempotency_key"])
+        self.assertIn(attempt_id, order_call.args[1]["external_id"])
+
+    def test_checkout_does_not_call_erp_inventory_or_reservation(self):
+        response = object()
+        order = MagicMock()
+        order_sudo = order.sudo.return_value
+        order_sudo._get_source_inventory_shortage_lines.return_value = False
+        fake_request = SimpleNamespace(cart=order, session={})
+
+        with patch.object(
+            website_sale_module, "request", fake_request,
+        ), patch.object(
+            StorefrontWebsiteSale, "_sync_website_checkout_language",
+        ), patch(
+            "odoo.addons.website_sale.controllers.main.WebsiteSale.shop_checkout",
+            return_value=response,
+        ) as native_checkout:
+            result = StorefrontWebsiteSale.shop_checkout.__wrapped__(
+                StorefrontWebsiteSale()
+            )
+
+        self.assertIs(result, response)
+        order_sudo._storefront_check_inventory.assert_not_called()
+        order_sudo._storefront_ensure_quote.assert_not_called()
+        native_checkout.assert_called_once()
+
+    def test_checkout_blocks_only_existing_erp_rejection_markers(self):
+        redirect_result = object()
+        order = MagicMock()
+        order_sudo = order.sudo.return_value
+        order_sudo._get_source_inventory_shortage_lines.return_value = MagicMock()
+        fake_request = SimpleNamespace(
+            cart=order,
+            session={},
+            redirect=MagicMock(return_value=redirect_result),
+        )
+
+        with patch.object(
+            website_sale_module, "request", fake_request,
+        ), patch.object(
+            StorefrontWebsiteSale, "_sync_website_checkout_language",
+        ):
+            result = StorefrontWebsiteSale.shop_checkout.__wrapped__(
+                StorefrontWebsiteSale()
+            )
+
+        self.assertIs(result, redirect_result)
+        self.assertTrue(fake_request.session["x_stock_quantity_warning"])
+        order_sudo._storefront_check_inventory.assert_not_called()
+
+    def test_payment_inventory_rejection_marks_rows_and_returns_to_cart(self):
+        redirect_result = object()
+        order = MagicMock(x_storefront_remote_payment_id=False)
+        order_sudo = order.sudo.return_value
+        order_sudo._get_source_inventory_shortage_lines.return_value = False
+        order_sudo._storefront_check_inventory.return_value = [{
+            "product_id": "variant-checkout-id", "available": False,
+        }]
+        fake_request = SimpleNamespace(
+            cart=order,
+            session={},
+            redirect=MagicMock(return_value=redirect_result),
+        )
+
+        with patch.object(
+            website_sale_module, "request", fake_request,
+        ), patch.object(
+            StorefrontWebsiteSale, "_sync_website_checkout_language",
+        ):
+            result = StorefrontWebsiteSale.shop_payment.__wrapped__(
+                StorefrontWebsiteSale()
+            )
+
+        self.assertIs(result, redirect_result)
+        self.assertTrue(fake_request.session["x_stock_quantity_warning"])
+        order_sudo._storefront_sync_remote_order.assert_not_called()
 
     def test_payment_methods_use_checkout_language(self):
         order = self._checkout_order()
