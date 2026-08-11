@@ -99,6 +99,7 @@ class TestWebsiteRefundReturn(TransactionCase):
         order, line = self._create_order(delivered=False)
         transaction = self._create_paid_transaction(order, "REFUND-NOT-DELIVERED")
         refund_request = self._create_refund_request(order, line, transaction)
+        self.assertEqual(refund_request.return_location_id, self.warehouse.lot_stock_id)
 
         with patch.object(
             self.env.registry["payment.transaction"],

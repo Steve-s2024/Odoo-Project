@@ -601,3 +601,29 @@ class TestShopApiHttp(ShopApiTestMixin, HttpCase):
         methods = response.json()["data"]
         codes = [method["code"] for method in methods]
         self.assertEqual(len(codes), len(set(codes)))
+
+    def test_customer_registration_is_authoritative_and_idempotent(self):
+        payload = json.dumps({
+            "name": "API Signup Customer",
+            "email": "api-signup-customer@example.test",
+            "password": "safe-test-password",
+            "language": "en_US",
+        })
+        created = self.url_open(
+            "/api/v1/customers/register", data=payload,
+            headers=self._headers("http-customer-register-key"),
+        )
+        replayed = self.url_open(
+            "/api/v1/customers/register", data=payload,
+            headers=self._headers("http-customer-register-key"),
+        )
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(replayed.status_code, 201)
+        self.assertTrue(created.json()["data"]["authoritative"])
+        self.assertTrue(created.json()["data"]["registered"])
+        self.assertEqual(created.json()["data"]["id"], replayed.json()["data"]["id"])
+        user = self.env["res.users"].sudo().search([
+            ("login", "=", "api-signup-customer@example.test"),
+        ], limit=1)
+        self.assertTrue(user)
+        self.assertTrue(user.share)

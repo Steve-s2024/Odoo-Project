@@ -755,12 +755,19 @@ class ShopApiController(Controller):
             name = str(body.get("name") or "").strip()
             password = str(body.get("password") or "")
             language = body.get("language") if body.get("language") in ("zh_CN", "en_US") else "zh_CN"
-            if not login or "@" not in login or not name or not password:
+            missing_fields = []
+            if not login or "@" not in login:
+                missing_fields.append("email")
+            if not password:
+                missing_fields.append("password")
+            if missing_fields:
                 raise ShopApiError(
                     "invalid_registration",
-                    "姓名、有效电子邮箱和密码不能为空。",
+                    "有效电子邮箱和密码不能为空。",
                     400,
+                    details={"missing_fields": missing_fields},
                 )
+            name = name or login.partition("@")[0]
             Users = request.env["res.users"].sudo().with_context(active_test=False)
             if Users.search_count([
                 "|", ("login", "=ilike", login), ("partner_id.email", "=ilike", login),

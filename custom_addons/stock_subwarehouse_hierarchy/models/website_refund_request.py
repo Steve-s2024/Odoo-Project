@@ -354,6 +354,11 @@ class WebsiteRefundRequest(models.Model):
         for quantities_by_move in quantities_by_picking.values():
             for move in quantities_by_move:
                 locations |= move.location_id
+        if not locations:
+            # A refund can be requested before the delivery move is completed or
+            # linked.  The sale line is still authoritative for the exact source
+            # subwarehouse selected during checkout.
+            locations |= self.line_ids.mapped("sale_line_id.x_source_location_id")
         return locations
 
     def _create_customer_return_pickings(self, quantities_by_picking):

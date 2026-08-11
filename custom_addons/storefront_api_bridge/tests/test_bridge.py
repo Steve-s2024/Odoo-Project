@@ -235,6 +235,56 @@ class TestStorefrontApiClient(TransactionCase):
             controller.do_signup({"signup_attempt_id": attempt_id})
         user_model._storefront_provision_portal_user.assert_not_called()
 
+    def test_signup_normalizes_email_and_derives_missing_display_name(self):
+        client = MagicMock()
+        client.post.return_value = {
+            "id": "erp-customer-id", "email": "new@example.com",
+            "login": "new@example.com", "authoritative": True, "registered": True,
+        }
+        client.get.return_value = {
+            "id": "erp-customer-id", "email": "new@example.com", "authoritative": True,
+        }
+        fake_request, _user_model, attempt_id = self._signup_request(client)
+        controller = StorefrontAuthSignup()
+        controller._prepare_signup_values = MagicMock(return_value={
+            "name": "   ", "login": " New@Example.COM ",
+            "password": "safe-password", "lang": "en_US",
+        })
+        with (
+            patch.object(signup_module, "request", fake_request),
+            patch.object(signup_module, "_erp_login_enabled", return_value=False),
+        ):
+            controller.do_signup({"signup_attempt_id": attempt_id})
+        payload = client.post.call_args.args[1]
+        self.assertEqual(payload["login"], "new@example.com")
+        self.assertEqual(payload["email"], "new@example.com")
+        self.assertEqual(payload["name"], "new")
+
+    def test_signup_rotates_attempt_after_definitive_erp_rejection(self):
+        client = MagicMock()
+        client.post.side_effect = StorefrontApiError(
+            "Invalid registration", code="invalid_registration", status=400,
+        )
+        fake_request, _user_model, attempt_id = self._signup_request(client)
+        controller = StorefrontAuthSignup()
+        controller._prepare_signup_values = MagicMock(return_value={
+            "name": "New Customer", "login": "new@example.com",
+            "password": "safe-password", "lang": "en_US",
+        })
+        qcontext = {"signup_attempt_id": attempt_id}
+        with (
+            patch.object(signup_module, "request", fake_request),
+            patch.object(signup_module, "_erp_login_enabled", return_value=False),
+            patch.object(signup_module, "_", side_effect=lambda message: message),
+            self.assertRaises(UserError),
+        ):
+            controller.do_signup(qcontext)
+        self.assertNotEqual(qcontext["signup_attempt_id"], attempt_id)
+        self.assertEqual(
+            fake_request.session["storefront_signup_attempt_id"],
+            qcontext["signup_attempt_id"],
+        )
+
     def _refund_submission_request(self, client):
         fake_env = MagicMock()
         fake_env.user = self.env.user
