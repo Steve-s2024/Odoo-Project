@@ -34,7 +34,7 @@ class PaymentProvider(models.Model):
         self.filtered(lambda provider: provider.code == "alipay").update({
             "support_express_checkout": False,
             "support_manual_capture": None,
-            "support_refund": None,
+            "support_refund": "partial",
             "support_tokenization": False,
         })
 
@@ -113,27 +113,43 @@ class PaymentProvider(models.Model):
 
     def _alipay_api_request(self, method, biz_content, notify_url=None, reference=None):
         self.ensure_one()
-        if method != "alipay.trade.precreate":
-            raise ValidationError(_("Unsupported Alipay SDK operation: %s", method))
         try:
-            from alipay.aop.api.domain.AlipayTradePrecreateModel import AlipayTradePrecreateModel
-            from alipay.aop.api.request.AlipayTradePrecreateRequest import AlipayTradePrecreateRequest
-            from alipay.aop.api.response.AlipayTradePrecreateResponse import AlipayTradePrecreateResponse
-            model = AlipayTradePrecreateModel.from_alipay_dict(biz_content)
-            sdk_request = AlipayTradePrecreateRequest(biz_model=model)
-            sdk_request.notify_url = notify_url
+            if method == "alipay.trade.precreate":
+                from alipay.aop.api.domain.AlipayTradePrecreateModel import AlipayTradePrecreateModel
+                from alipay.aop.api.request.AlipayTradePrecreateRequest import AlipayTradePrecreateRequest
+                from alipay.aop.api.response.AlipayTradePrecreateResponse import AlipayTradePrecreateResponse
+                model = AlipayTradePrecreateModel.from_alipay_dict(biz_content)
+                sdk_request = AlipayTradePrecreateRequest(biz_model=model)
+                sdk_request.notify_url = notify_url
+                response = AlipayTradePrecreateResponse()
+            elif method == "alipay.trade.refund":
+                from alipay.aop.api.domain.AlipayTradeRefundModel import AlipayTradeRefundModel
+                from alipay.aop.api.request.AlipayTradeRefundRequest import AlipayTradeRefundRequest
+                from alipay.aop.api.response.AlipayTradeRefundResponse import AlipayTradeRefundResponse
+                model = AlipayTradeRefundModel.from_alipay_dict(biz_content)
+                sdk_request = AlipayTradeRefundRequest(biz_model=model)
+                response = AlipayTradeRefundResponse()
+            else:
+                raise ValidationError(_("Unsupported Alipay SDK operation: %s", method))
             content = self._alipay_sdk_client().execute(sdk_request)
-            response = AlipayTradePrecreateResponse()
             response.parse_response_content(content)
         except ValidationError:
             raise
         except Exception as error:
             raise ValidationError(_("Alipay SDK request failed: %s", str(error))) from error
-        return {
+        result = {
             "code": response.code,
             "msg": response.msg,
             "sub_code": response.sub_code,
             "sub_msg": response.sub_msg,
             "out_trade_no": response.out_trade_no,
-            "qr_code": response.qr_code,
         }
+        if method == "alipay.trade.precreate":
+            result["qr_code"] = response.qr_code
+        else:
+            result.update({
+                "trade_no": response.trade_no,
+                "refund_fee": response.refund_fee,
+                "fund_change": response.fund_change,
+            })
+        return result

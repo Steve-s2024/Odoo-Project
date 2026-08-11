@@ -16,6 +16,7 @@ class PaymentTransaction(models.Model):
 
     alipay_qr_code = fields.Char(string="Alipay QR code URL", readonly=True)
     alipay_out_trade_no = fields.Char(string="Alipay merchant order number", readonly=True, copy=False)
+    alipay_out_refund_no = fields.Char(string="Alipay merchant refund number", readonly=True, copy=False)
     alipay_simulation_token = fields.Char(readonly=True, copy=False, groups="base.group_system")
 
     def _get_specific_rendering_values(self, processing_values):
@@ -97,7 +98,11 @@ class PaymentTransaction(models.Model):
     def _extract_amount_data(self, payment_data):
         if self.provider_code != "alipay":
             return super()._extract_amount_data(payment_data)
-        total_amount = payment_data.get("total_amount")
+        total_amount = (
+            payment_data.get("refund_fee")
+            if self.operation == "refund"
+            else payment_data.get("total_amount")
+        )
         if total_amount in (None, ""):
             return None
         return {
@@ -109,6 +114,22 @@ class PaymentTransaction(models.Model):
     def _apply_updates(self, payment_data):
         if self.provider_code != "alipay":
             return super()._apply_updates(payment_data)
+        if self.operation == "refund":
+            self.provider_reference = (
+                payment_data.get("trade_no")
+                or payment_data.get("out_request_no")
+                or self.alipay_out_refund_no
+            )
+            if payment_data.get("code") == "10000":
+                self._set_done()
+            else:
+                self._set_error(
+                    payment_data.get("sub_msg")
+                    or payment_data.get("msg")
+                    or _("Alipay refund failed.")
+                )
+            return
+
         self.provider_reference = payment_data.get("trade_no") or payment_data.get("out_trade_no")
         trade_status = payment_data.get("trade_status")
         if trade_status in ("TRADE_SUCCESS", "TRADE_FINISHED"):
@@ -117,3 +138,38 @@ class PaymentTransaction(models.Model):
             self._set_canceled()
         else:
             self._set_pending()
+
+    def _send_refund_request(self):
+        if self.provider_code != "alipay":
+            return super()._send_refund_request()
+
+        self.ensure_one()
+        source_tx = self.source_transaction_id
+        if not source_tx or not (source_tx.provider_reference or source_tx.alipay_out_trade_no):
+            raise ValidationError(_("The original Alipay transaction cannot be found."))
+        out_refund_no = self.alipay_out_refund_no or f"ODOOREF{self.id}"
+        self.alipay_out_refund_no = out_refund_no
+        provider = self.provider_id.sudo()
+        if provider.alipay_simulation_mode:
+            self._process("alipay", {
+                "code": "10000",
+                "trade_no": f"SIM-{out_refund_no}",
+                "out_request_no": out_refund_no,
+                "refund_fee": f"{-self.amount:.2f}",
+            })
+            self._post_process()
+            return
+
+        values = {
+            "refund_amount": f"{-self.amount:.2f}",
+            "refund_reason": f"Odoo refund {source_tx.reference}"[:256],
+            "out_request_no": out_refund_no,
+        }
+        if source_tx.provider_reference:
+            values["trade_no"] = source_tx.provider_reference
+        else:
+            values["out_trade_no"] = source_tx.alipay_out_trade_no
+        response = provider._alipay_api_request("alipay.trade.refund", values)
+        self._process("alipay", {**response, "out_request_no": out_refund_no})
+        if self.state == "done":
+            self._post_process()

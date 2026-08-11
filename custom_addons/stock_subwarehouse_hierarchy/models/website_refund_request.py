@@ -17,7 +17,7 @@ class WebsiteRefundRequest(models.Model):
         "payment.transaction", string="原支付交易", required=True, ondelete="restrict"
     )
     refund_transaction_id = fields.Many2one(
-        "payment.transaction", string="微信退款交易", readonly=True, ondelete="restrict"
+        "payment.transaction", string="支付退款交易", readonly=True, ondelete="restrict"
     )
     credit_note_id = fields.Many2one(
         "account.move", string="退款贷项通知单", readonly=True, copy=False, ondelete="restrict"
@@ -211,8 +211,11 @@ class WebsiteRefundRequest(models.Model):
 
     def _validate_payment_refund(self):
         self.ensure_one()
-        if self.source_transaction_id.provider_code != "wechatpay":
-            raise ValidationError(_("仅支持从微信支付交易发起退款。"))
+        if (
+            self.source_transaction_id.provider_code not in ("wechatpay", "alipay")
+            or not self.source_transaction_id.provider_id.support_refund
+        ):
+            raise ValidationError(_("该支付方式不支持原路退款。"))
         if self.amount_total <= 0:
             raise ValidationError(_("退款金额必须大于零。"))
         available = self.source_transaction_id.amount - sum(

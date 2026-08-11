@@ -444,6 +444,11 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
         ]
         self.assertEqual(order._shop_api_payload()["items"][0]["selected_options"], expected_options)
         self.assertEqual(payload["items"][0]["selected_options"], expected_options)
+        chinese_payload = order._shop_api_payload(language="zh_CN")
+        self.assertEqual(
+            [option["label"] for option in chinese_payload["items"][0]["selected_options"]],
+            ["类型", "尺码", "硬度"],
+        )
         self.assertNotIn("color", {option["key"] for option in expected_options})
         event = self.env["shop.api.event"].search([
             ("event_type", "=", "refund.requested"),

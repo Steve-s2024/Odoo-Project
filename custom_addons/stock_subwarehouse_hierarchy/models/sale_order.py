@@ -262,11 +262,14 @@ class SaleOrder(models.Model):
         if not payment:
             raise UserError(_("该网站订单没有可退款的已完成支付。"))
         transaction = payment.payment_transaction_id
-        if transaction.provider_code != "wechatpay":
+        if (
+            transaction.provider_code not in ("wechatpay", "alipay")
+            or not transaction.provider_id.support_refund
+        ):
             raise UserError(_("该网站订单的支付方式暂不支持从此处退款。"))
         return {
             "type": "ir.actions.act_window",
-            "name": _("微信退款"),
+            "name": _("支付退款"),
             "res_model": "stock.subwarehouse.website.payment.refund.wizard",
             "view_mode": "form",
             "target": "new",

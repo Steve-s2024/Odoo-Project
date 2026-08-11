@@ -4,7 +4,7 @@ from odoo.exceptions import ValidationError
 
 class WebsitePaymentRefundWizard(models.TransientModel):
     _name = "stock.subwarehouse.website.payment.refund.wizard"
-    _description = "Website WeChat Payment Refund"
+    _description = "Website Payment Refund"
 
     order_id = fields.Many2one("sale.order", string="订单", readonly=True)
     transaction_id = fields.Many2one(
@@ -34,15 +34,18 @@ class WebsitePaymentRefundWizard(models.TransientModel):
 
     def action_submit_refund(self):
         self.ensure_one()
-        if self.transaction_id.provider_code != "wechatpay":
-            raise ValidationError(_("仅支持微信支付交易退款。"))
+        if (
+            self.transaction_id.provider_code not in ("wechatpay", "alipay")
+            or not self.transaction_id.provider_id.support_refund
+        ):
+            raise ValidationError(_("该支付方式不支持原路退款。"))
         if not 0 < self.amount_to_refund <= self.amount_available:
             raise ValidationError(_("退款金额必须大于零且不超过可退款金额。"))
         refund_transaction = self.transaction_id._refund(self.amount_to_refund)
         message = (
             _("模拟退款已完成。")
             if refund_transaction.state == "done"
-            else _("退款申请已提交，正在等待微信支付确认。")
+            else _("退款申请已提交，正在等待支付平台确认。")
         )
         return {
             "type": "ir.actions.client",

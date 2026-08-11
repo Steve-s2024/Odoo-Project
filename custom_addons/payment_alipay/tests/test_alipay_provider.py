@@ -29,6 +29,7 @@ class TestAlipayProvider(TransactionCase):
         self.assertEqual(self.provider.code, "alipay")
         self.assertIn("alipay", self.provider._get_default_payment_method_codes())
         self.assertEqual(self.provider._get_supported_currencies().mapped("name"), ["CNY"])
+        self.assertEqual(self.provider.support_refund, "partial")
 
     def test_simulator_creates_pending_trade_and_completes(self):
         self.provider.write({"state": "test", "alipay_simulation_mode": True})
@@ -72,9 +73,8 @@ class TestAlipayProvider(TransactionCase):
 
     def test_precreate_is_delegated_to_official_sdk(self):
         client = SimpleNamespace(execute=lambda request: (
-            '{"alipay_trade_precreate_response":'
             '{"code":"10000","msg":"Success","out_trade_no":"ODOO1",'
-            '"qr_code":"https://qr.example.test/1"}}'
+            '"qr_code":"https://qr.example.test/1"}'
         ))
         with patch.object(type(self.provider), "_alipay_sdk_client", return_value=client):
             response = self.provider._alipay_api_request(
@@ -88,3 +88,17 @@ class TestAlipayProvider(TransactionCase):
             )
         self.assertEqual(response["code"], "10000")
         self.assertEqual(response["qr_code"], "https://qr.example.test/1")
+
+    def test_simulated_partial_refund_completes_authoritatively(self):
+        self.provider.write({"state": "test", "alipay_simulation_mode": True})
+        tx = self._create_transaction(reference="ALI-SIM-REFUND")
+        tx.write({
+            "alipay_out_trade_no": "ODOO-SOURCE-1",
+            "provider_reference": "SIM-SOURCE-1",
+        })
+        tx._set_done()
+        refund = tx._refund(2.34)
+        self.assertEqual(refund.operation, "refund")
+        self.assertEqual(refund.state, "done")
+        self.assertEqual(refund.amount, -2.34)
+        self.assertTrue(refund.alipay_out_refund_no)

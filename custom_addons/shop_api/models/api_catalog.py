@@ -68,6 +68,7 @@ BUILTIN_ENDPOINTS = [
     ("reservation_release", "POST", "/api/v1/reservations/{uuid}/release", "reservation:write", True, "释放库存预留", "Release reservation"),
     ("customer_upsert", "POST", "/api/v1/customers/upsert", "customer:write", True, "新增或更新客户", "Upsert customer"),
     ("customer_authenticate", "POST", "/api/v1/customers/authenticate", "customer:read", False, "验证商城客户账户", "Authenticate storefront customer"),
+    ("customer_register", "POST", "/api/v1/customers/register", "customer:write", True, "注册商城客户账户", "Register storefront customer"),
     ("customer_detail", "GET", "/api/v1/customers/{uuid}", "customer:read", False, "客户详情", "Customer detail"),
     ("customer_external", "GET", "/api/v1/customers/by-external-id/{id}", "customer:read", False, "按外部编号查询客户", "Customer by external ID"),
     ("address_create", "POST", "/api/v1/customers/{uuid}/addresses", "customer:write", True, "新增客户地址", "Create customer address"),
@@ -82,6 +83,8 @@ BUILTIN_ENDPOINTS = [
     ("order_confirm", "POST", "/api/v1/orders/{uuid}/confirm", "order:write", True, "确认订单", "Confirm order"),
     ("order_cancel", "POST", "/api/v1/orders/{uuid}/cancel", "order:write", True, "取消订单", "Cancel order"),
     ("order_documents", "GET", "/api/v1/orders/{uuid}/documents", "document:read", False, "订单单据", "Order documents"),
+    ("order_receipt_download", "GET", "/api/v1/orders/{uuid}/receipt.pdf", "document:read", False, "下载付款收据", "Download payment receipt"),
+    ("order_invoice_download", "GET", "/api/v1/orders/{uuid}/invoices/{invoice_uuid}.pdf", "document:read", False, "下载订单发票", "Download order invoice"),
     ("payment_create", "POST", "/api/v1/orders/{uuid}/payments", "payment:write", True, "创建支付", "Create payment"),
     ("payment_detail", "GET", "/api/v1/payments/{uuid}", "payment:read", False, "支付详情", "Payment detail"),
     ("payment_simulate_success", "POST", "/api/v1/payments/{uuid}/simulate-success", "payment:write", True, "模拟支付成功", "Simulate successful payment"),
@@ -199,7 +202,7 @@ class ShopApiEndpoint(models.Model):
                 "summary_en": summary_en,
                 "active": True,
             }
-            if code == "customer_authenticate":
+            if code in ("customer_authenticate", "customer_register"):
                 values.update({
                     "log_request_body": False,
                     "log_response_body": False,

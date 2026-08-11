@@ -9,7 +9,7 @@ from psycopg2.errors import LockNotAvailable
 
 from odoo import Command, fields
 from odoo.exceptions import AccessDenied, AccessError, MissingError, UserError, ValidationError
-from odoo.http import Controller, request, route
+from odoo.http import Controller, content_disposition, request, route
 from odoo.tools import SQL
 from odoo.tools.mimetypes import guess_mimetype
 
@@ -748,6 +748,54 @@ class ShopApiController(Controller):
 
         return self._run("customer_authenticate", handler)
 
+    @route("/api/v1/customers/register", type="http", auth="bearer", methods=["POST"], csrf=False)
+    def customer_register(self):
+        def handler(body, client):
+            login = str(body.get("login") or body.get("email") or "").strip().lower()
+            name = str(body.get("name") or "").strip()
+            password = str(body.get("password") or "")
+            language = body.get("language") if body.get("language") in ("zh_CN", "en_US") else "zh_CN"
+            if not login or "@" not in login or not name or not password:
+                raise ShopApiError(
+                    "invalid_registration",
+                    "姓名、有效电子邮箱和密码不能为空。",
+                    400,
+                )
+            Users = request.env["res.users"].sudo().with_context(active_test=False)
+            if Users.search_count([
+                "|", ("login", "=ilike", login), ("partner_id.email", "=ilike", login),
+            ], limit=1):
+                raise ShopApiError(
+                    "account_exists",
+                    "此电子邮箱已注册，请直接登录。",
+                    409,
+                )
+            partner = request.env["res.partner"].sudo().create({
+                "name": name,
+                "email": login,
+                "lang": language,
+                "customer_rank": 1,
+            })
+            user = Users.with_context(no_reset_password=True).create({
+                "name": name,
+                "login": login,
+                "password": password,
+                "partner_id": partner.id,
+                "group_ids": [Command.set([request.env.ref("base.group_portal").id])],
+            })
+            customer = user.partner_id.commercial_partner_id.sudo()
+            customer._shop_api_ensure_uuid()
+            request.env["shop.api.external.reference"].set_reference(
+                client, "customer", f"erp-account-{user.id}", customer,
+            )
+            return {
+                **customer._shop_api_payload(),
+                "authoritative": True,
+                "registered": True,
+                "login": user.login,
+            }, 201, None
+        return self._run("customer_register", handler)
+
     @route("/api/v1/customers/by-external-id/<string:external_id>", type="http", auth="bearer", methods=["GET"], csrf=False)
     def customer_external(self, external_id):
         def handler(_body, client):
@@ -763,7 +811,10 @@ class ShopApiController(Controller):
     @route("/api/v1/customers/<string:customer_uuid>", type="http", auth="bearer", methods=["GET"], csrf=False)
     def customer_detail(self, customer_uuid):
         return self._run("customer_detail", lambda _body, client: (
-            self._customer_record(customer_uuid, client)._shop_api_payload(), 200, None,
+            {
+                **self._customer_record(customer_uuid, client)._shop_api_payload(),
+                "authoritative": True,
+            }, 200, None,
         ))
 
     @route("/api/v1/customers/<string:customer_uuid>/orders", type="http", auth="bearer", methods=["GET"], csrf=False)
@@ -775,7 +826,8 @@ class ShopApiController(Controller):
             Order = request.env["sale.order"].sudo()
             total = Order.search_count(domain)
             orders = Order.search(domain, order="date_order desc, id desc", offset=(page - 1) * page_size, limit=page_size)
-            return [order._shop_api_payload() for order in orders], 200, {
+            language = self._site_language()
+            return [order._shop_api_payload(language=language) for order in orders], 200, {
                 "page": page, "page_size": page_size, "total": total,
             }
         return self._run("customer_orders", handler)
@@ -787,7 +839,8 @@ class ShopApiController(Controller):
             refunds = request.env["stock.subwarehouse.website.refund.request"].sudo().search([
                 ("order_id.partner_id.commercial_partner_id", "=", customer.id),
             ], order="create_date desc, id desc")
-            return [refund._shop_api_payload() for refund in refunds], 200, None
+            language = self._site_language()
+            return [refund._shop_api_payload(language=language) for refund in refunds], 200, None
         return self._run("customer_refunds", handler)
 
     @staticmethod
@@ -931,7 +984,9 @@ class ShopApiController(Controller):
     @route("/api/v1/orders/<string:order_uuid>", type="http", auth="bearer", methods=["GET"], csrf=False)
     def order_detail(self, order_uuid):
         return self._run("order_detail", lambda _body, client: (
-            self._order_record(order_uuid, client)._shop_api_payload(), 200, None,
+            self._order_record(order_uuid, client)._shop_api_payload(
+                language=self._site_language()
+            ), 200, None,
         ))
 
     @route("/api/v1/orders/by-external-id/<string:external_id>", type="http", auth="bearer", methods=["GET"], csrf=False)
@@ -992,9 +1047,70 @@ class ShopApiController(Controller):
 
     @route("/api/v1/orders/<string:order_uuid>/documents", type="http", auth="bearer", methods=["GET"], csrf=False)
     def order_documents(self, order_uuid):
-        return self._run("order_documents", lambda _body, client: ([
-            move._shop_api_payload() for move in self._order_record(order_uuid, client).invoice_ids
-        ], 200, None))
+        def handler(_body, client):
+            order = self._order_record(order_uuid, client)
+            invoices = order.invoice_ids.filtered(
+                lambda move: move.state != "cancel" and move.move_type in ("out_invoice", "out_refund")
+            )
+            payment = order._get_website_payment_receipt()
+            return {
+                "receipt": ({
+                    "available": True,
+                    "number": payment.name,
+                    "payment_id": str(payment.id),
+                } if payment else None),
+                "invoices": [move._shop_api_payload() for move in invoices],
+            }, 200, None
+        return self._run("order_documents", handler)
+
+    def _binary_client(self, endpoint_code):
+        endpoint = request.env["shop.api.endpoint"].sudo().search([
+            ("code", "=", endpoint_code), ("active", "=", True),
+        ], limit=1)
+        client = request.env["shop.api.client"]._client_for_current_user()
+        if not endpoint or not client or not client.allows_scope(endpoint.scope_id.code):
+            raise ShopApiError("scope_denied", "API 客户端无权下载该单据。", 403)
+        return client
+
+    @route("/api/v1/orders/<string:order_uuid>/receipt.pdf", type="http", auth="bearer", methods=["GET"], csrf=False)
+    def order_receipt_download(self, order_uuid):
+        client = self._binary_client("order_receipt_download")
+        order = self._order_record(order_uuid, client)
+        payment = order._get_website_payment_receipt()
+        if not payment:
+            raise ShopApiError("not_found", "该订单没有可下载的付款收据。", 404)
+        pdf, _report_type = request.env["ir.actions.report"].sudo()._render_qweb_pdf(
+            "stock_subwarehouse_hierarchy.action_report_website_payment_receipt",
+            res_ids=payment.ids,
+        )
+        return request.make_response(pdf, headers=[
+            ("Content-Type", "application/pdf"),
+            ("Content-Length", str(len(pdf))),
+            ("Content-Disposition", content_disposition(f"payment-receipt-{payment.name}.pdf")),
+        ])
+
+    @route("/api/v1/orders/<string:order_uuid>/invoices/<string:invoice_uuid>.pdf", type="http", auth="bearer", methods=["GET"], csrf=False)
+    def order_invoice_download(self, order_uuid, invoice_uuid):
+        client = self._binary_client("order_invoice_download")
+        order = self._order_record(order_uuid, client)
+        invoice = order.invoice_ids.filtered(
+            lambda move: move.shop_api_uuid == invoice_uuid
+            and move.state != "cancel"
+            and move.move_type in ("out_invoice", "out_refund")
+        )[:1]
+        if not invoice:
+            raise ShopApiError("not_found", "找不到该订单的发票。", 404)
+        report = invoice.partner_id.invoice_template_pdf_report_id or request.env.ref(
+            "account.account_invoices"
+        )
+        pdf, _report_type = request.env["ir.actions.report"].sudo()._render_qweb_pdf(
+            report.report_name, res_ids=invoice.ids,
+        )
+        return request.make_response(pdf, headers=[
+            ("Content-Type", "application/pdf"),
+            ("Content-Length", str(len(pdf))),
+            ("Content-Disposition", content_disposition(f"invoice-{invoice.name}.pdf")),
+        ])
 
     @route("/api/v1/orders/<string:order_uuid>/payments", type="http", auth="bearer", methods=["POST"], csrf=False)
     def payment_create(self, order_uuid):
@@ -1163,12 +1279,14 @@ class ShopApiController(Controller):
         def handler(body, client):
             order = self._order_record(order_uuid, client)
             transaction = order.transaction_ids.filtered(
-                lambda tx: tx.state == "done" and tx.provider_code == "wechatpay"
+                lambda tx: tx.state == "done"
+                and tx.provider_code in ("wechatpay", "alipay")
+                and bool(tx.provider_id.support_refund)
             ).sorted("id")[-1:]
             if not transaction:
                 raise ShopApiError(
                     "refund_provider_not_supported",
-                    "当前仅支持已完成的微信支付交易退款；支付宝退款尚未启用。",
+                    "该订单没有支持原路退款的已完成支付交易。",
                     409,
                 )
             lines = []
@@ -1192,13 +1310,16 @@ class ShopApiController(Controller):
     @route("/api/v1/refund-requests/<string:refund_uuid>", type="http", auth="bearer", methods=["GET"], csrf=False)
     def refund_request_detail(self, refund_uuid):
         return self._run("refund_request_detail", lambda _body, client: (
-            self._refund_record(refund_uuid, client)._shop_api_payload(), 200, None,
+            self._refund_record(refund_uuid, client)._shop_api_payload(
+                language=self._site_language()
+            ), 200, None,
         ))
 
     @route("/api/v1/orders/<string:order_uuid>/refund-requests", type="http", auth="bearer", methods=["GET"], csrf=False)
     def order_refund_requests(self, order_uuid):
         return self._run("order_refund_requests", lambda _body, client: ([
-            item._shop_api_payload() for item in self._order_record(order_uuid, client).x_website_refund_request_ids
+            item._shop_api_payload(language=self._site_language())
+            for item in self._order_record(order_uuid, client).x_website_refund_request_ids
         ], 200, None))
 
     @route("/api/v1/refund-requests/<string:refund_uuid>/cancel", type="http", auth="bearer", methods=["POST"], csrf=False)

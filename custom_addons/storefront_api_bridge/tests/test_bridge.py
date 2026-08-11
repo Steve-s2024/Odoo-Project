@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from odoo import Command, fields
-from odoo.exceptions import AccessDenied, ValidationError
+from odoo.exceptions import AccessDenied, UserError, ValidationError
 from odoo.tests import TransactionCase, tagged
 
 from odoo.addons.storefront_api_bridge.models.api_client import StorefrontApiError
@@ -18,6 +18,8 @@ from odoo.addons.storefront_api_bridge.controllers.customer_portal import Storef
 from odoo.addons.storefront_api_bridge.controllers import customer_portal as customer_portal_module
 from odoo.addons.storefront_api_bridge.controllers.website_sale import StorefrontWebsiteSale
 from odoo.addons.storefront_api_bridge.controllers import website_sale as website_sale_module
+from odoo.addons.storefront_api_bridge.controllers.signup import StorefrontAuthSignup
+from odoo.addons.storefront_api_bridge.controllers import signup as signup_module
 
 
 class _Response:
@@ -61,7 +63,9 @@ class TestStorefrontApiClient(TransactionCase):
         self.assertEqual(result[2]["orders"][0]["id"], "erp-order-id")
         self.assertFalse(result[2]["portal_error"])
         fake_client.call.assert_called_once_with(
-            "GET", "/api/v1/orders", params={"page": 1, "page_size": 100},
+            "GET", "/api/v1/orders", params={
+                "page": 1, "page_size": 100, "language": "zh_CN",
+            },
         )
 
     def test_internal_editor_can_render_purchase_detail_and_refund_items(self):
@@ -74,7 +78,7 @@ class TestStorefrontApiClient(TransactionCase):
             "items": [],
         }
         fake_client = MagicMock()
-        fake_client.get.side_effect = [order, [], order, []]
+        fake_client.get.side_effect = [order, [], {}, order, []]
         fake_env = MagicMock()
         fake_env.user = self.env.user
         fake_env.__getitem__.return_value = fake_client
@@ -103,6 +107,7 @@ class TestStorefrontApiClient(TransactionCase):
         self.assertEqual([entry.args[0] for entry in fake_client.get.call_args_list], [
             "/api/v1/orders/erp-order-id",
             "/api/v1/orders/erp-order-id/refund-requests",
+            "/api/v1/orders/erp-order-id/documents",
             "/api/v1/orders/erp-order-id",
             "/api/v1/orders/erp-order-id/refund-requests",
         ])
@@ -117,7 +122,7 @@ class TestStorefrontApiClient(TransactionCase):
             "items": [],
         }
         fake_client = MagicMock()
-        fake_client.get.side_effect = [order, []]
+        fake_client.get.side_effect = [order, [], {}]
         fake_user = MagicMock()
         fake_user._is_public.return_value = False
         fake_user._is_internal.return_value = False
@@ -138,6 +143,97 @@ class TestStorefrontApiClient(TransactionCase):
             result[0], "storefront_api_bridge.remote_purchase_detail_page",
         )
         self.assertEqual(result[1]["order"]["id"], "erp-order-id")
+
+    def _signup_request(self, client):
+        class Session(dict):
+            def __init__(self):
+                super().__init__()
+                self.authenticate = MagicMock()
+
+        session = Session()
+        attempt_id = str(uuid.uuid4())
+        session["storefront_signup_attempt_id"] = attempt_id
+        user_model = MagicMock()
+        fake_env = MagicMock()
+        fake_env.__getitem__.side_effect = lambda model: {
+            "storefront.erp.client": client,
+            "res.users": user_model,
+        }[model]
+        return SimpleNamespace(env=fake_env, session=session), user_model, attempt_id
+
+    def test_signup_waits_for_authoritative_create_and_readback(self):
+        client = MagicMock()
+        client.post.return_value = {
+            "id": "erp-customer-id", "email": "new@example.com",
+            "login": "new@example.com", "authoritative": True, "registered": True,
+        }
+        client.get.return_value = {
+            "id": "erp-customer-id", "email": "new@example.com", "authoritative": True,
+        }
+        fake_request, user_model, attempt_id = self._signup_request(client)
+        controller = StorefrontAuthSignup()
+        controller._prepare_signup_values = MagicMock(return_value={
+            "name": "New Customer", "login": "new@example.com",
+            "password": "safe-password", "lang": "en_US",
+        })
+        with (
+            patch.object(signup_module, "request", fake_request),
+            patch.object(signup_module, "_erp_login_enabled", return_value=False),
+        ):
+            controller.do_signup({"signup_attempt_id": attempt_id})
+        self.assertEqual(
+            client.post.call_args.kwargs["idempotency_key"],
+            f"storefront-signup-{attempt_id}",
+        )
+        client.get.assert_called_once_with("/api/v1/customers/erp-customer-id")
+        user_model._storefront_provision_portal_user.assert_called_once()
+        fake_request.session.authenticate.assert_called_once()
+        self.assertNotIn("storefront_signup_attempt_id", fake_request.session)
+
+    def test_signup_fails_closed_when_erp_times_out(self):
+        client = MagicMock()
+        client.post.side_effect = StorefrontApiError(
+            "ERP unavailable", code="erp_unavailable", status=503,
+        )
+        fake_request, user_model, attempt_id = self._signup_request(client)
+        controller = StorefrontAuthSignup()
+        controller._prepare_signup_values = MagicMock(return_value={
+            "name": "New Customer", "login": "new@example.com",
+            "password": "safe-password", "lang": "en_US",
+        })
+        with (
+            patch.object(signup_module, "request", fake_request),
+            patch.object(signup_module, "_erp_login_enabled", return_value=False),
+            patch.object(signup_module, "_", side_effect=lambda message: message),
+            self.assertRaises(UserError),
+        ):
+            controller.do_signup({"signup_attempt_id": attempt_id})
+        user_model._storefront_provision_portal_user.assert_not_called()
+        self.assertEqual(fake_request.session["storefront_signup_attempt_id"], attempt_id)
+
+    def test_signup_fails_closed_on_readback_mismatch(self):
+        client = MagicMock()
+        client.post.return_value = {
+            "id": "erp-customer-id", "email": "new@example.com",
+            "login": "new@example.com", "authoritative": True, "registered": True,
+        }
+        client.get.return_value = {
+            "id": "different-id", "email": "new@example.com", "authoritative": True,
+        }
+        fake_request, user_model, attempt_id = self._signup_request(client)
+        controller = StorefrontAuthSignup()
+        controller._prepare_signup_values = MagicMock(return_value={
+            "name": "New Customer", "login": "new@example.com",
+            "password": "safe-password", "lang": "en_US",
+        })
+        with (
+            patch.object(signup_module, "request", fake_request),
+            patch.object(signup_module, "_erp_login_enabled", return_value=False),
+            patch.object(signup_module, "_", side_effect=lambda message: message),
+            self.assertRaises(UserError),
+        ):
+            controller.do_signup({"signup_attempt_id": attempt_id})
+        user_model._storefront_provision_portal_user.assert_not_called()
 
     def _refund_submission_request(self, client):
         fake_env = MagicMock()

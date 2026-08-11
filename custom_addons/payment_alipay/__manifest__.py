@@ -1,6 +1,6 @@
 {
     "name": "Payment Provider: Alipay",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.1.1",
     "category": "Accounting/Payment Providers",
     "summary": "Accept Alipay QR payments with signed asynchronous notifications.",
     "depends": ["payment", "account_payment"],

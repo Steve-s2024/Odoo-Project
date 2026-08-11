@@ -1,7 +1,7 @@
 import logging
 import uuid
 
-from odoo.http import request, route
+from odoo.http import content_disposition, request, route
 from odoo.addons.stock_subwarehouse_hierarchy.controllers.purchase_history import (
     WebsitePurchaseHistory,
 )
@@ -21,7 +21,24 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
 
     @staticmethod
     def _is_english():
-        return bool((request.lang and request.lang.code or "").lower().startswith("en"))
+        language = getattr(request, "lang", None)
+        return bool((getattr(language, "code", "") or "").lower().startswith("en"))
+
+    @classmethod
+    def _language(cls):
+        return "en_US" if cls._is_english() else "zh_CN"
+
+    @staticmethod
+    def _payment_method_label(provider_code, is_english):
+        labels = {
+            "wechatpay": ("WeChat Pay", "微信支付"),
+            "alipay": ("Alipay", "支付宝"),
+            "stripe": ("Stripe", "Stripe"),
+            "demo": ("Demo payment", "模拟支付"),
+        }
+        return labels.get(provider_code, (provider_code or "—", provider_code or "—"))[
+            0 if is_english else 1
+        ]
 
     @staticmethod
     def _status_label(order, is_english):
@@ -78,7 +95,10 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         if not internal_user and not customer_id:
             return None
         try:
-            order = request.env["storefront.erp.client"].get(f"/api/v1/orders/{order_id}")
+            order = request.env["storefront.erp.client"].get(
+                f"/api/v1/orders/{order_id}",
+                params={"language": self._language()},
+            )
         except StorefrontApiError:
             return None
         # ERP-authorized internal website editors may inspect any storefront
@@ -111,6 +131,7 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         while True:
             rows, meta = client.call("GET", "/api/v1/orders", params={
                 "page": page, "page_size": 100,
+                "language": StorefrontCustomerPortal._language(),
             })
             orders.extend(rows or [])
             if len(orders) >= int((meta or {}).get("total") or len(orders)):
@@ -136,7 +157,7 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         try:
             orders = request.env["storefront.erp.client"].get(
                 f"/api/v1/customers/{customer_id}/orders",
-                params={"page_size": 100},
+                params={"page_size": 100, "language": self._language()},
             ) or []
             error = False
         except StorefrontApiError as exc:
@@ -163,17 +184,36 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
             return request.redirect("/purchase-history")
         try:
             refunds = request.env["storefront.erp.client"].get(
-                f"/api/v1/orders/{order_id}/refund-requests"
+                f"/api/v1/orders/{order_id}/refund-requests",
+                params={"language": self._language()},
             ) or []
         except StorefrontApiError:
             refunds = []
+        try:
+            documents = request.env["storefront.erp.client"].get(
+                f"/api/v1/orders/{order_id}/documents"
+            ) or {}
+        except StorefrontApiError:
+            documents = {}
         is_english = self._is_english()
+        completed_payments = [
+            payment for payment in (order.get("payments") or [])
+            if payment.get("state") == "done" and payment.get("operation") != "refund"
+        ]
+        payment = completed_payments[-1] if completed_payments else (
+            (order.get("payments") or [])[-1] if order.get("payments") else {}
+        )
         return request.render("storefront_api_bridge.remote_purchase_detail_page", {
             "order": order,
             "refunds": refunds,
             "is_english": is_english,
             "status": self._status_label(order, is_english),
             "payment_status": self._payment_label(order, is_english),
+            "payment": payment,
+            "payment_method": self._payment_method_label(
+                payment.get("provider"), is_english
+            ) if payment else "—",
+            "documents": documents,
             "refund_label": self._refund_label,
             "currency_symbol": self._currency_symbol,
             "additional_title": "Purchase Details" if is_english else "购买详情",
@@ -198,7 +238,8 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
             return request.redirect("/purchase-history")
         try:
             refunds = request.env["storefront.erp.client"].get(
-                f"/api/v1/orders/{order_id}/refund-requests"
+                f"/api/v1/orders/{order_id}/refund-requests",
+                params={"language": self._language()},
             ) or []
         except StorefrontApiError:
             refunds = []
@@ -307,3 +348,45 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
             return request.redirect(f"/refund-item/{order_id}")
         session["x_storefront_refund_flash"] = "success"
         return request.redirect(f"/refund-item/{order_id}")
+
+    @route(
+        "/purchase-document/<string:order_uuid>/receipt.pdf",
+        type="http", auth="public", website=True, sitemap=False,
+    )
+    def remote_payment_receipt(self, order_uuid, **kwargs):
+        order = self._remote_order(order_uuid)
+        if not order:
+            return self._login_redirect() if request.env.user._is_public() else request.not_found()
+        try:
+            pdf = request.env["storefront.erp.client"].get_binary(
+                f"/api/v1/orders/{order_uuid}/receipt.pdf"
+            )
+        except StorefrontApiError:
+            return request.not_found()
+        return request.make_response(pdf, headers=[
+            ("Content-Type", "application/pdf"),
+            ("Content-Length", str(len(pdf))),
+            ("Content-Disposition", content_disposition(
+                f"payment-receipt-{order.get('number') or order_uuid}.pdf"
+            )),
+        ])
+
+    @route(
+        "/purchase-document/<string:order_uuid>/invoice/<string:invoice_uuid>.pdf",
+        type="http", auth="public", website=True, sitemap=False,
+    )
+    def remote_invoice_download(self, order_uuid, invoice_uuid, **kwargs):
+        order = self._remote_order(order_uuid)
+        if not order:
+            return self._login_redirect() if request.env.user._is_public() else request.not_found()
+        try:
+            pdf = request.env["storefront.erp.client"].get_binary(
+                f"/api/v1/orders/{order_uuid}/invoices/{invoice_uuid}.pdf"
+            )
+        except StorefrontApiError:
+            return request.not_found()
+        return request.make_response(pdf, headers=[
+            ("Content-Type", "application/pdf"),
+            ("Content-Length", str(len(pdf))),
+            ("Content-Disposition", content_disposition(f"invoice-{invoice_uuid}.pdf")),
+        ])

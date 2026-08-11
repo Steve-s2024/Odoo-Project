@@ -457,16 +457,28 @@ class SaleOrderLine(models.Model):
             add_option(key, group["label"], " / ".join(group["values"]))
         return options
 
+    def _shop_api_display_name(self, language="zh_CN"):
+        """Return the website-facing name in the language requested by the shop."""
+        self.ensure_one()
+        language = "en_US" if str(language or "").lower().startswith("en") else "zh_CN"
+        if self.is_delivery or not self.product_id:
+            localized = self.with_context(lang=language)
+            return localized.name_short or localized.name
+        return self.product_id.product_tmpl_id._get_website_display_name(
+            is_english=language == "en_US"
+        )
+
 
 class SaleOrder(models.Model):
     _name = "sale.order"
     _inherit = ["sale.order", "shop.api.uuid.mixin"]
 
-    def _shop_api_payload(self):
+    def _shop_api_payload(self, language=None):
         self.ensure_one()
         self._shop_api_ensure_uuid()
         self.partner_id._shop_api_ensure_uuid()
-        language = self.x_website_checkout_language or self.partner_id.lang or "zh_CN"
+        language = language or self.x_website_checkout_language or self.partner_id.lang or "zh_CN"
+        language = "en_US" if str(language).lower().startswith("en") else "zh_CN"
         return {
             "id": self.shop_api_uuid,
             "version": self._shop_api_version(),
@@ -484,7 +496,7 @@ class SaleOrder(models.Model):
             "items": [
                 {
                     "product_id": line.product_id.shop_api_uuid,
-                    "name": line.name_short or line.name,
+                    "name": line._shop_api_display_name(language=language),
                     "quantity": line.product_uom_qty,
                     "unit_price": line.price_unit,
                     "subtotal": line.price_subtotal,
@@ -498,7 +510,10 @@ class SaleOrder(models.Model):
             ],
             "shipments": [picking._shop_api_payload() for picking in self.picking_ids],
             "payments": [transaction._shop_api_payload() for transaction in self.transaction_ids],
-            "refund_requests": [item._shop_api_payload() for item in self.x_website_refund_request_ids],
+            "refund_requests": [
+                item._shop_api_payload(language=language)
+                for item in self.x_website_refund_request_ids
+            ],
         }
 
     def _get_available_qty_for_source_location(self, product, location, exclude_order=False):
@@ -645,10 +660,17 @@ class WebsiteRefundRequest(models.Model):
     shop_api_return_tracking = fields.Char(string="客户退货单号", copy=False)
     shop_api_return_shipped_at = fields.Datetime(string="客户退货发出时间", copy=False)
 
-    def _shop_api_payload(self):
+    def _shop_api_payload(self, language=None):
         self.ensure_one()
         self._shop_api_ensure_uuid()
         self.order_id._shop_api_ensure_uuid()
+        language = (
+            language
+            or self.order_id.x_website_checkout_language
+            or self.order_id.partner_id.lang
+            or "zh_CN"
+        )
+        language = "en_US" if str(language).lower().startswith("en") else "zh_CN"
         return {
             "id": self.shop_api_uuid,
             "order_id": self.order_id.shop_api_uuid,
@@ -665,13 +687,11 @@ class WebsiteRefundRequest(models.Model):
             "items": [
                 {
                     "product_id": line.product_id.shop_api_uuid,
-                    "name": line.sale_line_id.name_short or line.sale_line_id.name,
+                    "name": line.sale_line_id._shop_api_display_name(language=language),
                     "quantity": line.quantity,
                     "amount": line.amount,
                     "selected_options": line.sale_line_id._shop_api_selected_options(
-                        language=self.order_id.x_website_checkout_language
-                        or self.order_id.partner_id.lang
-                        or "zh_CN"
+                        language=language
                     ),
                 }
                 for line in self.line_ids
