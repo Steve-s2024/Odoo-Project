@@ -1,7 +1,7 @@
 {
     "name": "Shop APIs",
     "summary": "Versioned shop integration APIs, reservations, webhooks, and audit records",
-    "version": "19.0.1.14.0",
+    "version": "19.0.1.14.1",
     "category": "Sales",
     "author": "Local",
     "license": "LGPL-3",

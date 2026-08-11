@@ -595,6 +595,12 @@ class TestStorefrontApiClient(TransactionCase):
         ).arch_db
         self.assertIn("oe_structure_remote_purchase_detail_page_top", purchase_arch)
         self.assertIn("oe_structure_remote_refund_item_page_top", refund_arch)
+        self.assertIn("remote_product_option_subtitle", purchase_arch)
+        self.assertIn("remote_product_option_subtitle", refund_arch)
+        subtitle_arch = self.env.ref(
+            "storefront_api_bridge.remote_product_option_subtitle"
+        ).arch_db
+        self.assertIn("selected_options", subtitle_arch)
 
     def test_order_shortage_lines_use_remote_variant_identifiers(self):
         partner = self.env["res.partner"].create({"name": "Storefront test"})

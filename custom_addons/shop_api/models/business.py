@@ -386,6 +386,78 @@ class ResPartner(models.Model):
         }
 
 
+class SaleOrderLine(models.Model):
+    _inherit = "sale.order.line"
+
+    @staticmethod
+    def _shop_api_option_semantic_key(label):
+        normalized = re.sub(r"[\s_\-/]+", "", str(label or "").casefold())
+        aliases = {
+            "color": "color", "colour": "color", "颜色": "color", "颜色分类": "color",
+            "size": "size", "尺寸": "size", "尺码": "size", "鞋码": "size",
+            "flex": "flex", "硬度": "flex", "款型": "flex",
+            "type": "type", "类型": "type", "款式": "type",
+        }
+        return aliases.get(normalized, normalized)
+
+    def _shop_api_selected_options(self, language="zh_CN"):
+        """Serialize the customer's selected non-colour product choices."""
+        self.ensure_one()
+        language = "en_US" if str(language or "").lower().startswith("en") else "zh_CN"
+        is_english = language == "en_US"
+        product_template = self.product_id.product_tmpl_id
+        raw_values = product_template._get_shop_variant_display_values(is_english=False)
+        display_values = product_template._get_shop_variant_display_values(is_english=is_english)
+        options = []
+        seen_keys = set()
+
+        def add_option(key, label, value):
+            semantic_key = self._shop_api_option_semantic_key(key or label)
+            value = str(value or "").strip()
+            if not value or semantic_key == "color" or semantic_key in seen_keys:
+                return
+            options.append({"key": semantic_key, "label": label, "value": value})
+            seen_keys.add(semantic_key)
+
+        type_code = str(raw_values.get("type_code") or "").strip()
+        if type_code:
+            add_option("type", "Type" if is_english else "类型", type_code)
+
+        raw_size = str(raw_values.get("size") or "").strip()
+        if raw_size not in {"", "未识别", "默认"}:
+            add_option("size", "Size" if is_english else "尺码", display_values.get("size"))
+
+        raw_flex = product_template._normalize_website_mapping_flex(raw_values.get("flex"))
+        if raw_flex not in {"", "000", "无", "无硬度", "未识别", "默认"}:
+            add_option("flex", "Flex" if is_english else "硬度", display_values.get("flex"))
+
+        selected_ptavs = (
+            self.product_template_attribute_value_ids
+            | self.product_no_variant_attribute_value_ids
+        ).sorted()
+        custom_values = {
+            value.custom_product_template_attribute_value_id.id: value.custom_value
+            for value in self.product_custom_attribute_value_ids
+        }
+        grouped_values = {}
+        for ptav in selected_ptavs:
+            translated = ptav.with_context(lang=language)
+            label = translated.attribute_id.name
+            semantic_key = self._shop_api_option_semantic_key(label)
+            if semantic_key == "color" or semantic_key in seen_keys:
+                continue
+            value = custom_values.get(ptav.id) or translated.name
+            group = grouped_values.setdefault(
+                semantic_key or f"attribute_{ptav.attribute_id.id}",
+                {"label": label, "values": []},
+            )
+            if value and value not in group["values"]:
+                group["values"].append(value)
+        for key, group in grouped_values.items():
+            add_option(key, group["label"], " / ".join(group["values"]))
+        return options
+
+
 class SaleOrder(models.Model):
     _name = "sale.order"
     _inherit = ["sale.order", "shop.api.uuid.mixin"]
@@ -394,6 +466,7 @@ class SaleOrder(models.Model):
         self.ensure_one()
         self._shop_api_ensure_uuid()
         self.partner_id._shop_api_ensure_uuid()
+        language = self.x_website_checkout_language or self.partner_id.lang or "zh_CN"
         return {
             "id": self.shop_api_uuid,
             "version": self._shop_api_version(),
@@ -406,7 +479,7 @@ class SaleOrder(models.Model):
             "amount_total": self.amount_total,
             "payment_state": self.x_website_payment_state,
             "payment_reference": self.x_website_payment_reference or "",
-            "language": self.x_website_checkout_language or self.partner_id.lang or "zh_CN",
+            "language": language,
             "created_at": fields.Datetime.to_string(self.create_date),
             "items": [
                 {
@@ -419,6 +492,7 @@ class SaleOrder(models.Model):
                     "uom": line.product_uom_id.name,
                     "is_delivery": bool(line.is_delivery),
                     "refundable": bool(not line.is_delivery and line.product_uom_qty > 0),
+                    "selected_options": line._shop_api_selected_options(language=language),
                 }
                 for line in self.order_line.filtered(lambda item: not item.display_type)
             ],
@@ -594,6 +668,11 @@ class WebsiteRefundRequest(models.Model):
                     "name": line.sale_line_id.name_short or line.sale_line_id.name,
                     "quantity": line.quantity,
                     "amount": line.amount,
+                    "selected_options": line.sale_line_id._shop_api_selected_options(
+                        language=self.order_id.x_website_checkout_language
+                        or self.order_id.partner_id.lang
+                        or "zh_CN"
+                    ),
                 }
                 for line in self.line_ids
             ],

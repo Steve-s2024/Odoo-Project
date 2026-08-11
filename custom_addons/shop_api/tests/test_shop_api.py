@@ -399,9 +399,11 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
         self.assertIn("qr_code_data_uri", payload)
 
     def test_refund_request_payload_is_authoritative_and_enqueues_event(self):
+        self.product.default_code = "012307S1-MA007-W001255"
         order = self.env["sale.order"].create({
             "partner_id": self.customer.id,
             "x_channel": self.client.code,
+            "x_website_checkout_language": "en_US",
             "order_line": [Command.create({
                 "product_id": self.product.id,
                 "product_uom_qty": 1,
@@ -435,6 +437,14 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
         payload = refund_request._shop_api_payload()
         self.assertTrue(payload["authoritative"])
         self.assertEqual(payload["order_id"], order.shop_api_uuid)
+        expected_options = [
+            {"key": "type", "label": "Type", "value": "S1"},
+            {"key": "size", "label": "Size", "value": "255"},
+            {"key": "flex", "label": "Flex", "value": "7 flex"},
+        ]
+        self.assertEqual(order._shop_api_payload()["items"][0]["selected_options"], expected_options)
+        self.assertEqual(payload["items"][0]["selected_options"], expected_options)
+        self.assertNotIn("color", {option["key"] for option in expected_options})
         event = self.env["shop.api.event"].search([
             ("event_type", "=", "refund.requested"),
             ("resource_uuid", "=", refund_request.shop_api_uuid),
