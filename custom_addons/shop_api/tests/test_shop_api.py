@@ -214,6 +214,24 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
         self.client.shop_base_url = "https://cn-shop.example.test"
         self.assertEqual(self.client.shop_base_url, "https://cn-shop.example.test")
 
+    def test_private_order_events_are_scoped_to_the_originating_shop(self):
+        order = self.env["sale.order"].create({
+            "partner_id": self.customer.id,
+            "pricelist_id": self.chinese_pricelist.id,
+        })
+        self.env["shop.api.external.reference"].set_reference(
+            self.client, "order", "private-order-routing", order,
+        )
+
+        order.action_confirm()
+
+        event = self.env["shop.api.event"].search([
+            ("event_type", "=", "order.confirmed"),
+            ("resource_id", "=", order.id),
+        ], order="id desc", limit=1)
+        self.assertTrue(event)
+        self.assertEqual(event.client_id, self.client)
+
     def test_chinese_console_actions_views_and_key_wizard_are_available(self):
         action_ids = [
             "shop_api.action_shop_api_configurations",
@@ -641,6 +659,9 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
                 "price_unit": 100,
             })],
         })
+        self.env["shop.api.external.reference"].set_reference(
+            self.client, "order", "refund-event-origin", order,
+        )
         provider = self.env.ref("payment.payment_provider_transfer")
         transaction = self.env["payment.transaction"].create({
             "provider_id": provider.id,
@@ -685,6 +706,7 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
             ("resource_uuid", "=", refund_request.shop_api_uuid),
         ], order="id desc", limit=1)
         self.assertTrue(event)
+        self.assertEqual(event.client_id, self.client)
         self.assertEqual(event.payload["review_state"], "requested")
 
     def test_expired_reservation_releases_stock_and_creates_event(self):

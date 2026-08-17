@@ -449,6 +449,17 @@ class SaleOrder(models.Model):
     _name = "sale.order"
     _inherit = ["sale.order", "shop.api.uuid.mixin"]
 
+    def _shop_api_origin_clients(self):
+        """Return only storefront clients that own these separated-shop orders."""
+        if not self:
+            return self.env["shop.api.client"]
+        references = self.env["shop.api.external.reference"].sudo().search([
+            ("resource_type", "=", "order"),
+            ("resource_model", "=", "sale.order"),
+            ("resource_id", "in", self.ids),
+        ])
+        return references.mapped("client_id").filtered("active")
+
     def _shop_api_payload(self, language=None):
         self.ensure_one()
         self._shop_api_ensure_uuid()
@@ -528,9 +539,10 @@ class SaleOrder(models.Model):
                     continue
                 event_type = event_by_state.get(order.x_website_delivery_state)
                 if event_type:
-                    self.env["shop.api.event"].enqueue(
-                        event_type, order, order._shop_api_payload(),
-                    )
+                    for client in order._shop_api_origin_clients():
+                        self.env["shop.api.event"].enqueue(
+                            event_type, order, order._shop_api_payload(), client=client,
+                        )
         return result
 
     def _get_available_qty_for_source_location(self, product, location, exclude_order=False):
@@ -544,24 +556,38 @@ class SaleOrder(models.Model):
         result = super().action_confirm()
         if not self.env.context.get("shop_api_skip_event"):
             for order in self:
-                self.env["shop.api.event"].enqueue(
-                    "order.confirmed", order, {"order_id": order.shop_api_uuid},
-                )
+                for client in order._shop_api_origin_clients():
+                    self.env["shop.api.event"].enqueue(
+                        "order.confirmed", order, {"order_id": order.shop_api_uuid},
+                        client=client,
+                    )
         return result
 
     def action_cancel(self):
         result = super().action_cancel()
         if not self.env.context.get("shop_api_skip_event"):
             for order in self:
-                self.env["shop.api.event"].enqueue(
-                    "order.cancelled", order, {"order_id": order.shop_api_uuid},
-                )
+                for client in order._shop_api_origin_clients():
+                    self.env["shop.api.event"].enqueue(
+                        "order.cancelled", order, {"order_id": order.shop_api_uuid},
+                        client=client,
+                    )
         return result
 
 
 class PaymentTransaction(models.Model):
     _name = "payment.transaction"
     _inherit = ["payment.transaction", "shop.api.uuid.mixin"]
+
+    def _shop_api_origin_clients(self):
+        clients = self.env["shop.api.client"]
+        for transaction in self:
+            orders = (
+                transaction.sale_order_ids
+                or transaction.source_transaction_id.sale_order_ids
+            )
+            clients |= orders._shop_api_origin_clients()
+        return clients
 
     def _shop_api_payload(self):
         self.ensure_one()
@@ -601,9 +627,11 @@ class PaymentTransaction(models.Model):
             state_message=state_message, extra_allowed_states=extra_allowed_states,
         )
         for transaction in transactions:
-            self.env["shop.api.event"].enqueue(
-                "payment.completed", transaction, transaction._shop_api_payload(),
-            )
+            for client in transaction._shop_api_origin_clients():
+                self.env["shop.api.event"].enqueue(
+                    "payment.completed", transaction, transaction._shop_api_payload(),
+                    client=client,
+                )
         transactions.sale_order_ids._queue_paid_website_delivery()
         post_processing_cron = self.env.ref(
             "payment.cron_post_process_payment_tx", raise_if_not_found=False,
@@ -619,9 +647,11 @@ class PaymentTransaction(models.Model):
             state_message=state_message, extra_allowed_states=extra_allowed_states,
         )
         for transaction in transactions:
-            self.env["shop.api.event"].enqueue(
-                "payment.pending", transaction, transaction._shop_api_payload(),
-            )
+            for client in transaction._shop_api_origin_clients():
+                self.env["shop.api.event"].enqueue(
+                    "payment.pending", transaction, transaction._shop_api_payload(),
+                    client=client,
+                )
         return transactions
 
     def _set_error(self, state_message, extra_allowed_states=()):
@@ -629,9 +659,11 @@ class PaymentTransaction(models.Model):
             state_message, extra_allowed_states=extra_allowed_states,
         )
         for transaction in transactions:
-            self.env["shop.api.event"].enqueue(
-                "payment.failed", transaction, transaction._shop_api_payload(),
-            )
+            for client in transaction._shop_api_origin_clients():
+                self.env["shop.api.event"].enqueue(
+                    "payment.failed", transaction, transaction._shop_api_payload(),
+                    client=client,
+                )
         return transactions
 
 
@@ -668,9 +700,10 @@ class StockPicking(models.Model):
                 ):
                     event_type = event_by_state.get(picking.state)
                     if event_type:
-                        self.env["shop.api.event"].enqueue(
-                            event_type, picking, picking._shop_api_payload(),
-                        )
+                        for client in picking.sale_id._shop_api_origin_clients():
+                            self.env["shop.api.event"].enqueue(
+                                event_type, picking, picking._shop_api_payload(), client=client,
+                            )
         return result
 
 
@@ -733,9 +766,10 @@ class WebsiteRefundRequest(models.Model):
     def create(self, vals_list):
         records = super().create(vals_list)
         for record in records:
-            self.env["shop.api.event"].enqueue(
-                "refund.requested", record, record._shop_api_payload(),
-            )
+            for client in record.order_id._shop_api_origin_clients():
+                self.env["shop.api.event"].enqueue(
+                    "refund.requested", record, record._shop_api_payload(), client=client,
+                )
         return records
 
     def write(self, vals):
@@ -747,9 +781,10 @@ class WebsiteRefundRequest(models.Model):
         if not self.env.context.get("shop_api_skip_event"):
             for record in self:
                 if previous[record.id] != (record.state, record.x_return_delivery_state):
-                    self.env["shop.api.event"].enqueue(
-                        "refund.updated", record, record._shop_api_payload(),
-                    )
+                    for client in record.order_id._shop_api_origin_clients():
+                        self.env["shop.api.event"].enqueue(
+                            "refund.updated", record, record._shop_api_payload(), client=client,
+                        )
         return result
 
 
