@@ -106,4 +106,13 @@
             </script>
         </xpath>
     </template>
+
+    <template id="sun_language_selector_flags" inherit_id="website.language_selector" name="SUN Language Selector Flags">
+        <xpath expr="//t[@t-call='website.lang_flag'][@flag_image_url='active_lang.flag_image_url']" position="attributes">
+            <attribute name="flag_image_url">'/stock_subwarehouse_hierarchy/static/img/flags/en_US.png' if active_lang.code == 'en_US' else ('/stock_subwarehouse_hierarchy/static/img/flags/zh_CN.png' if active_lang.code == 'zh_CN' else active_lang.flag_image_url)</attribute>
+        </xpath>
+        <xpath expr="//t[@t-call='website.lang_flag'][@flag_image_url='lg.flag_image_url']" position="attributes">
+            <attribute name="flag_image_url">'/stock_subwarehouse_hierarchy/static/img/flags/en_US.png' if lg.code == 'en_US' else ('/stock_subwarehouse_hierarchy/static/img/flags/zh_CN.png' if lg.code == 'zh_CN' else lg.flag_image_url)</attribute>
+        </xpath>
+    </template>
 </odoo>
