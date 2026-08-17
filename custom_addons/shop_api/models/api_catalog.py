@@ -335,12 +335,30 @@ class ShopApiClient(models.Model):
     company_ids = fields.Many2many("res.company", string="允许公司")
     website_ids = fields.Many2many("website", string="允许网站")
     rate_limit_per_minute = fields.Integer(string="每分钟请求上限", default=300)
+    shop_base_url = fields.Char(
+        string="商城公开地址",
+        help="该客户端对应商城的浏览器公开地址，用于支付完成后的回跳。",
+    )
     last_used_at = fields.Datetime(string="最后使用时间", readonly=True)
     last_used_ip = fields.Char(string="最后来源 IP", readonly=True)
     notes = fields.Text(string="备注")
 
     _unique_code = models.Constraint("UNIQUE(code)", "API 客户端代码必须唯一。")
     _unique_user = models.Constraint("UNIQUE(user_id)", "一个集成用户只能绑定一个 API 客户端。")
+
+    @api.constrains("shop_base_url")
+    def _check_shop_base_url(self):
+        for client in self.filtered("shop_base_url"):
+            parsed = urlparse(client.shop_base_url.strip())
+            is_https = parsed.scheme.lower() == "https" and bool(parsed.hostname)
+            is_local_test = (
+                parsed.scheme.lower() == "http"
+                and parsed.hostname in {"127.0.0.1", "localhost"}
+            )
+            if not (is_https or is_local_test):
+                raise ValidationError(_(
+                    "商城公开地址必须使用 HTTPS；本机测试仅允许 localhost 或 127.0.0.1。"
+                ))
 
     @api.constrains("user_id")
     def _check_integration_user(self):

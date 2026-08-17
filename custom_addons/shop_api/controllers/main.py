@@ -251,7 +251,7 @@ class ShopApiController(Controller):
                 "languages": ["zh_CN", "en_US"],
                 "currencies": [code for code in ("CNY", "USD") if request.env["res.currency"].sudo().search_count([("name", "=", code), ("active", "=", True)])],
                 "media_cache_ttl_seconds": config.media_cache_ttl_seconds,
-                "shop_base_url": config.shop_base_url,
+                "shop_base_url": client.shop_base_url or config.shop_base_url,
                 "payment_return_origins": sorted(config.payment_return_origins()),
             }, 200, None
         return self._run("shop_configuration", handler)

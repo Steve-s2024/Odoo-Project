@@ -210,6 +210,10 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
             "https://preview.example.test",
         })
 
+    def test_api_clients_keep_separate_public_shop_urls(self):
+        self.client.shop_base_url = "https://cn-shop.example.test"
+        self.assertEqual(self.client.shop_base_url, "https://cn-shop.example.test")
+
     def test_chinese_console_actions_views_and_key_wizard_are_available(self):
         action_ids = [
             "shop_api.action_shop_api_configurations",

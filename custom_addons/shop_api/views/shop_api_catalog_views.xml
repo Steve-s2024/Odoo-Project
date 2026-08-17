@@ -85,7 +85,7 @@
                 <sheet>
                     <widget name="web_ribbon" title="已停用" bg_color="text-bg-danger" invisible="active"/>
                     <div class="oe_title"><label for="name"/><h1><field name="name"/></h1></div>
-                    <group><group><field name="active" string="启用"/><field name="code"/><field name="user_id"/><field name="rate_limit_per_minute"/></group><group><field name="last_used_at" readonly="1"/><field name="last_used_ip" readonly="1"/><field name="company_ids" widget="many2many_tags"/><field name="website_ids" widget="many2many_tags"/></group></group>
+                    <group><group><field name="active" string="启用"/><field name="code"/><field name="user_id"/><field name="rate_limit_per_minute"/><field name="shop_base_url" widget="url"/></group><group><field name="last_used_at" readonly="1"/><field name="last_used_ip" readonly="1"/><field name="company_ids" widget="many2many_tags"/><field name="website_ids" widget="many2many_tags"/></group></group>
                     <notebook><page string="API 权限"><field name="scope_ids" widget="many2many_tags" options="{'no_create': True}"/></page><page string="备注"><field name="notes"/></page></notebook>
                 </sheet>
             </form>
