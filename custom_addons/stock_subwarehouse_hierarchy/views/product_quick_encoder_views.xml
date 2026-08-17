@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_product_quick_encoder_wizard_form" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.product.quick.encoder.wizard.form</field>
+        <field name="model">stock.subwarehouse.product.quick.encoder.wizard</field>
+        <field name="arch" type="xml">
+            <form string="&#25209;&#37327;&#32534;&#30721;">
+                <sheet>
+                    <div class="alert alert-info mb-3" role="alert">
+                        &#32534;&#30721;&#32467;&#26500;&#65306;&#21378;&#23478;(2) + &#29983;&#20135;&#24180;&#26376;(4) + &#20135;&#21697;&#31867;&#22411; - &#25104;&#21697;/&#25104;&#20154;&#20799;&#31461;/&#30828;&#24230; - &#39068;&#33394;/&#23610;&#30721;&#12290;
+                        &#29983;&#25104;&#26102;&#20250;&#21516;&#26102;&#26816;&#26597; ERP &#24050;&#26377;&#32534;&#30721;&#21644;&#26412;&#25209;&#27425;&#37325;&#22797;&#12290;
+                        &#21517;&#31216;&#20250;&#19982;&#20869;&#32622;&#32534;&#30721;&#35268;&#21017;&#25353;&#20849;&#21516;&#23383;&#31526;&#25968;&#33258;&#21160;&#21305;&#37197;&#65307;&#23384;&#22312;&#24182;&#21015;&#32467;&#26524;&#26102;&#19981;&#20250;&#33258;&#21160;&#29468;&#27979;&#12290;
+                    </div>
+                    <group col="4">
+                        <group string="Excel &#25209;&#37327;&#22788;&#29702;">
+                            <field name="import_file" filename="import_filename"/>
+                            <field name="import_filename" invisible="1"/>
+                            <button name="action_download_template" type="object" string="&#19979;&#36733; Excel &#27169;&#26495;" class="btn-secondary"/>
+                            <button name="action_import_excel" type="object" string="&#23548;&#20837;&#24182;&#29983;&#25104;" class="btn-primary" invisible="not import_file"/>
+                        </group>
+                        <group string="&#32467;&#26524;&#27010;&#35272;">
+                            <field name="line_count" readonly="1"/>
+                            <field name="ready_count" readonly="1"/>
+                            <field name="warning_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-danger mb-3" role="alert" invisible="not failed_entries">
+                        <strong>&#20197;&#19979;&#34892;&#24050;&#38459;&#27490;&#29983;&#25104;&#65306;</strong>
+                        <field name="failed_entries" nolabel="1" readonly="1" class="mt-2"/>
+                    </div>
+                    <div class="d-flex gap-2 mb-2">
+                        <button name="action_add_line" type="object" string="&#28155;&#21152;&#19968;&#34892;" class="btn-secondary"/>
+                        <button name="action_generate_codes" type="object" string="&#29983;&#25104;/&#37325;&#26032;&#26816;&#26597;&#32534;&#30721;" class="btn-primary" invisible="not line_ids"/>
+                        <button name="action_download_result" type="object" string="&#19979;&#36733;&#32534;&#30721;&#32467;&#26524; Excel" class="btn-success" invisible="not line_ids"/>
+                    </div>
+                    <field name="line_ids" nolabel="1">
+                        <list editable="bottom" create="1" delete="1">
+                            <field name="sequence" widget="handle"/>
+                            <field name="source_row" optional="hide"/>
+                            <field name="product_name"/>
+                            <field name="manufacturer"/>
+                            <field name="production_yymm"/>
+                            <field name="product_type"/>
+                            <field name="finished_type"/>
+                            <field name="audience"/>
+                            <field name="flex"/>
+                            <field name="color"/>
+                            <field name="size"/>
+                            <field name="match_summary" optional="show"/>
+                            <field name="manufacturer_match" optional="hide"/>
+                            <field name="product_type_match" optional="hide"/>
+                            <field name="color_match" optional="hide"/>
+                            <field name="finished_type_match" optional="hide"/>
+                            <field name="audience_match" optional="hide"/>
+                            <field name="generated_code" readonly="1" optional="show"/>
+                            <field name="status" readonly="1" decoration-success="status == 'ready'" decoration-warning="status in ('exists', 'duplicate')" decoration-danger="status == 'error'"/>
+                            <field name="remark" readonly="1" optional="show"/>
+                        </list>
+                    </field>
+                </sheet>
+                <footer>
+                    <button special="cancel" string="&#20851;&#38381;" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_product_quick_encoder" model="ir.actions.act_window">
+        <field name="name">&#25209;&#37327;&#32534;&#30721;</field>
+        <field name="res_model">stock.subwarehouse.product.quick.encoder.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem
+        id="menu_product_quick_encoder"
+        name="&#25209;&#37327;&#32534;&#30721;"
+        parent="menu_product_root"
+        action="action_product_quick_encoder"
+        sequence="5"
+        groups="base.group_user"
+    />
+</odoo>

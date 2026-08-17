@@ -10,6 +10,207 @@ IMPORT_TEMPLATE_ROUTE = "/stock_subwarehouse_hierarchy/import_template/mrp_produ
 class MrpProduction(models.Model):
     _inherit = "mrp.production"
 
+    @api.model
+    def load(self, import_fields, import_data):
+        filtered = self._filter_unique_mrp_import_rows(import_fields, import_data)
+        result = (
+            super().load(filtered["fields"], filtered["data"])
+            if filtered["data"]
+            else {"ids": [], "messages": [], "nextrow": 0}
+        )
+        result["x_business_import_failures"] = filtered["failures"]
+        if filtered["applied"]:
+            result["nextrow"] = (
+                filtered["source_window_size"]
+                if filtered["has_more_source_rows"]
+                else 0
+            )
+            self._record_mrp_import_results(result, filtered)
+        return result
+
+    @api.model
+    def _filter_unique_mrp_import_rows(self, import_fields, import_data):
+        result = {
+            "fields": import_fields,
+            "data": import_data,
+            "kept_source_indexes": list(range(len(import_data))),
+            "accepted_orders": [],
+            "failures": [],
+            "applied": False,
+            "source_window_size": len(import_data),
+            "has_more_source_rows": False,
+        }
+        if not self.env.context.get("import_file"):
+            return result
+
+        import_limit = self.env.context.get("_import_limit")
+        window_size = min(len(import_data), import_limit) if import_limit else len(import_data)
+        source_data = import_data[:window_size]
+        result.update({
+            "data": source_data,
+            "kept_source_indexes": list(range(window_size)),
+            "applied": True,
+            "source_window_size": window_size,
+            "has_more_source_rows": window_size < len(import_data),
+        })
+        source_offset = self.env.context.get("business_import_source_offset", 0)
+        header_offset = 2 if self.env.context.get("business_import_has_headers") else 1
+        if "name" not in import_fields:
+            result["data"] = []
+            result["kept_source_indexes"] = []
+            result["failures"] = [
+                {
+                    "source_row": source_offset + index + header_offset,
+                    "identifier": "",
+                    "reason": "必须映射制造单号（name）字段。",
+                }
+                for index, _row in enumerate(source_data)
+            ]
+            return result
+
+        name_index = import_fields.index("name")
+        self.env.cr.execute(
+            "SELECT pg_advisory_xact_lock(hashtext(%s))",
+            ["stock_subwarehouse_hierarchy.mrp_name_import"],
+        )
+        self.flush_model(["name"])
+        self.env.cr.execute("""
+            SELECT lower(btrim(name))
+              FROM mrp_production
+             WHERE name IS NOT NULL AND btrim(name) != ''
+        """)
+        existing = {row[0] for row in self.env.cr.fetchall()}
+        accepted = set()
+        prepared_fields, continuation_field_map = self._prepare_grouped_mrp_import_fields(
+            import_fields
+        )
+        groups = []
+        current_group = []
+        for source_index, row in enumerate(source_data):
+            starts_new_order = not self._is_empty_mrp_import_value(row[name_index])
+            if current_group and starts_new_order:
+                groups.append(current_group)
+                current_group = []
+            current_group.append((source_index, row))
+        if current_group:
+            groups.append(current_group)
+
+        kept_rows = []
+        kept_indexes = []
+        accepted_orders = []
+        failures = []
+        for group in groups:
+            first_source_index, first_row = group[0]
+            display_name = str(first_row[name_index] or "").strip()
+            normalized_name = display_name.casefold()
+            if not normalized_name:
+                reason = "制造单号不能为空。"
+            elif normalized_name in existing:
+                reason = "制造单号已存在于 ERP。"
+            elif normalized_name in accepted:
+                reason = "制造单号在本次导入文件中重复。"
+            else:
+                accepted.add(normalized_name)
+                for group_index, (source_index, row) in enumerate(group):
+                    prepared_row = list(row) + [""] * (len(prepared_fields) - len(row))
+                    if group_index:
+                        for source_field_index, target_field_index in continuation_field_map.items():
+                            if self._is_empty_mrp_import_value(prepared_row[target_field_index]):
+                                prepared_row[target_field_index] = prepared_row[source_field_index]
+                        # Odoo starts a new parent record whenever any parent
+                        # value is populated.  A continuation row represents an
+                        # additional finished product, so only its nested
+                        # by-product values may remain populated.
+                        for field_index, field_name in enumerate(prepared_fields):
+                            if not field_name.startswith("move_byproduct_ids/"):
+                                prepared_row[field_index] = ""
+                    kept_rows.append(prepared_row)
+                    kept_indexes.append(source_index)
+                accepted_orders.append({
+                    "source_index": first_source_index,
+                    "identifier": display_name,
+                })
+                continue
+            failures.append({
+                "source_row": source_offset + first_source_index + header_offset,
+                "identifier": display_name,
+                "reason": reason,
+            })
+        result.update({
+            "fields": prepared_fields,
+            "data": kept_rows,
+            "kept_source_indexes": kept_indexes,
+            "accepted_orders": accepted_orders,
+            "failures": failures,
+        })
+        return result
+
+    @api.model
+    def _prepare_grouped_mrp_import_fields(self, import_fields):
+        """Add nested finished-product fields used by continuation rows.
+
+        The spreadsheet deliberately keeps the familiar flat columns
+        ``product_id``, ``product_qty`` and ``product_uom_id`` on every product
+        row.  Only the first row is the MO's main product.  Values on following
+        blank-name rows are redirected to ``move_byproduct_ids`` before Odoo's
+        standard importer runs.
+        """
+        prepared_fields = list(import_fields)
+        continuation_field_map = {}
+        field_targets = []
+        for source_field_index, field_name in enumerate(import_fields):
+            if field_name == "product_qty":
+                target_field = "move_byproduct_ids/product_uom_qty"
+            elif field_name == "product_id" or field_name.startswith("product_id/"):
+                target_field = (
+                    "move_byproduct_ids/product_id" + field_name[len("product_id"):]
+                )
+            elif field_name == "product_uom_id" or field_name.startswith("product_uom_id/"):
+                target_field = (
+                    "move_byproduct_ids/product_uom"
+                    + field_name[len("product_uom_id"):]
+                )
+            else:
+                continue
+            field_targets.append((source_field_index, target_field))
+
+        for source_field_index, target_field in field_targets:
+            if target_field not in prepared_fields:
+                prepared_fields.append(target_field)
+            continuation_field_map[source_field_index] = prepared_fields.index(target_field)
+        return prepared_fields, continuation_field_map
+
+    @api.model
+    def _is_empty_mrp_import_value(self, value):
+        return value is None or (isinstance(value, str) and not value.strip())
+
+    @api.model
+    def _record_mrp_import_results(self, result, filtered):
+        batch_id = self.env.context.get("business_import_result_batch_id")
+        if not batch_id:
+            return
+        source_offset = self.env.context.get("business_import_source_offset", 0)
+        header_offset = 2 if self.env.context.get("business_import_has_headers") else 1
+        values = []
+        for accepted, record_id in zip(filtered["accepted_orders"], result.get("ids") or []):
+            values.append({
+                "batch_id": batch_id,
+                "source_row": source_offset + accepted["source_index"] + header_offset,
+                "status": "success",
+                "identifier": accepted["identifier"],
+                "record_ref": f"mrp.production,{record_id}",
+                "reason": "导入成功。",
+            })
+        values.extend({
+            "batch_id": batch_id,
+            "source_row": failure["source_row"],
+            "status": "failed",
+            "identifier": failure["identifier"],
+            "reason": failure["reason"],
+        } for failure in filtered["failures"])
+        if values:
+            self.env["stock.subwarehouse.business.import.result.line"].create(values)
+
     def _get_subwarehouse_manufacturing_location(self):
         location_id = self.env.context.get("subwarehouse_manufacturing_location_id")
         if not location_id:
@@ -129,6 +330,7 @@ class MrpProduction(models.Model):
     @api.model
     def _get_dynamic_import_template_columns(self):
         return [
+            ("name", _("制造单号")),
             ("product_id", _("产品")),
             ("product_qty", _("数量")),
             ("product_uom_id", _("计量单位")),
@@ -158,6 +360,7 @@ class MrpProduction(models.Model):
         headers = [field_name for field_name, _label in field_columns]
         import_sheet.append(headers)
         import_sheet.append([
+            "MO-IMPORT-001",
             "产品显示名称或外部 ID",
             1,
             "件",
@@ -169,6 +372,20 @@ class MrpProduction(models.Model):
             "制造",
             self.env.company.display_name,
             "如需要，使用逗号分隔产品属性值",
+        ])
+        import_sheet.append([
+            "",
+            "同一制造单的第二个产品（制造单号留空）",
+            1,
+            "件",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
         ])
 
         attribute_sheet = workbook.create_sheet("产品属性")
@@ -240,7 +457,8 @@ class MrpProduction(models.Model):
         export_sheet.append([field_name for field_name, _label in field_columns])
         export_sheet.append([label for _field_name, label in field_columns])
         for production in self:
-            export_sheet.append(production._get_dynamic_export_row(field_columns))
+            for row in production._get_dynamic_export_rows(field_columns):
+                export_sheet.append(row)
 
         attribute_sheet = workbook.create_sheet("产品属性")
         attribute_sheet.append(["属性ID", "属性", "变体创建方式", "值ID", "值"])
@@ -295,7 +513,26 @@ class MrpProduction(models.Model):
     def _get_dynamic_export_row(self, field_columns):
         return [self._get_mrp_export_value(field_name) for field_name, _label in field_columns]
 
+    def _get_dynamic_export_rows(self, field_columns):
+        self.ensure_one()
+        rows = [self._get_dynamic_export_row(field_columns)]
+        for move in self.move_byproduct_ids.sorted("id"):
+            row = []
+            for field_name, _label in field_columns:
+                if field_name == "product_id":
+                    row.append(move.product_id.default_code or move.product_id.display_name)
+                elif field_name == "product_qty":
+                    row.append(move.product_uom_qty)
+                elif field_name == "product_uom_id":
+                    row.append(move.product_uom.display_name)
+                else:
+                    row.append("")
+            rows.append(row)
+        return rows
+
     def _get_mrp_export_value(self, field_name):
+        if field_name == "product_id":
+            return self.product_id.default_code or self.product_id.display_name
         if field_name == "never_product_template_attribute_value_ids":
             return ", ".join(self.never_product_template_attribute_value_ids.mapped("display_name"))
         if field_name not in self._fields:

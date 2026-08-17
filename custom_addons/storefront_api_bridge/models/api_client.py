@@ -43,6 +43,15 @@ class StorefrontErpClient(models.AbstractModel):
         return os.environ.get("STOREFRONT_PUBLIC_URL", "http://127.0.0.1:8070").rstrip("/")
 
     @api.model
+    def erp_public_url(self):
+        """Browser-reachable ERP origin; never reuse a private API URL blindly."""
+        public_url = os.environ.get("STOREFRONT_ERP_PUBLIC_URL", "").strip()
+        if public_url:
+            return public_url.rstrip("/")
+        base_url, _api_key, _timeout = self._settings()
+        return base_url
+
+    @api.model
     def clear_inventory_snapshot_cache(self):
         with _INVENTORY_SNAPSHOT_LOCK:
             _INVENTORY_SNAPSHOT_CACHE.clear()
@@ -51,7 +60,7 @@ class StorefrontErpClient(models.AbstractModel):
     def inventory_snapshot(self):
         base_url, _api_key, _timeout = self._settings()
         cache_seconds = max(
-            1, min(int(os.environ.get("STOREFRONT_INVENTORY_CACHE_SECONDS", "30")), 300)
+            1, min(int(os.environ.get("STOREFRONT_INVENTORY_CACHE_SECONDS", "1")), 300)
         )
         stale_seconds = max(
             cache_seconds,

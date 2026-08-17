@@ -13,14 +13,18 @@ from odoo.exceptions import ValidationError
 
 SENSITIVE_KEYS = {
     "authorization", "password", "passwd", "secret", "token", "api_key",
-    "private_key", "card_number", "cvv", "signature",
+    "private_key", "card_number", "cvv", "signature", "current_password",
+    "new_password", "confirm_password",
 }
 
 
 def redact_payload(value):
     if isinstance(value, dict):
         return {
-            key: "***" if key.lower() in SENSITIVE_KEYS else redact_payload(item)
+            key: "***" if (
+                key.lower() in SENSITIVE_KEYS
+                or key.lower().endswith("_password")
+            ) else redact_payload(item)
             for key, item in value.items()
         }
     if isinstance(value, list):

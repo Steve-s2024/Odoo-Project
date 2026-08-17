@@ -15,6 +15,37 @@ const TEMPLATE_EXPORT_ROUTES = {
     "sale.order": "/stock_subwarehouse_hierarchy/export/sale_order.xlsx",
 };
 
+const TEMPLATE_EXPORT_MODELS = new Set(Object.keys(TEMPLATE_EXPORT_ROUTES));
+
+function getSupportedListRoot(env) {
+    if (!["kanban", "list"].includes(env.config?.viewType)) {
+        return null;
+    }
+    return env.model?.root || null;
+}
+
+// Keep Odoo's generic exporter everywhere else, but replace it on the models
+// that have a controlled, import-compatible template export.
+const standardExportAllItem = cogMenuRegistry.get("export-all-menu");
+cogMenuRegistry.remove("export-all-menu");
+cogMenuRegistry.add(
+    "export-all-menu",
+    {
+        ...standardExportAllItem,
+        isDisplayed: async (env) => {
+            // Odoo's original predicate first excludes graph, pivot,
+            // hierarchy, and other controllers that do not expose a list
+            // model root.  Preserve that short-circuit before inspecting the
+            // model used by our template exporter.
+            if (!(await standardExportAllItem.isDisplayed(env))) {
+                return false;
+            }
+            return !TEMPLATE_EXPORT_MODELS.has(env.model?.root?.resModel);
+        },
+    },
+    { sequence: 10 }
+);
+
 class TemplateFormatExportMenu extends Component {
     static template = "stock_subwarehouse_hierarchy.TemplateFormatExportMenu";
     static components = { DropdownItem };
@@ -61,12 +92,34 @@ class ProductBomImportMenu extends Component {
     }
 }
 
+class PartnerChannelExportAllMenu extends Component {
+    static template = "stock_subwarehouse_hierarchy.PartnerChannelExportAllMenu";
+    static components = { DropdownItem };
+    static props = {};
+
+    async onExportAll() {
+        const root = this.env.model.root;
+        await download({
+            url: "/stock_subwarehouse_hierarchy/export/partner_channel.xlsx",
+            data: {
+                channel: root.context.partner_channel_import_type,
+                domain: JSON.stringify(root.domain || []),
+            },
+        });
+    }
+}
+
 const templateFormatExportItem = {
     Component: TemplateFormatExportMenu,
     groupNumber: STATIC_ACTIONS_GROUP_NUMBER,
-    isDisplayed: (env) =>
-        ["kanban", "list"].includes(env.config.viewType) &&
-        Object.keys(TEMPLATE_EXPORT_ROUTES).includes(env.model.root.resModel),
+    isDisplayed: (env) => {
+        const root = getSupportedListRoot(env);
+        return Boolean(
+            root &&
+            TEMPLATE_EXPORT_MODELS.has(root.resModel) &&
+            !root.selection.length
+        );
+    },
 };
 
 cogMenuRegistry.add("stock-subwarehouse-template-format-export-menu", templateFormatExportItem, {
@@ -77,8 +130,25 @@ cogMenuRegistry.add("stock-subwarehouse-product-bom-import-menu", {
     Component: ProductBomImportMenu,
     groupNumber: STATIC_ACTIONS_GROUP_NUMBER,
     isDisplayed: (env) =>
-        ["kanban", "list"].includes(env.config.viewType) &&
-        env.model.root.resModel === "product.template",
+        getSupportedListRoot(env)?.resModel === "product.template",
 }, {
     sequence: 12,
+});
+
+cogMenuRegistry.add("stock-subwarehouse-partner-channel-export-all", {
+    Component: PartnerChannelExportAllMenu,
+    groupNumber: STATIC_ACTIONS_GROUP_NUMBER,
+    isDisplayed: (env) => {
+        const root = getSupportedListRoot(env);
+        return Boolean(
+            root &&
+            root.resModel === "res.partner" &&
+            ["distributor", "supplier"].includes(
+                root.context.partner_channel_import_type
+            ) &&
+            !root.selection.length
+        );
+    },
+}, {
+    sequence: 10,
 });

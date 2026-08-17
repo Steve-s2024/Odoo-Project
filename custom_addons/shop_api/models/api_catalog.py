@@ -69,6 +69,8 @@ BUILTIN_ENDPOINTS = [
     ("customer_upsert", "POST", "/api/v1/customers/upsert", "customer:write", True, "新增或更新客户", "Upsert customer"),
     ("customer_authenticate", "POST", "/api/v1/customers/authenticate", "customer:read", False, "验证商城客户账户", "Authenticate storefront customer"),
     ("customer_register", "POST", "/api/v1/customers/register", "customer:write", True, "注册商城客户账户", "Register storefront customer"),
+    ("customer_password_reset_request", "POST", "/api/v1/customers/password-reset/request", "customer:write", True, "申请重置商城账户密码", "Request storefront customer password reset"),
+    ("customer_password_change", "POST", "/api/v1/customers/password/change", "customer:write", True, "永久修改商城账户密码", "Permanently change storefront customer password"),
     ("customer_detail", "GET", "/api/v1/customers/{uuid}", "customer:read", False, "客户详情", "Customer detail"),
     ("customer_external", "GET", "/api/v1/customers/by-external-id/{id}", "customer:read", False, "按外部编号查询客户", "Customer by external ID"),
     ("address_create", "POST", "/api/v1/customers/{uuid}/addresses", "customer:write", True, "新增客户地址", "Create customer address"),
@@ -125,7 +127,7 @@ BUILTIN_ENDPOINTS.extend([
 BUILTIN_EVENT_TYPES = [
     "product.created", "product.updated", "product.archived", "product.image.updated",
     "price.updated", "inventory.updated", "reservation.expired", "order.created",
-    "order.confirmed", "order.cancelled", "payment.pending", "payment.completed",
+    "order.confirmed", "order.cancelled", "order.expired", "payment.pending", "payment.completed",
     "payment.failed", "shipment.ready", "shipment.shipped", "shipment.delivered",
     "refund.requested", "refund.updated", "return.required", "return.received",
     "credit_note.created",
@@ -202,7 +204,12 @@ class ShopApiEndpoint(models.Model):
                 "summary_en": summary_en,
                 "active": True,
             }
-            if code in ("customer_authenticate", "customer_register"):
+            if code in (
+                "customer_authenticate",
+                "customer_register",
+                "customer_password_reset_request",
+                "customer_password_change",
+            ):
                 values.update({
                     "log_request_body": False,
                     "log_response_body": False,

@@ -33,6 +33,12 @@
         </xpath>
         <xpath expr="//head" position="inside">
             <style>
+                .o_lang_flag {
+                    width: 1.4em;
+                    height: 0.9em;
+                    border-radius: 2px;
+                    object-fit: cover;
+                }
                 html.x_page_transition_ready body {
                     opacity: 1;
                     transition: opacity 320ms ease, transform 320ms ease;

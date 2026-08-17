@@ -15,12 +15,28 @@ class PaymentTransaction(models.Model):
                 ("refund_transaction_id", "in", done_transactions.ids),
                 ("credit_note_id", "=", False),
             ])._ensure_credit_note()
+            done_transactions.sale_order_ids.sudo()._queue_paid_website_delivery()
         return done_transactions
 
     def _apply_updates(self, payment_data):
-        if self.provider_code == "wechatpay" and payment_data.get("trade_state") == "SUCCESS":
+        payment_is_confirmed = (
+            self.provider_code == "wechatpay" and payment_data.get("trade_state") == "SUCCESS"
+        ) or (
+            self.provider_code == "alipay"
+            and payment_data.get("trade_status") in ("TRADE_SUCCESS", "TRADE_FINISHED")
+        )
+        if payment_is_confirmed:
             quotations = self.sale_order_ids.filtered(lambda order: order.state in ("draft", "sent"))
             if quotations:
+                expired_orders = quotations.filtered(
+                    lambda order: order._website_payment_deadline_is_expired()
+                )
+                if expired_orders:
+                    self._set_error(_(
+                        "支付确认已超过15分钟库存预留期限，交易不能完成。"
+                    ))
+                    expired_orders._expire_website_payment()
+                    return
                 try:
                     quotations._prepare_website_stock_for_payment()
                 except UserError as error:

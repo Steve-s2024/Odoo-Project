@@ -1,11 +1,13 @@
 import json
 from datetime import timedelta
+from unittest.mock import patch
 
 from odoo import Command, fields
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessDenied, UserError, ValidationError
 from odoo.tests import HttpCase, TransactionCase, tagged
 
 from odoo.addons.shop_api.models.api_catalog import BUILTIN_ENDPOINTS, BUILTIN_SCOPES
+from odoo.addons.shop_api.models.api_runtime import redact_payload
 
 
 class ShopApiTestMixin:
@@ -56,6 +58,18 @@ class ShopApiTestMixin:
             "email": "customer@example.test",
             "customer_rank": 1,
         })
+        cls.chinese_pricelist = cls.env["product.pricelist"].create({
+            "name": "Shop API Test CNY Pricelist",
+            "currency_id": cls.env.ref("base.CNY").id,
+        })
+        cls.english_pricelist = cls.env["product.pricelist"].create({
+            "name": "Shop API Test USD Pricelist",
+            "currency_id": cls.env.ref("base.USD").id,
+        })
+        cls.env["shop.api.configuration"]._ensure_default_configuration().write({
+            "chinese_pricelist_id": cls.chinese_pricelist.id,
+            "english_pricelist_id": cls.english_pricelist.id,
+        })
 
 
 @tagged("post_install", "-at_install")
@@ -84,6 +98,94 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
         self.assertFalse(authentication.idempotency_required)
         self.assertFalse(authentication.log_request_body)
         self.assertFalse(authentication.log_response_body)
+        reset_request = self.env["shop.api.endpoint"].search([
+            ("code", "=", "customer_password_reset_request"),
+        ], limit=1)
+        self.assertEqual(
+            reset_request.path,
+            "/api/v1/customers/password-reset/request",
+        )
+        self.assertEqual(reset_request.scope_id.code, "customer:write")
+        self.assertTrue(reset_request.idempotency_required)
+        self.assertFalse(reset_request.log_request_body)
+        self.assertFalse(reset_request.log_response_body)
+        password_change = self.env["shop.api.endpoint"].search([
+            ("code", "=", "customer_password_change"),
+        ], limit=1)
+        self.assertEqual(
+            password_change.path,
+            "/api/v1/customers/password/change",
+        )
+        self.assertEqual(password_change.scope_id.code, "customer:write")
+        self.assertTrue(password_change.idempotency_required)
+        self.assertFalse(password_change.log_request_body)
+        self.assertFalse(password_change.log_response_body)
+
+    def test_encoded_password_cannot_be_imported_or_double_hashed(self):
+        partner = self.env["res.partner"].create({"name": "Encoded Password Guard"})
+        encoded = "$pbkdf2-sha512$600000$copied$credential"
+        with self.assertRaisesRegex(ValidationError, "不能填写或导入加密后的密码"):
+            self.env["res.users"].with_context(no_reset_password=True).create({
+                "name": partner.name,
+                "login": "encoded-password@example.test",
+                "password": encoded,
+                "partner_id": partner.id,
+                "group_ids": [Command.set([self.env.ref("base.group_portal").id])],
+            })
+        safe_user = self.env["res.users"].with_context(no_reset_password=True).create({
+            "name": partner.name,
+            "login": "plaintext-password@example.test",
+            "password": "one-plain-input",
+            "partner_id": partner.id,
+            "group_ids": [Command.set([self.env.ref("base.group_portal").id])],
+        })
+        self.env.cr.execute("SELECT password FROM res_users WHERE id = %s", [safe_user.id])
+        stored_password = self.env.cr.fetchone()[0]
+        self.assertNotEqual(stored_password, "one-plain-input")
+        self.assertTrue(stored_password.startswith("$pbkdf2-sha512$"))
+
+    def test_erp_password_change_verifies_old_and_new_plaintext_once(self):
+        partner = self.env["res.partner"].create({
+            "name": "Password Change Customer",
+            "email": "password-change-customer@example.test",
+        })
+        user = self.env["res.users"].with_context(no_reset_password=True).create({
+            "name": partner.name,
+            "login": partner.email,
+            "password": "old-password",
+            "partner_id": partner.id,
+            "group_ids": [Command.set([self.env.ref("base.group_portal").id])],
+        })
+        self.assertTrue(user._shop_api_change_password(
+            "old-password", "new-permanent-password",
+        ))
+        acting_user = user.with_user(user).sudo()
+        acting_user._check_credentials({
+            "type": "password",
+            "login": user.login,
+            "password": "new-permanent-password",
+        }, {"interactive": True})
+        with self.assertRaises(AccessDenied):
+            acting_user._check_credentials({
+                "type": "password",
+                "login": user.login,
+                "password": "old-password",
+            }, {"interactive": True})
+
+    def test_password_fields_are_always_redacted_from_api_audit_payloads(self):
+        self.assertEqual(redact_payload({
+            "login": "customer@example.test",
+            "password": "one",
+            "current_password": "two",
+            "new_password": "three",
+            "nested": {"temporary_password": "four"},
+        }), {
+            "login": "customer@example.test",
+            "password": "***",
+            "current_password": "***",
+            "new_password": "***",
+            "nested": {"temporary_password": "***"},
+        })
 
     def test_payment_return_origins_support_parallel_migration_hosts(self):
         configuration = self.env["shop.api.configuration"]._ensure_default_configuration()
@@ -190,30 +292,154 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
             {"Test Snowboard Boots Group"},
         )
 
-    def test_gallery_image_changes_enqueue_product_media_event(self):
+    def test_product_and_gallery_changes_enter_one_deduplicated_sync_set(self):
         template = self.product.product_tmpl_id
-        before = self.env["shop.api.event"].search_count([
-            ("event_type", "=", "product.image.updated"),
-            ("resource_uuid", "=", template.shop_api_uuid),
-        ])
+        Pending = self.env["shop.api.product.sync.pending"]
+        Pending.search([]).unlink()
+        template.write({"list_price": 123.0})
         image = self.env["product.image"].create({
             "name": "Gallery test",
             "product_tmpl_id": template.id,
         })
-        self.assertEqual(self.env["shop.api.event"].search_count([
-            ("event_type", "=", "product.image.updated"),
-            ("resource_uuid", "=", template.shop_api_uuid),
-        ]), before + 1)
         image.write({"name": "Gallery test updated"})
-        self.assertEqual(self.env["shop.api.event"].search_count([
-            ("event_type", "=", "product.image.updated"),
-            ("resource_uuid", "=", template.shop_api_uuid),
-        ]), before + 2)
         image.unlink()
-        self.assertEqual(self.env["shop.api.event"].search_count([
-            ("event_type", "=", "product.image.updated"),
+        pending = Pending.search([("product_tmpl_id", "=", template.id)])
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending.product_uuid, template.shop_api_uuid)
+
+    def test_product_sync_set_flush_embeds_current_bilingual_snapshots_and_clears(self):
+        template = self.product.product_tmpl_id
+        Pending = self.env["shop.api.product.sync.pending"]
+        Pending.search([]).unlink()
+        template.write({
+            "name": "ERP current product",
+            "x_website_english_name": "ERP current product EN",
+            "list_price": 321.0,
+            "x_shop_group_cover": True,
+        })
+        before = self.env["shop.api.event"].search_count([
             ("resource_uuid", "=", template.shop_api_uuid),
-        ]), before + 3)
+            ("event_type", "=", "product.updated"),
+        ])
+
+        result = Pending._flush_pending_products(dispatch=False)
+
+        self.assertEqual(result["products"], 1)
+        self.assertFalse(Pending.search_count([("product_tmpl_id", "=", template.id)]))
+        event = self.env["shop.api.event"].search([
+            ("resource_uuid", "=", template.shop_api_uuid),
+            ("event_type", "=", "product.updated"),
+        ], order="id desc", limit=1)
+        self.assertEqual(self.env["shop.api.event"].search_count([
+            ("resource_uuid", "=", template.shop_api_uuid),
+            ("event_type", "=", "product.updated"),
+        ]), before + 1)
+        self.assertTrue(event.payload["authoritative"])
+        self.assertTrue(event.payload["replace"])
+        self.assertEqual(event.payload["snapshots"]["zh_CN"]["price_cny"], 321.0)
+        self.assertEqual(
+            event.payload["snapshots"]["en_US"]["name_en"],
+            "ERP current product EN",
+        )
+        self.assertEqual(
+            event.payload["snapshots"]["zh_CN"]["available_quantity"],
+            5.0,
+        )
+        self.assertTrue(event.payload["snapshots"]["zh_CN"]["group_cover"])
+        self.assertTrue(event.payload["snapshots"]["zh_CN"]["inventory_version"])
+
+    def test_manual_product_push_includes_same_name_group(self):
+        Pending = self.env["shop.api.product.sync.pending"]
+        products = self.env["product.template"].create([
+            {
+                "name": "Manual grouped cover push",
+                "website_published": True,
+                "sale_ok": True,
+            },
+            {
+                "name": "Manual grouped cover push",
+                "website_published": True,
+                "sale_ok": True,
+            },
+        ])
+        Pending.search([]).unlink()
+
+        products[:1].action_push_updates_to_shop()
+
+        self.assertEqual(self.env["shop.api.event"].search_count([
+            ("resource_uuid", "in", products.mapped("shop_api_uuid")),
+            ("event_type", "=", "product.updated"),
+        ]), 2)
+
+    def test_category_and_attribute_display_changes_queue_related_product(self):
+        template = self.product.product_tmpl_id
+        Pending = self.env["shop.api.product.sync.pending"]
+        attribute = self.env["product.attribute"].create({"name": "同步规格"})
+        value = self.env["product.attribute.value"].create({
+            "name": "同步值", "attribute_id": attribute.id,
+        })
+        self.env["product.template.attribute.line"].create({
+            "product_tmpl_id": template.id,
+            "attribute_id": attribute.id,
+            "value_ids": [Command.set(value.ids)],
+        })
+        Pending.search([("product_tmpl_id", "=", template.id)]).unlink()
+
+        template.categ_id.write({"name": "同步后的类别"})
+        attribute.write({"name": "同步后的规格"})
+        value.write({"name": "同步后的值"})
+
+        self.assertEqual(Pending.search_count([("product_tmpl_id", "=", template.id)]), 1)
+
+    def test_force_product_sync_button_flushes_the_whole_pending_set(self):
+        Pending = self.env["shop.api.product.sync.pending"]
+        products = self.env["product.template"].create([
+            {"name": "Force sync A", "website_published": True},
+            {"name": "Force sync B", "website_published": True},
+        ])
+        self.assertEqual(Pending.search_count([("product_tmpl_id", "in", products.ids)]), 2)
+
+        action = products.action_push_updates_to_shop()
+
+        self.assertEqual(action["tag"], "display_notification")
+        self.assertFalse(Pending.search_count([("product_tmpl_id", "in", products.ids)]))
+        self.assertEqual(self.env["shop.api.event"].search_count([
+            ("resource_uuid", "in", products.mapped("shop_api_uuid")),
+            ("event_type", "=", "product.updated"),
+        ]), 2)
+
+    def test_product_push_is_available_as_template_and_variant_group_actions(self):
+        for xml_id, model_name in (
+            ("shop_api.action_product_template_push_updates_to_shop", "product.template"),
+            ("shop_api.action_product_variant_push_updates_to_shop", "product.product"),
+        ):
+            action = self.env.ref(xml_id)
+            self.assertEqual(action.model_id.model, model_name)
+            self.assertEqual(action.binding_model_id.model, model_name)
+            self.assertEqual(action.binding_view_types, "list")
+            self.assertIn("action_push_updates_to_shop", action.code)
+
+    def test_stock_quantity_change_emits_inventory_update_for_finished_product(self):
+        Event = self.env["shop.api.event"]
+        before = Event.search_count([
+            ("event_type", "=", "inventory.updated"),
+            ("resource_uuid", "=", self.product.shop_api_uuid),
+        ])
+
+        self.env["stock.quant"]._update_available_quantity(
+            self.product, self.bin_location, 1.0,
+        )
+
+        event = Event.search([
+            ("event_type", "=", "inventory.updated"),
+            ("resource_uuid", "=", self.product.shop_api_uuid),
+        ], order="id desc", limit=1)
+        self.assertEqual(Event.search_count([
+            ("event_type", "=", "inventory.updated"),
+            ("resource_uuid", "=", self.product.shop_api_uuid),
+        ]), before + 1)
+        self.assertEqual(event.payload["product_id"], self.product.shop_api_uuid)
+        self.assertEqual(event.payload["available_quantity"], 6.0)
 
     def test_unpublished_product_still_has_integration_payload(self):
         template = self.product.product_tmpl_id
@@ -359,7 +585,7 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
         provider = self.env.ref("payment.payment_provider_transfer")
         transaction = self.env["payment.transaction"].create({
             "provider_id": provider.id,
-            "payment_method_id": provider.payment_method_ids[:1].id,
+            "payment_method_id": self.env.ref("payment.payment_method_bank_transfer").id,
             "reference": "SHOP-API-AUTHORITY",
             "amount": order.amount_total,
             "currency_id": order.currency_id.id,
@@ -414,7 +640,7 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
         provider = self.env.ref("payment.payment_provider_transfer")
         transaction = self.env["payment.transaction"].create({
             "provider_id": provider.id,
-            "payment_method_id": provider.payment_method_ids[:1].id,
+            "payment_method_id": self.env.ref("payment.payment_method_bank_transfer").id,
             "reference": "SHOP-API-REFUND-EVENT",
             "amount": order.amount_total,
             "currency_id": order.currency_id.id,
@@ -473,6 +699,89 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
         ], order="id desc", limit=1)
         self.assertTrue(event)
         self.assertEqual(event.payload["id"], reservation.name)
+
+    def test_confirmed_unpaid_order_expires_without_renewing_its_hold(self):
+        reservation = self.env["shop.api.reservation"].create_reservation(self.client, {
+            "external_id": "expiring-confirmed-order",
+            "items": [{"product_id": self.product.shop_api_uuid, "quantity": 1}],
+        })
+        order = reservation.create_order(
+            self.customer, "SHOP-ORDER-EXPIRING", language="zh_CN",
+        )
+        original_deadline = order.x_website_stock_reserved_until
+
+        order._prepare_website_stock_for_payment()
+
+        self.assertEqual(order.x_website_stock_reserved_until, original_deadline)
+        expired_at = fields.Datetime.now() - timedelta(seconds=1)
+        reservation.expires_at = expired_at
+        order.order_line.filtered("is_storable").write({
+            "x_website_stock_reserved_until": expired_at,
+        })
+
+        self.env["shop.api.reservation"]._cron_expire_reservations()
+        order.invalidate_recordset()
+
+        self.assertEqual(reservation.state, "expired")
+        self.assertEqual(order.state, "cancel")
+        self.assertEqual(order.x_website_payment_state, "expired")
+        payload = order._shop_api_payload()
+        self.assertTrue(payload["authoritative"])
+        self.assertTrue(payload["payment_expired"])
+        self.assertEqual(payload["payment_state"], "expired")
+        self.assertEqual(payload["delivery_state"], "")
+        self.assertTrue(self.env["shop.api.event"].search_count([
+            ("event_type", "=", "order.expired"),
+            ("resource_uuid", "=", order.shop_api_uuid),
+        ]))
+
+    def test_paid_order_enters_fifo_delivery_queue_and_dispatch_deducts_stock(self):
+        reservation = self.env["shop.api.reservation"].create_reservation(self.client, {
+            "external_id": "paid-delivery-queue",
+            "items": [{"product_id": self.product.shop_api_uuid, "quantity": 1}],
+        })
+        order = reservation.create_order(
+            self.customer, "SHOP-ORDER-DELIVERY", language="zh_CN",
+        )
+        provider = self.env.ref("payment.payment_provider_transfer")
+        transaction = self.env["payment.transaction"].create({
+            "provider_id": provider.id,
+            "payment_method_id": self.env.ref("payment.payment_method_bank_transfer").id,
+            "reference": "SHOP-API-DELIVERY-PAID",
+            "amount": order.amount_total,
+            "currency_id": order.currency_id.id,
+            "partner_id": order.partner_id.id,
+            "operation": "online_redirect",
+            "sale_order_ids": [Command.set(order.ids)],
+        })
+
+        transaction._set_done()
+
+        self.assertEqual(order.x_website_delivery_state, "awaiting_delivery")
+        self.assertEqual(order.x_pending_website_delivery_count, 1)
+        self.assertTrue(order.activity_ids.filtered(
+            lambda activity: activity.summary == "已支付订单待发货"
+        ))
+        before_dispatch = self.env["stock.quant"]._get_available_quantity(
+            self.product, self.bin_location, strict=True,
+        )
+
+        order.action_start_website_delivery()
+
+        self.assertEqual(order.x_website_delivery_state, "delivering")
+        self.assertEqual(order.x_pending_website_delivery_count, 0)
+        self.assertEqual(order.picking_ids.filtered(
+            lambda picking: picking.picking_type_code == "outgoing"
+        ).state, "done")
+        self.assertEqual(
+            self.env["stock.quant"]._get_available_quantity(
+                self.product, self.bin_location, strict=True,
+            ),
+            before_dispatch - 1,
+        )
+        order.action_mark_website_delivery_delivered()
+        self.assertEqual(order.x_website_delivery_state, "delivered")
+        self.assertTrue(order.x_website_delivered_at)
 
     def test_stage_three_site_and_checkout_catalog_is_registered(self):
         endpoint_codes = set(self.env["shop.api.endpoint"].search([]).mapped("code"))
@@ -601,6 +910,12 @@ class TestShopApiHttp(ShopApiTestMixin, HttpCase):
         methods = response.json()["data"]
         codes = [method["code"] for method in methods]
         self.assertEqual(len(codes), len(set(codes)))
+        bank_card = next(method for method in methods if method["code"] == "bank_card")
+        self.assertEqual(bank_card["name"], "Bank card (coming soon)")
+        self.assertFalse(bank_card["available"])
+        self.assertTrue(bank_card["shell"])
+        self.assertNotIn("custom", codes)
+        self.assertNotIn("Cash on Delivery", {method["name"] for method in methods})
 
     def test_customer_registration_is_authoritative_and_idempotent(self):
         payload = json.dumps({
@@ -627,3 +942,65 @@ class TestShopApiHttp(ShopApiTestMixin, HttpCase):
         ], limit=1)
         self.assertTrue(user)
         self.assertTrue(user.share)
+        self.env.cr.execute("SELECT password FROM res_users WHERE id = %s", [user.id])
+        stored_password = self.env.cr.fetchone()[0]
+        self.assertNotEqual(stored_password, "safe-test-password")
+        self.assertTrue(user._crypt_context().verify("safe-test-password", stored_password))
+
+    def test_customer_password_change_rejects_encoded_new_password(self):
+        response = self.url_open(
+            "/api/v1/customers/password/change",
+            data=json.dumps({
+                "login": "admin",
+                "current_password": "irrelevant",
+                "new_password": "$pbkdf2-sha512$600000$copied$credential",
+            }),
+            headers=self._headers("http-password-change-encoded"),
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["error"]["code"], "business_rule_failed")
+
+    def test_customer_password_reset_is_authoritative(self):
+        reset_partner = self.env["res.partner"].create({
+            "name": "API Reset Customer",
+            "email": "api-reset-customer@example.test",
+        })
+        self.env["res.users"].with_context(no_reset_password=True).create({
+            "name": reset_partner.name,
+            "login": reset_partner.email,
+            "password": "old-safe-test-password",
+            "partner_id": reset_partner.id,
+            "group_ids": [Command.set([self.env.ref("base.group_portal").id])],
+        })
+        user_model_class = type(self.env["res.users"])
+        with patch.object(
+            user_model_class,
+            "action_reset_password",
+            autospec=True,
+            return_value={},
+        ) as reset_mock:
+            existing = self.url_open(
+                "/api/v1/customers/password-reset/request",
+                data=json.dumps({"login": reset_partner.email}),
+                headers=self._headers("http-password-reset-existing"),
+            )
+
+        self.assertEqual(existing.status_code, 202)
+        self.assertEqual(existing.json()["data"], {
+            "authoritative": True,
+            "accepted": True,
+        })
+        reset_mock.assert_called_once()
+
+    def test_customer_password_reset_does_not_enumerate_unknown_account(self):
+        unknown = self.url_open(
+            "/api/v1/customers/password-reset/request",
+            data=json.dumps({"login": "unknown-account@example.test"}),
+            headers=self._headers("http-password-reset-unknown"),
+        )
+
+        self.assertEqual(unknown.status_code, 202)
+        self.assertEqual(unknown.json()["data"], {
+            "authoritative": True,
+            "accepted": True,
+        })

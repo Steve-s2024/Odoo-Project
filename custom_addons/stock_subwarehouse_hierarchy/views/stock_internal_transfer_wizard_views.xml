@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_stock_internal_transfer_wizard_form" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.internal.transfer.wizard.form</field>
+        <field name="model">stock.subwarehouse.internal.transfer.wizard</field>
+        <field name="arch" type="xml">
+            <form string="内部调拨">
+                <group>
+                    <group>
+                        <field name="company_id" groups="base.group_multi_company"/>
+                        <field name="source_warehouse_id"/>
+                        <field name="source_root_location_id"/>
+                    </group>
+                    <group>
+                        <field name="destination_warehouse_id" options="{'no_create': True, 'no_open': True}"/>
+                        <field name="destination_location_id"/>
+                        <field name="selected_inventory_count"/>
+                        <field name="selected_product_count"/>
+                    </group>
+                </group>
+                <separator string="将转移以下可用库存"/>
+                <field name="quant_ids" nolabel="1" readonly="1">
+                    <list create="0" edit="0" delete="0">
+                        <field name="product_id"/>
+                        <field name="location_id"/>
+                        <field name="available_quantity" string="可用数量"/>
+                        <field name="product_uom_id"/>
+                        <field name="lot_id" optional="hide" groups="stock.group_production_lot"/>
+                        <field name="package_id" optional="hide" groups="stock.group_tracking_lot"/>
+                    </list>
+                </field>
+                <footer>
+                    <button
+                        name="action_create_internal_transfer"
+                        type="object"
+                        string="创建内部调拨"
+                        class="btn-primary"/>
+                    <button string="取消" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

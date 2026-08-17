@@ -266,15 +266,36 @@ class ShopApiReservation(models.Model):
 
     @api.model
     def _cron_expire_reservations(self):
+        now = fields.Datetime.now()
         reservations = self.sudo().search([
-            ("state", "=", "active"), ("expires_at", "<=", fields.Datetime.now()),
+            ("state", "in", ("active", "confirmed")),
+            ("expires_at", "<=", now),
         ])
         for reservation in reservations:
+            order = reservation.confirmed_order_id
+            if order and order.x_website_payment_state == "paid":
+                continue
+            if order:
+                order._expire_website_payment()
             reservation.state = "expired"
             self.env["shop.api.event"].enqueue(
                 "reservation.expired", payload=reservation._shop_api_payload(),
                 client=reservation.client_id,
             )
+            if order:
+                self.env["shop.api.event"].enqueue(
+                    "order.expired", order, order._shop_api_payload(),
+                    client=reservation.client_id,
+                )
+
+        # Idempotent recovery for a successful provider callback that completed
+        # just before this cron, or for legacy paid orders created before the
+        # delivery event queue was introduced.
+        self.env["sale.order"].sudo().search([
+            ("website_id", "!=", False),
+            ("x_website_delivery_state", "=", False),
+            ("transaction_ids.state", "=", "done"),
+        ], limit=500)._queue_paid_website_delivery()
 
 
 class ShopApiReservationLine(models.Model):

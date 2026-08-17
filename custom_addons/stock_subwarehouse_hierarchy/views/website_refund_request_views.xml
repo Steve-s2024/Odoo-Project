@@ -11,6 +11,7 @@
                 <field name="amount_total" widget="monetary"/>
                 <field name="currency_id" column_invisible="True"/>
                 <field name="return_required" optional="show"/>
+                <field name="x_return_delivery_state" string="退货配送状态" widget="badge" optional="show"/>
                 <field name="state"/>
                 <field name="create_date"/>
             </list>
@@ -39,6 +40,8 @@
             <form>
                 <header>
                     <button name="action_submit_wechat_refund" type="object" string="审核通过" class="btn-primary" invisible="state != 'requested'"/>
+                    <button name="action_start_customer_return_delivery" type="object" string="开始退货配送" class="btn-primary" invisible="x_return_delivery_state != 'awaiting_delivery'"/>
+                    <button name="action_mark_customer_return_delivered" type="object" string="确认退货送达并入库" class="btn-primary" invisible="x_return_delivery_state != 'delivering'"/>
                     <button name="action_submit_wechat_refund" type="object" string="退货已收货，提交原路退款" class="btn-primary" invisible="state != 'return_received'"/>
                     <button name="action_recreate_customer_return" type="object" string="重新创建客户退货单" class="btn-primary" invisible="state != 'return_cancelled'"/>
                     <button name="action_reject" type="object" string="拒绝" invisible="state != 'requested'"/>
@@ -62,6 +65,9 @@
                         <field name="return_required"/>
                         <field name="return_warehouse_id" invisible="not return_required"/>
                         <field name="return_location_id" readonly="state != 'requested'"/>
+                        <field name="x_return_delivery_state" widget="badge" readonly="1" invisible="not return_required"/>
+                        <field name="x_return_delivery_started_at" readonly="1" invisible="not x_return_delivery_started_at"/>
+                        <field name="x_return_delivered_at" readonly="1" invisible="not x_return_delivered_at"/>
                         <field name="return_picking_count" invisible="1"/>
                         <field name="currency_id" invisible="1"/>
                         <field name="amount_total" widget="monetary"/>

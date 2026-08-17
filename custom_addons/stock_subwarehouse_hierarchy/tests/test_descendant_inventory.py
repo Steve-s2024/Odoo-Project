@@ -1,4 +1,5 @@
 import base64
+import json
 from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -51,6 +52,10 @@ class TestDescendantInventoryTotals(TransactionCase):
         cls.customer = cls.env["res.partner"].create({
             "name": "Subwarehouse Test Customer",
         })
+        cls.cny_pricelist = cls.env["product.pricelist"].create({
+            "name": "Descendant Test CNY Pricelist",
+            "currency_id": cls.env.ref("base.CNY").id,
+        })
 
     def test_descendant_inventory_totals_sum_child_locations(self):
         self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
@@ -70,6 +75,261 @@ class TestDescendantInventoryTotals(TransactionCase):
                 ("location_id.usage", "=", "internal"),
             ]).mapped("location_id").ids,
         )
+
+    def test_sale_import_rejects_duplicate_order_ids_with_partial_success(self):
+        existing = self.env["sale.order"].create({
+            "name": "IMPORT-SALE-EXISTING",
+            "partner_id": self.customer.id,
+        })
+        fields_list = ["name", "partner_id"]
+        rows = [
+            [existing.name.lower(), self.customer.name],
+            ["IMPORT-SALE-UNIQUE", self.customer.name],
+            [" import-sale-unique ", self.customer.name],
+            ["", self.customer.name],
+        ]
+
+        result = self.env["sale.order"].with_context(
+            import_file=True,
+            sale_import_source_offset=0,
+            sale_import_has_headers=True,
+        ).load(fields_list, rows)
+
+        imported = self.env["sale.order"].browse(result["ids"])
+        self.assertEqual(imported.mapped("name"), ["IMPORT-SALE-UNIQUE"])
+        self.assertEqual(len(result["x_business_import_failures"]), 3)
+        self.assertEqual(
+            {failure["source_row"] for failure in result["x_business_import_failures"]},
+            {2, 4, 5},
+        )
+
+    def test_mrp_import_rejects_duplicate_ids_with_partial_success(self):
+        existing = self.env["mrp.production"].create({
+            "name": "IMPORT-MO-EXISTING",
+            "product_id": self.product_a.id,
+            "product_qty": 1.0,
+            "product_uom_id": self.product_a.uom_id.id,
+            "location_src_id": self.bin_a.id,
+            "location_dest_id": self.bin_b.id,
+        })
+        fields_list = [
+            "name", "product_id", "product_qty", "product_uom_id",
+            "location_src_id", "location_dest_id",
+        ]
+        valid_row = [
+            "IMPORT-MO-UNIQUE", self.product_a.display_name, 1,
+            self.product_a.uom_id.name, self.bin_a.complete_name, self.bin_b.complete_name,
+        ]
+        rows = [
+            [existing.name.lower(), *valid_row[1:]],
+            valid_row,
+            [" import-mo-unique ", *valid_row[1:]],
+            ["", *valid_row[1:]],
+        ]
+
+        result = self.env["mrp.production"].with_context(
+            import_file=True,
+            business_import_source_offset=0,
+            business_import_has_headers=True,
+        ).load(fields_list, rows)
+
+        imported = self.env["mrp.production"].browse(result["ids"])
+        self.assertEqual(imported.mapped("name"), ["IMPORT-MO-UNIQUE"])
+        self.assertEqual(len(result["x_business_import_failures"]), 2)
+
+    def test_mrp_import_groups_blank_name_product_rows_as_finished_products(self):
+        self.product_a.default_code = "IMPORT-MO-FINISHED-A"
+        self.product_b.default_code = "IMPORT-MO-FINISHED-B"
+        fields_list = [
+            "name", "product_id", "product_qty", "product_uom_id",
+            "origin", "location_src_id", "location_dest_id",
+        ]
+        rows = [
+            [
+                "IMPORT-MO-MULTI-PRODUCT",
+                self.product_a.default_code,
+                2,
+                self.product_a.uom_id.name,
+                "Grouped manufacturing import",
+                self.bin_a.complete_name,
+                self.bin_b.complete_name,
+            ],
+            [
+                "",
+                self.product_b.default_code,
+                3,
+                self.product_b.uom_id.name,
+                "",
+                "",
+                "",
+            ],
+        ]
+
+        result = self.env["mrp.production"].with_context(
+            import_file=True,
+            business_import_source_offset=0,
+            business_import_has_headers=True,
+        ).load(fields_list, rows)
+
+        self.assertFalse(result["messages"])
+        self.assertFalse(result["x_business_import_failures"])
+        self.assertEqual(len(result["ids"]), 1)
+        production = self.env["mrp.production"].browse(result["ids"])
+        self.assertEqual(production.name, "IMPORT-MO-MULTI-PRODUCT")
+        self.assertEqual(production.product_id, self.product_a)
+        self.assertEqual(production.product_qty, 2)
+        byproduct = production.move_byproduct_ids.filtered(
+            lambda move: move.product_id == self.product_b
+        )
+        self.assertEqual(len(byproduct), 1)
+        self.assertEqual(byproduct.product_uom_qty, 3)
+
+        production.action_confirm()
+        production.qty_producing = 2
+        production.button_mark_done()
+        self.assertEqual(
+            self.StockQuant._get_available_quantity(self.product_a, self.bin_b),
+            2,
+        )
+        self.assertEqual(
+            self.StockQuant._get_available_quantity(self.product_b, self.bin_b),
+            3,
+        )
+
+    def test_mrp_export_keeps_one_name_and_multiple_finished_product_rows(self):
+        from openpyxl import load_workbook
+
+        self.product_a.default_code = "EXPORT-MO-FINISHED-A"
+        self.product_b.default_code = "EXPORT-MO-FINISHED-B"
+        production = self.env["mrp.production"].create({
+            "name": "EXPORT-MO-MULTI-PRODUCT",
+            "product_id": self.product_a.id,
+            "product_qty": 2,
+            "product_uom_id": self.product_a.uom_id.id,
+            "location_src_id": self.bin_a.id,
+            "location_dest_id": self.bin_b.id,
+            "move_byproduct_ids": [Command.create({
+                "product_id": self.product_b.id,
+                "product_uom_qty": 3,
+                "product_uom": self.product_b.uom_id.id,
+            })],
+        })
+
+        workbook = load_workbook(
+            BytesIO(production._generate_dynamic_export_xlsx()),
+            read_only=True,
+        )
+        rows = list(workbook["制造单导出"].iter_rows(values_only=True))
+        headers = rows[0]
+        self.assertEqual(rows[2][headers.index("name")], "EXPORT-MO-MULTI-PRODUCT")
+        self.assertEqual(rows[2][headers.index("product_id")], "EXPORT-MO-FINISHED-A")
+        self.assertIsNone(rows[3][headers.index("name")])
+        self.assertEqual(rows[3][headers.index("product_id")], "EXPORT-MO-FINISHED-B")
+        self.assertEqual(rows[3][headers.index("product_qty")], 3)
+
+    def test_mrp_import_preview_maps_readonly_name_as_manufacturing_number(self):
+        import_job = self.env["base_import.import"].create({
+            "res_model": "mrp.production",
+        })
+
+        fields_tree = import_job.get_fields_tree("mrp.production")
+        name_fields = [field for field in fields_tree if field.get("name") == "name"]
+
+        self.assertEqual(len(name_fields), 1)
+        self.assertEqual(name_fields[0]["string"], "制造单号")
+        self.assertTrue(name_fields[0]["required"])
+        for header in ("name", "制造单号"):
+            suggestion = import_job._get_mapping_suggestion(
+                header, fields_tree, ["char"], {},
+            )
+            self.assertEqual(suggestion["field_path"], ["name"])
+
+    def test_product_page_family_title_and_out_of_stock_overlay_are_presentation_only(self):
+        family_title_arch = self.env.ref(
+            "stock_subwarehouse_hierarchy.product_page_family_title"
+        ).arch_db
+        unavailable_button_arch = self.env.ref(
+            "stock_subwarehouse_hierarchy.product_page_replace_add_to_cart_button"
+        ).arch_db
+        product_style_arch = self.env.ref(
+            "stock_subwarehouse_hierarchy.product_page_hide_standard_product_attributes"
+        ).arch_db
+        sibling_selector_arch = self.env.ref(
+            "stock_subwarehouse_hierarchy.product_page_shop_group_siblings"
+        ).arch_db
+
+        self.assertIn("'ski': 'Ski Products' if x_shop_family_is_english else '双板商品'", family_title_arch)
+        self.assertNotIn("(SKI PRODUCTS)", family_title_arch)
+        self.assertNotIn("(SNOWBOARD PRODUCTS)", family_title_arch)
+        self.assertNotIn("(OTHER PRODUCTS)", family_title_arch)
+        self.assertIn("font-size: 16px", family_title_arch)
+        self.assertIn("x_shop_product_family_title", family_title_arch)
+        self.assertIn('disabled="disabled"', unavailable_button_arch)
+        self.assertIn("x_shop_stock_banner", unavailable_button_arch)
+        self.assertIn("Out of stock", unavailable_button_arch)
+        self.assertIn("缺货", unavailable_button_arch)
+        self.assertNotIn("fa-times", unavailable_button_arch)
+        self.assertIn("background-color: #111 !important", product_style_arch)
+        self.assertIn("data-current-product-code", sibling_selector_arch)
+        self.assertIn("data-product-code", sibling_selector_arch)
+        self.assertIn("currentPageVariant", sibling_selector_arch)
+        self.assertIn("refreshCurrentPageAvailability", sibling_selector_arch)
+        self.assertIn("event.isTrusted", sibling_selector_arch)
+
+    def test_item_search_and_product_cards_reuse_title_hover_motion(self):
+        item_page_arch = self.env.ref(
+            "stock_subwarehouse_hierarchy.item_pages_product_card_section"
+        ).arch_db
+        family_page_arch = self.env.ref(
+            "stock_subwarehouse_hierarchy.custom_product_family_page"
+        ).arch_db
+
+        for title in ("双板商品", "单板商品", "其他商品"):
+            self.assertIn(title, item_page_arch)
+        for removed_suffix in (
+            "(SKI PRODUCTS)", "(SNOWBOARD PRODUCTS)", "(OTHER PRODUCTS)",
+        ):
+            self.assertNotIn(removed_suffix, item_page_arch)
+
+        for arch, search_class, card_class in (
+            (item_page_arch, "x_item_product_search", "x_item_product_card"),
+            (family_page_arch, "x_custom_family_search", "x_custom_product_card"),
+        ):
+            self.assertIn(f".{search_class}:focus-within", arch)
+            self.assertIn(f".{card_class}:focus-visible", arch)
+            self.assertIn("transition: transform 180ms ease", arch)
+            self.assertIn("transition: transform 220ms ease", arch)
+            self.assertIn("transform: translateY(-1px)", arch)
+            self.assertIn("transform: scaleX(1)", arch)
+            self.assertIn("prefers-reduced-motion: reduce", arch)
+
+    def test_quant_import_rejects_duplicate_identity_with_partial_success(self):
+        self.product_a.default_code = "IMPORT-QUANT-A"
+        self.product_b.default_code = "IMPORT-QUANT-B"
+        self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 1.0)
+        fields_list = [
+            "product_id/.id",
+            "location_id/.id",
+            "inventory_quantity_auto_apply",
+        ]
+        rows = [
+            [str(self.product_a.id), str(self.bin_a.id), 2],
+            [str(self.product_b.id), str(self.bin_b.id), 3],
+            [str(self.product_b.id), str(self.bin_b.id), 4],
+            ["", str(self.bin_b.id), 5],
+        ]
+
+        result = self.StockQuant.with_context(
+            import_file=True,
+            inventory_mode=True,
+            business_import_source_offset=0,
+            business_import_has_headers=True,
+        ).load(fields_list, rows)
+
+        imported = self.StockQuant.browse(result["ids"])
+        self.assertEqual(imported.product_id, self.product_b)
+        self.assertEqual(imported.location_id, self.bin_b)
+        self.assertEqual(len(result["x_business_import_failures"]), 3)
 
     def test_store_map_url_opens_amap_search(self):
         map_url = _amap_search_url("SUN Beijing Flagship Store Test Address")
@@ -166,7 +426,7 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(totals_by_product[self.product_a].available_quantity, 12.0)
         self.assertEqual(totals_by_product[self.product_b].quantity, 3.0)
 
-    def test_descendant_product_totals_transfer_selected_creates_internal_transfer(self):
+    def test_descendant_product_totals_transfer_selected_opens_destination_wizard(self):
         self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
         self.StockQuant._update_available_quantity(self.product_a, self.bin_b, 7.0)
 
@@ -175,16 +435,28 @@ class TestDescendantInventoryTotals(TransactionCase):
             *action["domain"],
             ("product_id", "=", self.product_a.id),
         ])
-        transfer_action = total.action_transfer_selected_out_of_current_warehouse()
+        wizard_action = total.action_transfer_selected_out_of_current_warehouse()
+        wizard = self.env[wizard_action["res_model"]].browse(wizard_action["res_id"])
+        destination_warehouse = self.env["stock.warehouse"].create({
+            "name": "Totals Transfer Destination",
+            "code": "TTD",
+        })
+        wizard.destination_warehouse_id = destination_warehouse
+        transfer_action = wizard.action_create_internal_transfer()
         picking = self.env["stock.picking"].browse(transfer_action["res_id"])
 
+        self.assertEqual(wizard_action["res_model"], "stock.subwarehouse.internal.transfer.wizard")
+        self.assertEqual(wizard.selected_inventory_count, 2)
+        self.assertEqual(wizard.selected_product_count, 1)
         self.assertEqual(transfer_action["res_model"], "stock.picking")
         self.assertEqual(picking.picking_type_id, self.warehouse.int_type_id)
+        self.assertEqual(picking.location_dest_id, destination_warehouse.lot_stock_id)
+        self.assertEqual(picking.origin, "下级库存内部调拨")
         self.assertEqual(sum(picking.move_ids.mapped("product_uom_qty")), 12.0)
         self.assertEqual(set(picking.move_ids.mapped("location_id").ids), set((self.bin_a | self.bin_b).ids))
         self.assertTrue(all(move.product_id == self.product_a for move in picking.move_ids))
 
-    def test_quant_descendant_transfer_button_creates_internal_transfer(self):
+    def test_quant_descendant_transfer_button_uses_selected_destination_warehouse(self):
         self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
         self.StockQuant._update_available_quantity(self.product_b, self.bin_b, 3.0)
         quants = self.StockQuant.search([
@@ -192,13 +464,24 @@ class TestDescendantInventoryTotals(TransactionCase):
             ("location_id", "in", (self.bin_a | self.bin_b).ids),
         ])
 
-        transfer_action = quants.with_context(
+        wizard_action = quants.with_context(
             descendant_inventory_warehouse_id=self.warehouse.id,
             descendant_inventory_root_location_id=self.warehouse.view_location_id.id,
         ).action_transfer_selected_out_of_descendant_inventory()
+        wizard = self.env[wizard_action["res_model"]].browse(wizard_action["res_id"])
+        destination_warehouse = self.env["stock.warehouse"].create({
+            "name": "Quant Transfer Destination",
+            "code": "QTD",
+        })
+        wizard.destination_warehouse_id = destination_warehouse
+        transfer_action = wizard.action_create_internal_transfer()
         picking = self.env["stock.picking"].browse(transfer_action["res_id"])
 
+        self.assertEqual(wizard_action["res_model"], "stock.subwarehouse.internal.transfer.wizard")
+        self.assertEqual(set(wizard.quant_ids.ids), set(quants.ids))
         self.assertEqual(picking.picking_type_id, self.warehouse.int_type_id)
+        self.assertEqual(picking.location_dest_id, destination_warehouse.lot_stock_id)
+        self.assertEqual(picking.state, "draft")
         self.assertEqual(
             {move.product_id.id: move.product_uom_qty for move in picking.move_ids},
             {self.product_a.id: 5.0, self.product_b.id: 3.0},
@@ -239,6 +522,27 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(
             action["context"]["default_picking_type_id"],
             self.warehouse.int_type_id.id,
+        )
+
+    def test_internal_transfer_button_only_exists_on_descendant_inventory(self):
+        location_view = self.env.ref(
+            "stock_subwarehouse_hierarchy.view_location_form_subwarehouse_actions"
+        )
+        quant_view = self.env.ref(
+            "stock_subwarehouse_hierarchy.view_stock_quant_tree_descendant_transfer_button"
+        )
+        total_view = self.env.ref(
+            "stock_subwarehouse_hierarchy.view_descendant_inventory_total_list"
+        )
+
+        self.assertNotIn('name="action_create_internal_transfer"', location_view.arch_db)
+        self.assertIn(
+            'name="action_transfer_selected_out_of_descendant_inventory"',
+            quant_view.arch_db,
+        )
+        self.assertIn(
+            'name="action_transfer_selected_out_of_current_warehouse"',
+            total_view.arch_db,
         )
 
     def test_location_load_remove_inventory_action_filters_current_location(self):
@@ -325,11 +629,33 @@ class TestDescendantInventoryTotals(TransactionCase):
             second_order._prepare_website_stock_for_payment()
 
     def test_cart_shortage_line_clears_after_quantity_is_reduced(self):
-        self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 2.0)
-        order, line = self._create_sale_order_line(self.product_a, 3.0)
+        shortage_product = self.env["product.product"].create({
+            "name": "Cart Shortage Isolated Product",
+            "is_storable": True,
+        })
+        self.StockQuant._update_available_quantity(shortage_product, self.bin_a, 2.0)
+        order, line = self._create_sale_order_line(shortage_product, 3.0)
         line.x_source_location_id = False
 
-        self.assertIn(line, order._get_source_inventory_shortage_lines())
+        shortage_lines = order._get_source_inventory_shortage_lines()
+        candidate_availability = [
+            (
+                location.complete_name,
+                order._get_available_qty_for_source_location(
+                    shortage_product, location, exclude_order=order,
+                ),
+            )
+            for location in line._get_source_location_candidates()
+        ]
+        self.assertTrue(line.is_storable)
+        self.assertFalse(line.display_type)
+        self.assertLess(max(quantity for _location, quantity in candidate_availability), 3.0)
+        self.assertIn(
+            line,
+            shortage_lines,
+            f"quantity={line.product_uom_qty}, required={line._get_required_qty_in_product_uom()}, "
+            f"candidates={candidate_availability}",
+        )
         shortage_html = str(self.env["ir.ui.view"]._render_template(
             "website_sale.cart_lines",
             {
@@ -373,6 +699,7 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.product_a.list_price = 120.0
         self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
         order, line = self._create_sale_order_line(self.product_a, 2.0)
+        order.pricelist_id = self.cny_pricelist
         order.website_id = self.env["website"].get_current_website()
         line.x_source_location_id = False
         order._prepare_website_stock_for_payment()
@@ -418,7 +745,7 @@ class TestDescendantInventoryTotals(TransactionCase):
         report_html = report_html.decode()
         self.assertIn(order.name, report_html)
         self.assertIn(self.product_a.display_name, report_html)
-        self.assertIn("not a tax invoice", report_html)
+        self.assertIn("不作为增值税发票", report_html)
 
         refund_wizard = self.env["stock.subwarehouse.website.payment.refund.wizard"].create({
             "order_id": order.id,
@@ -439,6 +766,7 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.product_a.list_price = 120.0
         self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 2.0)
         order, line = self._create_sale_order_line(self.product_a, 2.0)
+        order.pricelist_id = self.cny_pricelist
         line.x_source_location_id = False
         order._prepare_website_stock_for_payment()
         tx = self._create_simulated_wechat_transaction(order, "WX-WEBSITE-NO-STOCK")
@@ -1095,6 +1423,212 @@ class TestDescendantInventoryTotals(TransactionCase):
         with self.assertRaises(UserError):
             order.action_confirm()
 
+    def test_bulk_sale_confirmation_confirms_eligible_orders_with_partial_failure(self):
+        service_product = self.env["product.product"].create({
+            "name": "Bulk Confirmation Service",
+            "type": "service",
+        })
+        good_order = self.env["sale.order"].create({
+            "partner_id": self.customer.id,
+            "order_line": [Command.create({
+                "product_id": service_product.id,
+                "product_uom_qty": 1,
+            })],
+        })
+        already_confirmed_order = self.env["sale.order"].create({
+            "partner_id": self.customer.id,
+            "order_line": [Command.create({
+                "product_id": service_product.id,
+                "product_uom_qty": 1,
+            })],
+        })
+        already_confirmed_order.action_confirm()
+        self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 1.0)
+        failing_order = self.env["sale.order"].create({
+            "partner_id": self.customer.id,
+            "warehouse_id": self.warehouse.id,
+            "order_line": [Command.create({
+                "product_id": self.product_a.id,
+                "product_uom_qty": 2,
+                "x_source_location_id": self.bin_a.id,
+            })],
+        })
+
+        result = (good_order | failing_order | already_confirmed_order).action_bulk_confirm()
+
+        self.assertEqual(good_order.state, "sale")
+        self.assertEqual(failing_order.state, "draft")
+        self.assertEqual(already_confirmed_order.state, "sale")
+        self.assertEqual(result["tag"], "display_notification")
+        self.assertEqual(result["params"]["type"], "warning")
+        self.assertIn("已成功确认 1 个销售订单", result["params"]["message"])
+        self.assertIn("已忽略 1 个非待确认状态的订单", result["params"]["message"])
+        self.assertIn("有 1 个订单确认失败", result["params"]["message"])
+
+        server_action = self.env.ref(
+            "stock_subwarehouse_hierarchy.action_sale_order_bulk_confirm"
+        )
+        self.assertEqual(server_action.binding_model_id.model, "sale.order")
+        self.assertEqual(server_action.binding_view_types, "list")
+
+    def test_bulk_sale_archiving_archives_active_orders(self):
+        active_order = self.env["sale.order"].create({
+            "partner_id": self.customer.id,
+        })
+        already_archived_order = self.env["sale.order"].create({
+            "partner_id": self.customer.id,
+            "active": False,
+        })
+
+        result = (active_order | already_archived_order).action_bulk_archive()
+
+        self.assertFalse(active_order.active)
+        self.assertFalse(already_archived_order.active)
+        self.assertEqual(result["tag"], "display_notification")
+        self.assertEqual(result["params"]["type"], "success")
+        self.assertIn("已成功归档 1 个销售订单", result["params"]["message"])
+        self.assertIn("已忽略 1 个已归档订单", result["params"]["message"])
+
+        server_action = self.env.ref(
+            "stock_subwarehouse_hierarchy.action_sale_order_bulk_archive"
+        )
+        self.assertEqual(server_action.binding_model_id.model, "sale.order")
+        self.assertEqual(server_action.binding_view_types, "list")
+
+    def test_external_sale_is_completed_without_inventory_or_delivery_documents(self):
+        self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
+        self.product_a.lst_price = 325.0
+
+        order = self.env["sale.order"].create({
+            "partner_id": self.customer.id,
+            "warehouse_id": self.warehouse.id,
+            "x_is_external_order": True,
+            "x_processing_fee": 25.0,
+            "x_amount_received": 600.0,
+            "order_line": [Command.create({
+                "product_id": self.product_a.id,
+                "product_uom_qty": 2.0,
+                "price_unit": 300.0,
+                "x_source_location_id": self.bin_a.id,
+            })],
+        })
+
+        self.assertEqual(order.state, "external_done")
+        self.assertEqual(order.delivery_status, "full")
+        self.assertEqual(order.order_line.qty_delivered, 2.0)
+        self.assertEqual(order.order_line.qty_to_invoice, 0.0)
+        self.assertEqual(order.order_line.invoice_status, "no")
+        self.assertFalse(order.order_line.x_source_location_id)
+        self.assertFalse(order.picking_ids)
+        self.assertEqual(order.x_official_total, 650.0)
+        self.product_a.lst_price = 999.0
+        self.assertEqual(order.x_official_total, 650.0)
+        self.assertEqual(
+            self.StockQuant._get_available_quantity(self.product_a, self.bin_a),
+            5.0,
+        )
+        with self.assertRaisesRegex(UserError, "外部订单不参与ERP开票流程"):
+            order._create_invoices()
+
+    def test_external_sale_report_is_separate_and_allocates_order_finance_once(self):
+        self.product_a.lst_price = 100.0
+        external_order = self.env["sale.order"].create({
+            "partner_id": self.customer.id,
+            "x_is_external_order": True,
+            "x_processing_fee": 15.0,
+            "x_amount_received": 250.0,
+            "order_line": [
+                Command.create({
+                    "product_id": self.product_a.id,
+                    "product_uom_qty": 1.0,
+                    "price_unit": 100.0,
+                }),
+                Command.create({
+                    "product_id": self.product_b.id,
+                    "product_uom_qty": 2.0,
+                    "price_unit": 100.0,
+                }),
+            ],
+        })
+        service_product = self.env["product.product"].create({
+            "name": "External Report Internal Control",
+            "type": "service",
+            "list_price": 100.0,
+        })
+        internal_order = self.env["sale.order"].create({
+            "partner_id": self.customer.id,
+            "order_line": [Command.create({
+                "product_id": service_product.id,
+                "product_uom_qty": 1.0,
+                "price_unit": 100.0,
+            })],
+        })
+        internal_order.with_context(skip_procurement=True).action_confirm()
+
+        external_report = self.env["sale.report"].search([
+            ("name", "=", external_order.name),
+            ("x_is_external_order", "=", True),
+        ])
+        internal_report = self.env["sale.report"].search([
+            ("name", "=", internal_order.name),
+            ("x_is_external_order", "=", False),
+        ])
+
+        self.assertEqual(len(external_report), 2)
+        self.assertAlmostEqual(sum(external_report.mapped("x_processing_fee")), 15.0)
+        self.assertAlmostEqual(sum(external_report.mapped("x_amount_received")), 250.0)
+        self.assertTrue(internal_report)
+
+        internal_action = self.env.ref("sale.action_order_report_all")
+        external_action = self.env.ref(
+            "stock_subwarehouse_hierarchy.action_external_sale_report"
+        )
+        self.assertIn("('x_is_external_order', '=', False)", internal_action.domain)
+        self.assertIn("('x_is_external_order', '=', True)", external_action.domain)
+
+    def test_internal_and_external_sales_dashboards_use_separate_domains(self):
+        internal = self.env.ref(
+            "spreadsheet_dashboard_sale.spreadsheet_dashboard_sales"
+        )
+        external = self.env.ref(
+            "stock_subwarehouse_hierarchy.spreadsheet_dashboard_external_sales"
+        )
+        self.env["spreadsheet.dashboard"]._configure_separate_sales_dashboards()
+
+        internal_snapshot = json.loads(internal.spreadsheet_data)
+        external_snapshot = json.loads(external.spreadsheet_data)
+
+        internal_domains = [
+            data["domain"]
+            for data in internal_snapshot.get("lists", {}).values()
+            if data.get("model") == "sale.order"
+        ] + [
+            data["domain"]
+            for data in internal_snapshot.get("pivots", {}).values()
+            if data.get("model") == "sale.report"
+        ]
+        external_domains = [
+            data["domain"]
+            for data in external_snapshot.get("lists", {}).values()
+            if data.get("model") == "sale.order"
+        ] + [
+            data["domain"]
+            for data in external_snapshot.get("pivots", {}).values()
+            if data.get("model") == "sale.report"
+        ]
+
+        self.assertTrue(internal_domains)
+        self.assertTrue(external_domains)
+        self.assertTrue(all(
+            '"x_is_external_order", "=", false' in json.dumps(domain)
+            for domain in internal_domains
+        ))
+        self.assertTrue(all(
+            '"x_is_external_order", "=", true' in json.dumps(domain)
+            for domain in external_domains
+        ))
+        self.assertIn('"x_amount_received"', external.spreadsheet_data)
+
     def test_sale_delivery_move_uses_selected_source_inventory(self):
         self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
         order = self.env["sale.order"].create({
@@ -1113,7 +1647,7 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertTrue(move)
         self.assertEqual(move[:1].location_id, self.bin_a)
 
-    def test_internal_transfer_from_parent_location_does_not_reserve_child_stock(self):
+    def test_internal_transfer_from_parent_location_reserves_child_stock(self):
         self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
         picking = self.env["stock.picking"].create({
             "picking_type_id": self.warehouse.int_type_id.id,
@@ -1133,10 +1667,42 @@ class TestDescendantInventoryTotals(TransactionCase):
         picking.action_assign()
 
         move = picking.move_ids.filtered(lambda stock_move: stock_move.product_id == self.product_a)
-        self.assertNotEqual(move.state, "assigned")
-        self.assertFalse(move.move_line_ids.filtered(lambda line: line.location_id == self.bin_a))
-        with self.assertRaises(UserError):
-            picking.button_validate()
+        self.assertEqual(move.state, "assigned")
+        self.assertTrue(move.move_line_ids.filtered(lambda line: line.location_id == self.bin_a))
+
+    def test_internal_transfer_product_selector_uses_source_descendant_available_stock(self):
+        self.StockQuant._update_available_quantity(self.product_a, self.bin_a, 5.0)
+        self.StockQuant._update_available_quantity(self.product_b, self.bin_b, 2.0)
+        self.StockQuant._update_reserved_quantity(
+            self.product_b,
+            self.bin_b,
+            2.0,
+            strict=True,
+        )
+        other_warehouse = self.env["stock.warehouse"].create({
+            "name": "Internal Selector Other Warehouse",
+            "code": "ISOW",
+        })
+        self.StockQuant._update_available_quantity(
+            self.product_b,
+            other_warehouse.lot_stock_id,
+            8.0,
+        )
+
+        options = self.env["product.product"].with_context(
+            internal_transfer_stock_filter=True,
+            internal_transfer_source_location_id=self.subwarehouse.id,
+            internal_transfer_company_id=self.warehouse.company_id.id,
+        )
+        autocomplete_ids = {
+            product_id for product_id, _label in options.name_search(limit=100)
+        }
+        search_more_ids = set(options.search([]).ids)
+
+        self.assertIn(self.product_a.id, autocomplete_ids)
+        self.assertNotIn(self.product_b.id, autocomplete_ids)
+        self.assertIn(self.product_a.id, search_more_ids)
+        self.assertNotIn(self.product_b.id, search_more_ids)
 
     def test_product_attribute_apply_wizard_adds_attribute_to_all_products(self):
         templates = self.env["product.template"].search([])
@@ -1430,6 +1996,57 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(product_template.x_component_specification, "\u03c68.5*8.1*52")
         self.assertEqual(product_template.x_component_color, "\u672c\u8272")
 
+    def test_product_import_skips_existing_and_in_file_duplicate_codes(self):
+        existing_code = "IMPORT-UNIQUE-EXISTING"
+        self.env["product.template"].create({
+            "name": "Existing import uniqueness product",
+            "default_code": existing_code,
+        })
+        batch = self.env["stock.subwarehouse.product.import.result.batch"].create({
+            "import_job_id": 987654,
+        })
+
+        result = self.env["product.template"].with_context(
+            import_file=True,
+            product_import_result_batch_id=batch.id,
+            product_import_has_headers=True,
+        ).load(
+            ["name", "default_code"],
+            [
+                ["Unique import product", "IMPORT-UNIQUE-NEW"],
+                ["Existing duplicate", existing_code.lower()],
+                ["In-file duplicate", "import-unique-new"],
+                ["Missing code", ""],
+            ],
+        )
+
+        self.assertEqual(len(result["ids"]), 1, result)
+        self.assertEqual(len(result["x_product_import_failures"]), 3)
+        self.assertEqual(batch.line_ids.mapped("status").count("success"), 1)
+        self.assertEqual(batch.line_ids.mapped("status").count("failed"), 3)
+        self.assertEqual(batch.line_ids.mapped("source_row"), [2, 3, 4, 5])
+        self.assertTrue(self.env["product.template"].search([
+            ("default_code", "=", "IMPORT-UNIQUE-NEW"),
+        ]))
+        self.assertFalse(self.env["product.template"].search([
+            ("name", "=", "In-file duplicate"),
+        ]))
+
+    def test_product_file_import_requires_product_code_mapping(self):
+        result = self.env["product.template"].with_context(
+            import_file=True,
+            product_import_has_headers=True,
+        ).load(
+            ["name"],
+            [["Missing product code column"]],
+        )
+
+        self.assertEqual(result["ids"], [])
+        self.assertEqual(len(result["x_product_import_failures"]), 1)
+        self.assertFalse(self.env["product.template"].search([
+            ("name", "=", "Missing product code column"),
+        ]))
+
     def test_product_import_preserves_legacy_repeated_custom_attribute_columns(self):
         self.env["stock.subwarehouse.product.attribute.apply.wizard"].create({
             "attribute_name": "Legacy Attribute A",
@@ -1495,6 +2112,10 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertIn("product_id", import_headers)
         self.assertIn("product_qty", import_headers)
         self.assertIn("never_product_template_attribute_value_ids", import_headers)
+        import_rows = list(workbook["制造单导入"].iter_rows(values_only=True))
+        self.assertEqual(import_rows[1][import_headers.index("name")], "MO-IMPORT-001")
+        self.assertIsNone(import_rows[2][import_headers.index("name")])
+        self.assertTrue(import_rows[2][import_headers.index("product_id")])
 
         attribute_rows = list(workbook["产品属性"].iter_rows(values_only=True))
         self.assertIn(
@@ -1809,7 +2430,7 @@ class TestDescendantInventoryTotals(TransactionCase):
 
         self.assertEqual(rows[0][0], "Order Reference")
         self.assertEqual(rows[1][0], "订单号")
-        self.assertEqual(rows[0][:16], (
+        self.assertEqual(rows[0][:15], (
             "Order Reference",
             "Customer*",
             "Order Date",
@@ -1825,7 +2446,6 @@ class TestDescendantInventoryTotals(TransactionCase):
             "Order Lines/Quantity",
             "Order Lines/Unit Price",
             "Order Lines/x_source_location_id",
-            "x_finance_remark",
         ))
         self.assertIn("Order Lines/Products*", rows[0])
         self.assertNotIn("order_line/product_id/default_code", rows[0])
@@ -1853,7 +2473,9 @@ class TestDescendantInventoryTotals(TransactionCase):
             "partner_id": self.customer.id,
             "x_platform": "有赞",
             "x_channel": "凌动雪具",
-            "x_sale_nature": "retail",
+            "x_sale_nature": self.env.ref(
+                "stock_subwarehouse_hierarchy.sale_nature_retail"
+            ).id,
             "x_finance_remark": "财务备注",
             "order_line": [(
                 0,
@@ -1919,6 +2541,15 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(sale_rows[2][sale_rows[0].index("Order Lines/Products*")], "EXPORT-PRODUCT-A")
         self.assertEqual(sale_rows[2][sale_rows[0].index("x_platform")], "有赞")
         self.assertEqual(sale_rows[2][sale_rows[0].index("x_sale_nature")], "零售")
+
+        for expected_column in (
+            "x_official_total",
+            "x_processing_fee",
+            "x_amount_received",
+            "x_is_external_order",
+        ):
+            self.assertIn(expected_column, sale_rows[0])
+
         self.assertEqual(sale_rows[2][sale_rows[0].index("Order Lines/x_import_product_name")], "双板鞋")
         self.assertEqual(sale_rows[2][sale_rows[0].index("Order Lines/x_color")], "黑色")
         self.assertEqual(sale_rows[2][sale_rows[0].index("Order Lines/x_size")], "260")
@@ -1932,6 +2563,268 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertIn("/stock_subwarehouse_hierarchy/export/product_template.xlsx", product_action["url"])
         self.assertIn("/stock_subwarehouse_hierarchy/export/mrp_production.xlsx", manufacturing_action["url"])
         self.assertIn("/stock_subwarehouse_hierarchy/export/sale_order.xlsx", sale_action["url"])
+
+    def test_sale_import_ignores_official_total_and_finalizes_external_order(self):
+        self.product_a.lst_price = 180.0
+        self.product_a.default_code = "EXT-IMPORT-PRODUCT"
+        result = self.env["sale.order"].with_context(import_file=True).load(
+            [
+                "name",
+                "partner_id",
+                "order_line/product_id",
+                "order_line/product_uom_qty",
+                "x_official_total",
+                "x_processing_fee",
+                "x_amount_received",
+                "x_is_external_order",
+            ],
+            [[
+                "EXT-IMPORT-001",
+                self.customer.display_name,
+                self.product_a.default_code,
+                2.0,
+                1.0,
+                8.0,
+                333.0,
+                "True",
+            ]],
+        )
+
+        self.assertFalse(result["messages"])
+        order = self.env["sale.order"].browse(result["ids"])
+        self.assertEqual(order.state, "external_done")
+        self.assertEqual(order.x_official_total, 360.0)
+        self.assertEqual(order.x_processing_fee, 8.0)
+        self.assertEqual(order.x_amount_received, 333.0)
+        self.assertFalse(order.picking_ids)
+
+    def test_sale_nature_import_can_create_unmatched_value(self):
+        sale_nature_field = self.env["sale.order"]._fields["x_sale_nature"]
+        self.assertEqual(sale_nature_field.type, "many2one")
+        self.assertEqual(
+            sale_nature_field.comodel_name,
+            "stock.subwarehouse.sale.nature",
+        )
+        created_id, created_name = self.env[
+            "stock.subwarehouse.sale.nature"
+        ].name_create("直播团购")
+        created = self.env["stock.subwarehouse.sale.nature"].browse(created_id)
+        self.assertEqual(created_name, "直播团购")
+        self.assertEqual(created.name, "直播团购")
+        self.assertTrue(created.code)
+
+        order = self.env["sale.order"].create({
+            "partner_id": self.customer.id,
+            "x_sale_nature": created.id,
+        })
+        self.assertEqual(order.x_sale_nature, created)
+
+    def test_sale_import_skips_unknown_product_without_blocking_valid_order(self):
+        self.product_a.default_code = "SALE-IMPORT-PARTIAL-VALID"
+        fields_to_import = [
+            "name",
+            "partner_id",
+            "order_line/product_id",
+            "order_line/product_uom_qty",
+        ]
+        rows = [
+            [
+                "SALE-IMPORT-GOOD",
+                self.customer.display_name,
+                self.product_a.default_code,
+                2,
+            ],
+            [
+                "SALE-IMPORT-BAD",
+                self.customer.display_name,
+                "SALE-IMPORT-DOES-NOT-EXIST",
+                1,
+            ],
+        ]
+
+        result = self.env["sale.order"].with_context(
+            import_file=True,
+            import_skip_records=[],
+            sale_import_has_headers=True,
+        ).load(fields_to_import, rows)
+
+        self.assertFalse(result["messages"])
+        self.assertEqual(len(result["ids"]), 1, result)
+        imported_order = self.env["sale.order"].browse(result["ids"])
+        self.assertEqual(imported_order.name, "SALE-IMPORT-GOOD")
+        self.assertEqual(imported_order.order_line.product_id, self.product_a)
+        self.assertEqual(
+            result["x_sale_import_skipped_rows"],
+            [{
+                "source_row": 3,
+                "product_id": "SALE-IMPORT-DOES-NOT-EXIST",
+                "reason": "产品ID在ERP中不存在。",
+            }],
+        )
+
+    def test_sale_import_skips_blank_product_and_preserves_continuation_order(self):
+        self.product_a.default_code = "SALE-IMPORT-CONTINUATION-VALID"
+        fields_to_import = [
+            "name",
+            "partner_id",
+            "order_line/product_id",
+            "order_line/product_uom_qty",
+        ]
+        rows = [
+            ["SALE-IMPORT-CONTINUATION", self.customer.display_name, "", 1],
+            ["", "", self.product_a.default_code, 3],
+        ]
+
+        result = self.env["sale.order"].with_context(
+            import_file=True,
+            import_skip_records=["order_line/product_id"],
+            sale_import_has_headers=True,
+        ).load(fields_to_import, rows)
+
+        self.assertFalse(result["messages"])
+        self.assertEqual(len(result["ids"]), 1, result)
+        imported_order = self.env["sale.order"].browse(result["ids"])
+        self.assertEqual(imported_order.name, "SALE-IMPORT-CONTINUATION")
+        self.assertEqual(imported_order.partner_id, self.customer)
+        self.assertEqual(imported_order.order_line.product_id, self.product_a)
+        self.assertEqual(imported_order.order_line.product_uom_qty, 3)
+        self.assertEqual(result["x_sale_import_skipped_rows"][0]["source_row"], 2)
+        self.assertEqual(result["x_sale_import_skipped_rows"][0]["reason"], "产品ID为空。")
+
+    def test_sale_import_skips_group_missing_required_parent_value(self):
+        self.product_a.default_code = "SALE-IMPORT-REQUIRED-PARENT"
+        fields_to_import = [
+            "name",
+            "partner_id",
+            "order_line/product_id",
+        ]
+        rows = [
+            ["SALE-IMPORT-NO-CUSTOMER", "", self.product_a.default_code],
+            ["SALE-IMPORT-WITH-CUSTOMER", self.customer.display_name, self.product_a.default_code],
+        ]
+
+        result = self.env["sale.order"].with_context(
+            import_file=True,
+            import_skip_records=["partner_id", "order_line/product_id"],
+            sale_import_has_headers=True,
+        ).load(fields_to_import, rows)
+
+        self.assertFalse(result["messages"])
+        self.assertEqual(len(result["ids"]), 1)
+        self.assertEqual(self.env["sale.order"].browse(result["ids"]).name, "SALE-IMPORT-WITH-CUSTOMER")
+        self.assertEqual(result["x_sale_import_skipped_rows"][0]["source_row"], 2)
+        self.assertEqual(
+            result["x_sale_import_skipped_rows"][0]["reason"],
+            "必填字段“客户”缺少值。",
+        )
+
+    def test_sale_import_skip_warning_uses_chinese_field_label_for_salesperson(self):
+        self.product_a.default_code = "SALE-IMPORT-CHINESE-WARNING"
+        result = self.env["sale.order"].with_context(
+            lang="en_US",
+            import_file=True,
+            import_skip_records=["user_id", "order_line/product_id"],
+            sale_import_has_headers=True,
+        ).load(
+            ["name", "partner_id", "user_id", "order_line/product_id"],
+            [[
+                "SALE-IMPORT-NO-SALESPERSON",
+                self.customer.display_name,
+                "",
+                self.product_a.default_code,
+            ]],
+        )
+
+        self.assertFalse(result["ids"])
+        self.assertFalse(result["messages"])
+        self.assertEqual(
+            result["x_sale_import_skipped_rows"][0]["reason"],
+            "必填字段“销售员”缺少值。",
+        )
+
+    def test_sale_import_skips_blank_required_product_even_without_skip_policy(self):
+        self.product_a.default_code = "SALE-IMPORT-BLANK-AUTOMATIC"
+        fields_to_import = [
+            "name",
+            "partner_id",
+            "order_line/product_id",
+        ]
+        rows = [
+            ["SALE-IMPORT-BLANK", self.customer.display_name, ""],
+            ["SALE-IMPORT-NONBLANK", self.customer.display_name, self.product_a.default_code],
+        ]
+
+        result = self.env["sale.order"].with_context(
+            import_file=True,
+            import_skip_records=[],
+            sale_import_has_headers=True,
+        ).load(fields_to_import, rows)
+
+        self.assertFalse(result["messages"])
+        self.assertEqual(len(result["ids"]), 1, result)
+        self.assertEqual(self.env["sale.order"].browse(result["ids"]).name, "SALE-IMPORT-NONBLANK")
+        self.assertEqual(result["x_sale_import_skipped_rows"][0]["source_row"], 2)
+        self.assertEqual(result["x_sale_import_skipped_rows"][0]["reason"], "产品ID为空。")
+
+    def test_sale_file_import_test_and_formal_import_both_allow_partial_success(self):
+        self.product_a.default_code = "SALE-IMPORT-FILE-VALID"
+        self.product_a.flush_recordset(["default_code"])
+        csv_content = (
+            "Order Reference,Customer,Product ID,Quantity\n"
+            f"SALE-FILE-GOOD,{self.customer.display_name},{self.product_a.default_code},2\n"
+            f"SALE-FILE-UNKNOWN,{self.customer.display_name},SALE-FILE-NOT-IN-ERP,1\n"
+            f"SALE-FILE-BLANK,{self.customer.display_name},,1\n"
+        ).encode("utf-8")
+        importer = self.env["base_import.import"].create({
+            "res_model": "sale.order",
+            "file": csv_content,
+            "file_name": "sale_partial_success.csv",
+        })
+        fields_to_import = [
+            "name",
+            "partner_id",
+            "order_line/product_id",
+            "order_line/product_uom_qty",
+        ]
+        columns = ["order reference", "customer", "product id", "quantity"]
+        options = {
+            "advanced": True,
+            "has_headers": True,
+            "headers": True,
+            "skip": 0,
+            "limit": 2000,
+            "encoding": "utf-8",
+            "separator": ",",
+            "quoting": '"',
+            "date_format": "",
+            "datetime_format": "",
+            "float_thousand_separator": ",",
+            "float_decimal_separator": ".",
+            "import_skip_records": [],
+            "import_set_empty_fields": [],
+            "name_create_enabled_fields": {},
+            "fallback_values": {},
+        }
+
+        dry_result = importer.execute_import(
+            fields_to_import, columns, dict(options), dryrun=True
+        )
+        formal_result = importer.execute_import(
+            fields_to_import, columns, dict(options), dryrun=False
+        )
+
+        self.assertFalse(dry_result["messages"])
+        self.assertEqual(len(dry_result["ids"]), 1, dry_result)
+        self.assertEqual(len(dry_result["x_sale_import_skipped_rows"]), 2)
+        self.assertFalse(formal_result["messages"])
+        self.assertEqual(len(formal_result["ids"]), 1, formal_result)
+        self.assertEqual(len(formal_result["x_sale_import_skipped_rows"]), 2)
+        imported_order = self.env["sale.order"].browse(formal_result["ids"])
+        self.assertEqual(imported_order.name, "SALE-FILE-GOOD")
+        self.assertEqual(imported_order.order_line.product_id, self.product_a)
+        self.assertFalse(self.env["sale.order"].search([
+            ("name", "in", ["SALE-FILE-UNKNOWN", "SALE-FILE-BLANK"]),
+        ]))
 
     def test_new_products_do_not_get_default_product_taxes(self):
         product = self.env["product.template"].create({
@@ -1986,6 +2879,7 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(product.x_website_english_name, "Ski Boots 100 flex")
         self.assertEqual(product.x_website_usd_price, 595.0)
         self.assertEqual(product._get_website_display_name(True), "Ski Boots 100 flex")
+        self.assertEqual(product.with_context(lang="en_US").name, "\u6d4b\u8bd5\u53cc\u677f\u978b")
         self.assertEqual(product._get_website_display_price_label(True), "$595.00")
         self.assertEqual(product._get_website_display_name(False), "\u6d4b\u8bd5\u53cc\u677f\u978b")
         self.assertEqual(product._get_website_display_price_label(False), "\uffe5599.00")
@@ -1999,6 +2893,26 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(product._get_english_shop_variant_value("size", "\u901a\u7801"), "One size")
         self.assertEqual(product._get_english_shop_variant_value("flex", "\u786c\u5ea6100"), "100 flex")
         self.assertEqual(action["params"]["type"], "success")
+
+        unsafe_product = self.env["product.template"].create({
+            "name": "\u5b89\u5168 URL \u56de\u9000\u6d4b\u8bd5",
+            "x_website_english_name": "---",
+        })
+        self.assertEqual(
+            unsafe_product.with_context(lang="en_US").name,
+            "\u5b89\u5168 URL \u56de\u9000\u6d4b\u8bd5",
+        )
+
+    def test_english_website_name_does_not_replace_canonical_chinese_product_name(self):
+        product = self.env["product.template"].with_context(lang="zh_CN").create({
+            "name": "\u4e2d\u6587 ERP \u4ea7\u54c1\u540d",
+        })
+
+        product.write({"x_website_english_name": "English Storefront Name"})
+
+        self.assertEqual(product.with_context(lang="zh_CN").name, "\u4e2d\u6587 ERP \u4ea7\u54c1\u540d")
+        self.assertEqual(product.with_context(lang="en_US").name, "\u4e2d\u6587 ERP \u4ea7\u54c1\u540d")
+        self.assertEqual(product._get_website_display_name(True), "English Storefront Name")
 
     def test_website_checkout_language_uses_mapped_usd_price_and_name(self):
         website = self.env["website"].get_current_website()

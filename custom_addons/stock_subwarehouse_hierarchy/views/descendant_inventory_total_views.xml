@@ -9,7 +9,7 @@
                     <button
                         name="action_transfer_selected_out_of_current_warehouse"
                         type="object"
-                        string="转移所有已选项·"
+                        string="内部调拨"
                         class="btn-primary"/>
                 </header>
                 <field name="product_id"/>

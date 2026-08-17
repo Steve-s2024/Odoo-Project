@@ -1,5 +1,6 @@
 import re
 import uuid
+from calendar import timegm
 
 from odoo import api, fields, models
 
@@ -153,6 +154,10 @@ class ProductTemplate(models.Model):
             "price_usd": self.x_website_usd_price,
             "family": self._get_shop_product_family(),
             "group_summary": self._get_shop_group_summary(),
+            # The storefront has its own PostgreSQL catalogue copy.  Preserve
+            # the ERP-selected representative for a same-name product group
+            # instead of letting that copy fall back to an arbitrary SKU.
+            "group_cover": bool(self.x_shop_group_cover),
             "available": self._is_shop_available(),
             "available_quantity": self._get_shop_available_quantity(),
             "variants": variants,
@@ -240,33 +245,16 @@ class ProductTemplate(models.Model):
     def create(self, vals_list):
         records = super().create(vals_list)
         if not self.env.context.get("shop_api_skip_event"):
-            for record in records:
-                self.env["shop.api.event"].enqueue(
-                    "product.created", record, {"product_id": record.shop_api_uuid},
-                )
+            records._queue_shop_product_sync("product.created")
         return records
 
     def write(self, vals):
         result = super().write(vals)
         if self.env.context.get("shop_api_skip_event"):
             return result
-        tracked = {
-            "name", "x_website_english_name", "x_website_description_zh",
-            "x_website_description_en", "list_price", "x_website_usd_price",
-            "website_published", "sale_ok", "active", "categ_id",
-        }
-        image_fields = {"image_1920", "product_template_image_ids", "x_shop_group_cover"}
-        if tracked.intersection(vals):
-            event_type = "product.archived" if vals.get("active") is False else "product.updated"
-            for record in self:
-                self.env["shop.api.event"].enqueue(
-                    event_type, record, {"product_id": record.shop_api_uuid},
-                )
-        if image_fields.intersection(vals):
-            for record in self:
-                self.env["shop.api.event"].enqueue(
-                    "product.image.updated", record, {"product_id": record.shop_api_uuid},
-                )
+        self._queue_shop_product_sync(
+            "product.archived" if vals.get("active") is False else "product.updated"
+        )
         return result
 
 
@@ -298,11 +286,7 @@ class ProductImage(models.Model):
     def create(self, vals_list):
         images = super().create(vals_list)
         if not self.env.context.get("shop_api_skip_event"):
-            for product in images.mapped("product_tmpl_id"):
-                self.env["shop.api.event"].enqueue(
-                    "product.image.updated", product,
-                    {"product_id": product.shop_api_uuid},
-                )
+            images.mapped("product_tmpl_id")._queue_shop_product_sync("product.image.updated")
         return images
 
     def write(self, vals):
@@ -312,22 +296,14 @@ class ProductImage(models.Model):
             "image_1920", "name", "sequence", "product_tmpl_id",
         }.intersection(vals):
             affected_products |= self.mapped("product_tmpl_id")
-            for product in affected_products:
-                self.env["shop.api.event"].enqueue(
-                    "product.image.updated", product,
-                    {"product_id": product.shop_api_uuid},
-                )
+            affected_products._queue_shop_product_sync("product.image.updated")
         return result
 
     def unlink(self):
         products = self.mapped("product_tmpl_id")
         result = super().unlink()
         if not self.env.context.get("shop_api_skip_event"):
-            for product in products.exists():
-                self.env["shop.api.event"].enqueue(
-                    "product.image.updated", product,
-                    {"product_id": product.shop_api_uuid},
-                )
+            products.exists()._queue_shop_product_sync("product.image.updated")
         return result
 
 
@@ -479,8 +455,12 @@ class SaleOrder(models.Model):
         self.partner_id._shop_api_ensure_uuid()
         language = language or self.x_website_checkout_language or self.partner_id.lang or "zh_CN"
         language = "en_US" if str(language).lower().startswith("en") else "zh_CN"
+        payment_expired = self._website_payment_deadline_is_expired()
+        payment_state = "expired" if payment_expired else self.x_website_payment_state
+        payment_expires_at = self.x_website_stock_reserved_until
         return {
             "id": self.shop_api_uuid,
+            "authoritative": True,
             "version": self._shop_api_version(),
             "number": self.name,
             "state": self.state,
@@ -489,8 +469,21 @@ class SaleOrder(models.Model):
             "amount_untaxed": self.amount_untaxed,
             "amount_tax": self.amount_tax,
             "amount_total": self.amount_total,
-            "payment_state": self.x_website_payment_state,
+            "payment_state": payment_state,
+            "payment_expired": payment_expired,
+            "payment_expires_at": fields.Datetime.to_string(
+                payment_expires_at
+            ),
+            "payment_expires_at_epoch": (
+                timegm(payment_expires_at.timetuple()) * 1000
+                if payment_expires_at else 0
+            ),
             "payment_reference": self.x_website_payment_reference or "",
+            "delivery_state": self.x_website_delivery_state or "",
+            "delivery_started_at": fields.Datetime.to_string(
+                self.x_website_delivery_started_at
+            ),
+            "delivered_at": fields.Datetime.to_string(self.x_website_delivered_at),
             "language": language,
             "created_at": fields.Datetime.to_string(self.create_date),
             "items": [
@@ -515,6 +508,30 @@ class SaleOrder(models.Model):
                 for item in self.x_website_refund_request_ids
             ],
         }
+
+    def write(self, vals):
+        previous_delivery_states = {
+            order.id: order.x_website_delivery_state for order in self
+        }
+        result = super().write(vals)
+        if (
+            "x_website_delivery_state" in vals
+            and not self.env.context.get("shop_api_skip_event")
+        ):
+            event_by_state = {
+                "awaiting_delivery": "shipment.ready",
+                "delivering": "shipment.shipped",
+                "delivered": "shipment.delivered",
+            }
+            for order in self:
+                if previous_delivery_states.get(order.id) == order.x_website_delivery_state:
+                    continue
+                event_type = event_by_state.get(order.x_website_delivery_state)
+                if event_type:
+                    self.env["shop.api.event"].enqueue(
+                        event_type, order, order._shop_api_payload(),
+                    )
+        return result
 
     def _get_available_qty_for_source_location(self, product, location, exclude_order=False):
         available = super()._get_available_qty_for_source_location(
@@ -587,6 +604,7 @@ class PaymentTransaction(models.Model):
             self.env["shop.api.event"].enqueue(
                 "payment.completed", transaction, transaction._shop_api_payload(),
             )
+        transactions.sale_order_ids._queue_paid_website_delivery()
         post_processing_cron = self.env.ref(
             "payment.cron_post_process_payment_tx", raise_if_not_found=False,
         )
@@ -643,7 +661,11 @@ class StockPicking(models.Model):
         if "state" in vals and not self.env.context.get("shop_api_skip_event"):
             event_by_state = {"assigned": "shipment.ready", "done": "shipment.delivered"}
             for picking in self:
-                if previous_states[picking.id] != picking.state and picking.picking_type_code == "outgoing":
+                if (
+                    previous_states[picking.id] != picking.state
+                    and picking.picking_type_code == "outgoing"
+                    and not picking.sale_id.x_website_delivery_state
+                ):
                     event_type = event_by_state.get(picking.state)
                     if event_type:
                         self.env["shop.api.event"].enqueue(
@@ -684,6 +706,13 @@ class WebsiteRefundRequest(models.Model):
             "return_location": self.return_location_id.complete_name if self.return_location_id else "",
             "return_carrier": self.shop_api_return_carrier or "",
             "return_tracking": self.shop_api_return_tracking or "",
+            "return_delivery_state": self.x_return_delivery_state or "",
+            "return_delivery_started_at": fields.Datetime.to_string(
+                self.x_return_delivery_started_at
+            ),
+            "return_delivered_at": fields.Datetime.to_string(
+                self.x_return_delivered_at
+            ),
             "items": [
                 {
                     "product_id": line.product_id.shop_api_uuid,
@@ -710,11 +739,14 @@ class WebsiteRefundRequest(models.Model):
         return records
 
     def write(self, vals):
-        previous = {record.id: record.state for record in self}
+        previous = {
+            record.id: (record.state, record.x_return_delivery_state)
+            for record in self
+        }
         result = super().write(vals)
         if not self.env.context.get("shop_api_skip_event"):
             for record in self:
-                if previous[record.id] != record.state:
+                if previous[record.id] != (record.state, record.x_return_delivery_state):
                     self.env["shop.api.event"].enqueue(
                         "refund.updated", record, record._shop_api_payload(),
                     )

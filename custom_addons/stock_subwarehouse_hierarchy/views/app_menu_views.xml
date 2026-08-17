@@ -1,15 +1,117 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="stock.menu_stock_root" model="ir.ui.menu">
-        <field name="sequence">1</field>
+        <field name="name">&#24211;&#23384;</field>
+        <field name="sequence">20</field>
     </record>
 
     <menuitem
         id="menu_product_root"
-        name="产品"
+        name="&#20135;&#21697;"
         action="stock.product_template_action_product"
-        sequence="2"
+        sequence="10"
         web_icon="product,static/description/icon.png"
         groups="base.group_user"
     />
+
+    <record id="sale.sale_menu_root" model="ir.ui.menu">
+        <field name="name">&#38144;&#21806;</field>
+        <field name="sequence">30</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="action_open_storefront_8070" model="ir.actions.act_url">
+        <field name="name">&#32593;&#31449;</field>
+        <field name="url">/stock_subwarehouse_hierarchy/storefront</field>
+        <field name="target">self</field>
+    </record>
+
+    <record id="website.menu_website_configuration" model="ir.ui.menu">
+        <field name="name">&#32593;&#31449;</field>
+        <field name="sequence">40</field>
+        <field name="action" ref="action_open_storefront_8070"/>
+    </record>
+
+    <record id="spreadsheet_dashboard.spreadsheet_dashboard_menu_root" model="ir.ui.menu">
+        <field name="name">&#20202;&#34920;&#30424;</field>
+        <field name="sequence">50</field>
+    </record>
+
+    <record id="base.menu_administration" model="ir.ui.menu">
+        <field name="name">&#35774;&#32622;</field>
+        <field name="sequence">60</field>
+    </record>
+
+    <menuitem
+        id="menu_other_root"
+        name="&#20854;&#20182;"
+        sequence="70"
+        web_icon="base,static/description/icon.png"
+        groups="base.group_user"
+    />
+
+    <record id="mail.menu_root_discuss" model="ir.ui.menu">
+        <field name="parent_id" ref="menu_other_root"/>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="contacts.menu_contacts" model="ir.ui.menu">
+        <field name="parent_id" ref="menu_other_root"/>
+        <field name="sequence">50</field>
+    </record>
+
+    <record id="account.menu_finance" model="ir.ui.menu">
+        <field name="parent_id" ref="menu_other_root"/>
+        <field name="sequence">60</field>
+    </record>
+
+    <record id="mass_mailing.mass_mailing_menu_root" model="ir.ui.menu">
+        <field name="parent_id" ref="menu_other_root"/>
+        <field name="sequence">70</field>
+    </record>
+
+    <record id="utm.menu_link_tracker_root" model="ir.ui.menu">
+        <field name="parent_id" ref="menu_other_root"/>
+        <field name="sequence">80</field>
+    </record>
+
+    <record id="base.menu_management" model="ir.ui.menu">
+        <field name="parent_id" ref="menu_other_root"/>
+        <field name="sequence">90</field>
+    </record>
+
+    <record id="base.menu_tests" model="ir.ui.menu">
+        <field name="parent_id" ref="menu_other_root"/>
+        <field name="sequence">100</field>
+    </record>
+
+    <record id="mrp.menu_mrp_root" model="ir.ui.menu">
+        <field name="active" eval="False"/>
+    </record>
+
+    <menuitem
+        id="menu_distributor_root"
+        name="&#32463;&#38144;&#21830;"
+        parent="menu_other_root"
+        action="action_distributors"
+        sequence="10"
+        groups="base.group_user"
+    />
+
+    <menuitem id="menu_distributor_partners" name="&#32463;&#38144;&#21830;" parent="menu_distributor_root" action="action_distributors" sequence="10" groups="base.group_user"/>
+    <menuitem id="menu_distributor_sale_orders" name="&#38144;&#21806;&#35746;&#21333;" parent="menu_distributor_root" action="action_distributor_sale_orders" sequence="20" groups="sales_team.group_sale_salesman"/>
+    <menuitem id="menu_distributor_deliveries" name="&#20986;&#24211;&#21333;" parent="menu_distributor_root" action="action_distributor_deliveries" sequence="30" groups="stock.group_stock_user"/>
+
+    <menuitem
+        id="menu_supplier_root"
+        name="&#20379;&#24212;&#21830;"
+        parent="menu_other_root"
+        action="action_suppliers"
+        sequence="20"
+        groups="account.group_account_invoice,stock.group_stock_user"
+    />
+
+    <menuitem id="menu_supplier_partners" name="&#20379;&#24212;&#21830;" parent="menu_supplier_root" action="action_suppliers" sequence="10" groups="account.group_account_invoice,stock.group_stock_user"/>
+    <menuitem id="menu_supplier_outstanding_bills" name="&#26410;&#32467;&#28165;&#36134;&#21333;" parent="menu_supplier_root" action="action_supplier_outstanding_bills" sequence="20" groups="account.group_account_invoice"/>
+    <menuitem id="menu_supplier_expected_receipts" name="&#39044;&#26399;&#21040;&#36135;" parent="menu_supplier_root" action="action_supplier_expected_receipts" sequence="30" groups="stock.group_stock_user"/>
 </odoo>

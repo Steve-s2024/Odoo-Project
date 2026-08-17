@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_picking_form_internal_transfer_stocked_products" model="ir.ui.view">
+        <field name="name">stock.picking.form.internal.transfer.stocked.products</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='move_ids']//field[@name='product_id']" position="attributes">
+                <attribute name="context">{
+                    'default_is_storable': True,
+                    'internal_transfer_stock_filter': parent.picking_type_code == 'internal',
+                    'internal_transfer_source_location_id': parent.location_id,
+                    'internal_transfer_company_id': parent.company_id
+                }</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>

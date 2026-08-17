@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_business_import_result_line_list" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.business.import.result.line.list</field>
+        <field name="model">stock.subwarehouse.business.import.result.line</field>
+        <field name="arch" type="xml">
+            <list string="业务导入结果" create="0" edit="0" delete="0"
+                  decoration-success="status == 'success'"
+                  decoration-danger="status == 'failed'">
+                <field name="source_row"/>
+                <field name="status" widget="badge"
+                       decoration-success="status == 'success'"
+                       decoration-danger="status == 'failed'"/>
+                <field name="identifier"/>
+                <field name="record_ref" optional="show"/>
+                <field name="reason"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_business_import_result_line_search" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.business.import.result.line.search</field>
+        <field name="model">stock.subwarehouse.business.import.result.line</field>
+        <field name="arch" type="xml">
+            <search string="业务导入结果">
+                <field name="identifier"/>
+                <filter name="success" string="成功" domain="[('status', '=', 'success')]"/>
+                <filter name="failed" string="未导入" domain="[('status', '=', 'failed')]"/>
+                <separator/>
+                <filter name="group_by_status" string="按状态分组" context="{'group_by': 'status'}"/>
+            </search>
+        </field>
+    </record>
+</odoo>

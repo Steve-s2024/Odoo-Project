@@ -54,4 +54,17 @@
             <attribute name="t-value">line._get_combination_name() if not x_storefront_selected_options else False</attribute>
         </xpath>
     </template>
+
+    <template
+        id="delivery_method_language_detection"
+        inherit_id="website_sale.delivery_method"
+        name="Localized storefront delivery method names"
+    >
+        <xpath expr="//span[@name='o_delivery_method_name']" position="replace">
+            <span
+                name="o_delivery_method_name"
+                t-out="dm.with_context(lang='en_US' if bool(request.lang and (request.lang.code or '').lower().startswith('en')) else 'zh_CN').name"
+            />
+        </xpath>
+    </template>
 </odoo>

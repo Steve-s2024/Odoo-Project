@@ -10,8 +10,9 @@
                     <form t-foreach="x_storefront_payment_methods" t-as="provider"
                           t-att-action="'/shop/erp-payment/start/%s' % provider['code']" method="post">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                        <button class="btn btn-outline-secondary w-100 d-flex align-items-center gap-3 px-3 py-3 text-start"
-                                type="submit">
+                        <button t-att-class="'btn btn-outline-secondary w-100 d-flex align-items-center gap-3 px-3 py-3 text-start %s' % ('disabled opacity-50' if not provider.get('available', True) else '')"
+                                type="submit" t-att-disabled="not provider.get('available', True) or None"
+                                t-att-aria-disabled="'true' if not provider.get('available', True) else 'false'">
                             <i t-att-class="'fa %s fa-lg' % provider['icon_class']" aria-hidden="true"/>
                             <span class="flex-grow-1 fw-semibold" t-out="provider['display_name']"/>
                             <i class="fa fa-chevron-right text-muted" aria-hidden="true"/>
@@ -35,6 +36,7 @@
         </xpath>
         <xpath expr="//section[@id='x_website_stock_hold']" position="attributes">
             <attribute name="t-att-data-expiry-epoch">website_sale_order.x_storefront_reservation_expiry_epoch</attribute>
+            <attribute name="t-att-data-expired-url">'/purchase-detail/%s' % website_sale_order.x_storefront_remote_order_id</attribute>
         </xpath>
     </template>
 
@@ -67,11 +69,27 @@
 
     <template id="payment_status" name="ERP payment status">
         <t t-call="website.layout">
-            <main class="container py-5 text-center">
+                <main class="container py-5 text-center" data-storefront-payment-status="1"
+                  t-att-data-payment-id="payment and payment.get('id') or ''"
+                  t-att-data-payment-pending="'true' if payment and payment.get('state') == 'pending' and not remote_order.get('payment_expired') else 'false'"
+                  t-att-data-payment-expired="'true' if remote_order.get('payment_expired') or remote_order.get('payment_state') == 'expired' else 'false'"
+                  t-att-data-payment-expires-at="remote_order.get('payment_expires_at_epoch') or 0"
+                  t-att-data-expired-url="'/purchase-detail/%s' % remote_order.get('id') if remote_order.get('id') else '/purchase-history'"
+                  t-att-data-payment-simulation="'true' if payment and payment.get('simulation_mode') else 'false'"
+                  t-att-data-receipt-pending="'true' if payment and payment.get('state') == 'done' and completed_order_id and not receipt_available else 'false'">
                 <t t-set="is_english" t-value="request.lang.code == 'en_US'"/>
-                <h1 t-out="'Payment status' if is_english else '支付状态'"/>
-                <p class="fs-4" t-out="('Completed' if is_english else '支付成功') if payment and payment.get('state') == 'done' else ('Pending' if is_english else '等待支付')"/>
-                <div t-if="payment and payment.get('state') == 'pending' and payment.get('qr_code_data_uri')"
+                <h1 t-out="('Payment successful' if is_english else '支付成功') if payment and payment.get('state') == 'done' else (('Order expired' if is_english else '订单已过期') if remote_order.get('payment_expired') else ('Payment status' if is_english else '支付状态'))"/>
+                <p class="fs-4" t-out="('Completed' if is_english else '支付成功') if payment and payment.get('state') == 'done' else (('Expired' if is_english else '已过期') if remote_order.get('payment_expired') else ('Pending' if is_english else '等待支付'))"/>
+                <p t-if="payment and payment.get('state') == 'pending' and not remote_order.get('payment_expired')"
+                   class="alert alert-info d-inline-block"
+                   t-att-data-storefront-payment-expiry="remote_order.get('payment_expires_at_epoch') or 0"
+                   t-att-data-expired-label="'Order expired' if is_english else '订单已过期'">
+                    <t t-out="'Reserved inventory expires in ' if is_english else '库存保留剩余时间：'"/><strong data-payment-countdown-value="1"/>
+                </p>
+                <p t-if="payment and payment.get('state') == 'done'"
+                   class="text-muted"
+                   t-out="'Your order is complete and the cart has been cleared.' if is_english else '订单已完成，购物车已清空。'"/>
+                <div t-if="payment and payment.get('state') == 'pending' and not remote_order.get('payment_expired') and payment.get('qr_code_data_uri')"
                      class="my-4">
                     <p t-if="payment.get('provider') == 'alipay'"
                        t-out="'Scan with Alipay to pay' if is_english else '请使用支付宝扫码支付'"/>
@@ -79,15 +97,32 @@
                     <img t-att-src="payment.get('qr_code_data_uri')" alt="Payment QR code"
                          style="width: min(280px, 80vw); height: auto;"/>
                 </div>
-                <form t-if="payment and payment.get('state') == 'pending' and payment.get('simulation_mode')"
+                <form t-if="payment and payment.get('state') == 'pending' and not remote_order.get('payment_expired') and payment.get('simulation_mode')"
                       action="/shop/payment/simulate-success" method="post" class="mb-3">
                     <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                     <button class="btn btn-primary" type="submit"
                             t-out="'Simulate successful payment' if is_english else '模拟支付成功'"/>
                 </form>
+                <p t-if="payment and payment.get('state') == 'pending' and not remote_order.get('payment_expired')" class="text-muted">
+                    <t t-out="'You may leave this page and resume payment from Purchase History before the timer expires.' if is_english else '您可以离开此页面，并在倒计时结束前从购买记录继续支付。'"/>
+                </p>
+                <a t-if="payment and payment.get('state') == 'pending' and not remote_order.get('payment_expired')"
+                   class="btn btn-outline-secondary me-2" href="/shop/payment/status">
+                    <t t-out="'Refresh status' if is_english else '刷新支付状态'"/>
+                </a>
                 <a class="btn btn-primary" href="/purchase-history">
                     <t t-out="'Purchase history' if is_english else '购买记录'"/>
                 </a>
+                <a t-if="payment and payment.get('state') == 'done' and completed_order_id and receipt_available"
+                   class="btn btn-outline-primary ms-2"
+                   t-attf-href="/purchase-document/#{completed_order_id}/receipt.pdf"
+                   target="_blank"
+                   t-out="'View receipt' if is_english else '查看付款收据'"/>
+                <span t-if="payment and payment.get('state') == 'done' and completed_order_id and not receipt_available"
+                      class="d-inline-flex align-items-center gap-2 ms-2 text-muted">
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"/>
+                    <span t-out="'Preparing receipt…' if is_english else '正在生成付款收据…'"/>
+                </span>
             </main>
         </t>
     </template>

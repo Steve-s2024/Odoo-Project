@@ -10,9 +10,17 @@
             .x_purchase_list { padding-top: 24px; padding-bottom: 72px; }
             .x_purchase_item { display: grid; grid-template-columns: 1.2fr .9fr .8fr auto; gap: 18px; align-items: center; padding: 22px 0; border-bottom: 1px solid #e5e5e5; color: inherit; text-decoration: none; }
             .x_purchase_item:hover { background: #f7f7f7; margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
+            .x_portal_title_motion { position: relative; color: inherit; text-decoration: none; transition: color 180ms ease, transform 180ms ease; }
+            .x_portal_title_motion::after { content: ""; position: absolute; right: 0; bottom: -0.14em; left: 0; height: 2px; background: currentColor; transform: scaleX(0); transform-origin: right center; transition: transform 220ms ease; }
+            .x_portal_title_motion:hover, .x_portal_title_motion:focus-visible { color: inherit; text-decoration: none; transform: translateY(-1px); }
+            .x_portal_title_motion:hover::after, .x_portal_title_motion:focus-visible::after { transform: scaleX(1); transform-origin: left center; }
+            .x_portal_title_motion:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
             .x_purchase_number { font-weight: 900; font-size: 1.08rem; }
             .x_purchase_meta { color: #666; font-size: .92rem; margin-top: 5px; }
             .x_purchase_status { display: inline-block; padding: 5px 9px; background: #f0f0f0; font-size: .82rem; font-weight: 800; }
+            .x_payment_countdown { display: block; margin-top: 7px; color: #8a5a00; font-size: .82rem; font-weight: 700; }
+            .x_payment_countdown_alert { margin: 18px 0 0; padding: 12px 16px; background: #fff5d6; color: #624500; }
+            .x_payment_countdown.is-expired, .x_payment_countdown_alert.is-expired { background: #ffe5e5; color: #941b1b; }
             .x_purchase_amount { font-weight: 900; text-align: right; }
             .x_purchase_arrow { font-size: 1.35rem; }
             .x_purchase_empty { padding: 52px 0; color: #666; text-align: center; }
@@ -62,6 +70,7 @@
             .x_refund_history_item + .x_refund_history_item { border-top: 1px solid #dedede; }
             .x_refund_return { margin-top: 12px; padding: 12px 16px; border-left: 3px solid #111; background: #fff8df; color: #4a3b00; }
             .x_remote_error { padding: 14px 18px; background: #ffe6e6; color: #8a1111; }
+            @media (prefers-reduced-motion: reduce) { .x_portal_title_motion, .x_portal_title_motion::after { transition: none; } .x_portal_title_motion:hover, .x_portal_title_motion:focus-visible { transform: none; } }
             @media (max-width: 760px) { .x_purchase_grid, .x_purchase_detail_head { display: block; } .x_purchase_summary { margin-top: 28px; } }
             @media (max-width: 680px) { .x_purchase_inner { padding-left: 16px; padding-right: 16px; } .x_purchase_item { grid-template-columns: 1fr auto; } .x_refund_row { grid-template-columns: minmax(0,1fr) 90px; } .x_product_option_subtitle { display: block; margin: 4px 0 0; } }
         </style>
@@ -80,9 +89,16 @@
             <section class="x_purchase_header"><div class="x_purchase_inner"><h1 t-out="'Purchase History' if is_english else '购买记录'"/><p t-out="'Review payment, processing, and completed orders.' if is_english else '查看待支付、处理中和已完成的订单。'"/></div></section>
             <section class="x_purchase_inner x_purchase_list"><div id="oe_structure_purchase_history_top" class="oe_structure oe_empty"/>
                 <p t-if="portal_error" class="x_remote_error" t-out="portal_error"/>
-                <a t-foreach="orders" t-as="order" t-attf-href="/purchase-detail/#{order['id']}" class="x_purchase_item">
+                <a t-foreach="orders" t-as="order" t-attf-href="/purchase-detail/#{order['id']}" class="x_purchase_item x_portal_title_motion">
                     <div><div class="x_purchase_number" t-out="order.get('number')"/><div class="x_purchase_meta" t-out="order.get('created_at')"/></div>
-                    <div><span class="x_purchase_status" t-out="status_label(order, is_english)"/></div>
+                    <div t-att-data-storefront-payment-expiry="order.get('payment_expires_at_epoch') or 0"
+                         t-att-data-expired-label="'Expired' if is_english else '已过期'">
+                        <span class="x_purchase_status" t-out="status_label(order, is_english)"/>
+                        <small t-if="order.get('payment_state') in ('unpaid', 'pending', 'error') and not order.get('payment_expired')"
+                               class="x_payment_countdown">
+                            <t t-out="'Payment expires in ' if is_english else '支付剩余时间：'"/><span data-payment-countdown-value="1"/>
+                        </small>
+                    </div>
                     <span class="x_purchase_amount"><t t-out="currency_symbol(order.get('currency'))"/><t t-out="'{:,.2f}'.format(order.get('amount_total') or 0)"/></span><span class="x_purchase_arrow">&#8594;</span>
                 </a>
                 <p t-if="not orders and not portal_error" class="x_purchase_empty" t-out="'There are no purchases yet.' if is_english else '暂无购买记录。'"/>
@@ -94,9 +110,8 @@
     <template id="remote_refund_history" name="Remote Refund History">
         <section class="x_refund_history mt-5" t-if="refunds"><h2 class="h4 mb-3" t-out="'Refund history' if is_english else '退款记录'"/><div class="x_refund_history_list">
             <article t-foreach="refunds" t-as="refund" class="x_refund_history_entry">
-                <div class="x_refund_history_head"><strong t-out="'Refund request' if is_english else '退款申请'"/><span class="x_refund_history_status" t-out="refund_label(refund, is_english)"/><span class="x_refund_history_total"><t t-out="currency_symbol(refund.get('currency'))"/><t t-out="'{:,.2f}'.format(refund.get('amount') or 0)"/></span></div>
+                <div class="x_refund_history_head"><strong t-out="'Refund request' if is_english else '退款申请'"/><span class="x_refund_history_status"><t t-out="refund_label(refund, is_english)"/><t t-if="refund.get('return_delivery_state')"> · <t t-out="return_delivery_label(refund, is_english)"/></t></span><span class="x_refund_history_total"><t t-out="currency_symbol(refund.get('currency'))"/><t t-out="'{:,.2f}'.format(refund.get('amount') or 0)"/></span></div>
                 <div class="x_refund_history_items"><div t-foreach="refund.get('items') or []" t-as="item" class="x_refund_history_item"><div class="x_product_name_with_options"><strong t-out="item.get('name')"/><t t-call="storefront_api_bridge.remote_product_option_subtitle"/></div><span><t t-out="'Quantity: ' if is_english else '数量：'"/><t t-out="item.get('quantity')"/></span><span class="x_refund_history_amount"><t t-out="currency_symbol(refund.get('currency'))"/><t t-out="'{:,.2f}'.format(item.get('amount') or 0)"/></span></div></div>
-                <div t-if="refund.get('return_required') and refund.get('state') in ('returning', 'return_cancelled')" class="x_refund_return"><strong t-out="'Product return required' if is_english else '需要退回商品'"/><div t-if="refund.get('return_location')" t-out="refund.get('return_location')"/></div>
             </article></div>
         </section>
     </template>
@@ -104,13 +119,26 @@
     <template id="remote_purchase_detail_page" name="Remote Purchase Detail">
         <t t-call="website.layout"><main id="wrap" class="x_purchase_page"><t t-call="storefront_api_bridge.remote_portal_style"/>
             <div id="oe_structure_remote_purchase_detail_page_top" class="oe_structure oe_empty"/>
-            <section class="x_purchase_inner x_purchase_detail"><div id="oe_structure_purchase_detail_top" class="oe_structure oe_empty"/><a href="/purchase-history" class="x_purchase_back" t-out="'← Purchase History' if is_english else '← 购买记录'"/>
+            <section class="x_purchase_inner x_purchase_detail"><div id="oe_structure_purchase_detail_top" class="oe_structure oe_empty"/><a href="/purchase-history" class="x_purchase_back x_portal_title_motion" t-out="'← Purchase History' if is_english else '← 购买记录'"/>
+                <div t-if="resume_payment_error" class="x_remote_error mt-3" role="alert"
+                     t-out="'This pending payment cannot be restored on the Shop. Please contact customer support.' if is_english else '此待支付订单暂时无法恢复，请联系客服。'"/>
+                <div t-if="order.get('payment_state') in ('unpaid', 'pending', 'error') and not order.get('payment_expired')"
+                     class="x_payment_countdown_alert"
+                     t-att-data-storefront-payment-expiry="order.get('payment_expires_at_epoch') or 0"
+                     t-att-data-expired-label="'Order expired' if is_english else '订单已过期'">
+                    <t t-out="'Reserved inventory expires in ' if is_english else '库存保留剩余时间：'"/><strong data-payment-countdown-value="1"/>
+                </div>
                 <div class="x_purchase_detail_head"><div><p class="text-muted mb-2" t-out="'Order' if is_english else '订单'"/><h1 t-out="order.get('number')"/></div><span class="x_purchase_status" t-out="status"/></div>
                 <div class="x_purchase_grid"><section><h2 class="h4 mb-3" t-out="'Items' if is_english else '商品明细'"/>
                     <div class="x_purchase_lines"><div t-foreach="order.get('items') or []" t-as="item" class="x_purchase_line"><div class="x_product_name_with_options"><span class="x_purchase_line_name" t-out="item.get('name')"/><t t-call="storefront_api_bridge.remote_product_option_subtitle"/></div><span class="x_purchase_line_qty">× <t t-out="item.get('quantity')"/></span><span class="x_purchase_line_total"><t t-out="currency_symbol(order.get('currency'))"/><t t-out="'{:,.2f}'.format(item.get('total') or 0)"/></span></div></div>
-                </section><aside class="x_purchase_summary"><dl><dt t-out="'Order date' if is_english else '下单时间'"/><dd t-out="order.get('created_at')"/><dt t-out="'Payment status' if is_english else '支付状态'"/><dd t-out="payment_status"/><dt t-out="'Payment method' if is_english else '支付方式'"/><dd t-out="payment_method"/><t t-if="payment and payment.get('provider_reference')"><dt t-out="'Transaction reference' if is_english else '交易参考号'"/><dd t-out="payment.get('provider_reference')"/></t></dl><dl class="x_purchase_total"><dt t-out="'Total' if is_english else '订单总额'"/><dd><t t-out="currency_symbol(order.get('currency'))"/><t t-out="'{:,.2f}'.format(order.get('amount_total') or 0)"/></dd></dl>
+                </section><aside class="x_purchase_summary"><dl><dt t-out="'Order date' if is_english else '下单时间'"/><dd t-out="order.get('created_at')"/><dt t-out="'Payment status' if is_english else '支付状态'"/><dd t-out="payment_status"/><t t-if="order.get('payment_state') == 'paid'"><dt t-out="'Delivery status' if is_english else '配送状态'"/><dd t-out="delivery_status"/></t><dt t-out="'Payment method' if is_english else '支付方式'"/><dd t-out="payment_method"/><t t-if="payment and payment.get('provider_reference')"><dt t-out="'Transaction reference' if is_english else '交易参考号'"/><dd t-out="payment.get('provider_reference')"/></t></dl><dl class="x_purchase_total"><dt t-out="'Total' if is_english else '订单总额'"/><dd><t t-out="currency_symbol(order.get('currency'))"/><t t-out="'{:,.2f}'.format(order.get('amount_total') or 0)"/></dd></dl>
                     <a t-if="documents.get('receipt')" t-attf-href="/purchase-document/#{order['id']}/receipt.pdf" class="btn btn-outline-dark x_purchase_receipt" target="_blank" t-out="'Download receipt' if is_english else '下载付款收据'"/>
                     <a t-foreach="documents.get('invoices') or []" t-as="invoice" t-attf-href="/purchase-document/#{order['id']}/invoice/#{invoice['id']}.pdf" class="btn btn-outline-dark x_purchase_receipt" target="_blank"><t t-out="'Download invoice' if is_english else '下载发票'"/><t t-if="invoice.get('number')"> · <t t-out="invoice.get('number')"/></t></a>
+                    <form t-if="can_pay" t-attf-action="/purchase-detail/#{order['id']}/pay" method="post">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <button type="submit" class="btn btn-dark x_purchase_receipt"
+                                t-out="'Pay order' if is_english else '支付订单'"/>
+                    </form>
                     <a t-attf-href="/refund-item/#{order['id']}" class="btn btn-outline-dark x_purchase_receipt" t-out="'Request a refund' if is_english else '申请退款'"/>
                 </aside></div><t t-call="storefront_api_bridge.remote_refund_history"/>
                 <div id="oe_structure_purchase_detail_bottom" class="oe_structure oe_empty"/>
@@ -125,7 +153,7 @@
                 <t t-else="" t-out="'Refund request was not successful. Please contact customer support.' if is_english else '退款申请提交失败，请联系客服。'"/>
             </div>
             <div id="oe_structure_remote_refund_item_page_top" class="oe_structure oe_empty"/>
-            <section class="x_purchase_inner x_refund_form"><div id="oe_structure_refund_item_top" class="oe_structure oe_empty"/><a t-attf-href="/purchase-detail/#{order['id']}" class="x_purchase_back" t-out="'← Purchase details' if is_english else '← 购买详情'"/><h1 t-out="'Request a refund' if is_english else '申请退款'"/>
+            <section class="x_purchase_inner x_refund_form"><div id="oe_structure_refund_item_top" class="oe_structure oe_empty"/><a t-attf-href="/purchase-detail/#{order['id']}" class="x_purchase_back x_portal_title_motion" t-out="'← Purchase details' if is_english else '← 购买详情'"/><h1 t-out="'Request a refund' if is_english else '申请退款'"/>
                 <p t-out="'Select the purchased items and quantities you want reviewed for refund.' if is_english else '选择需要申请退款的商品与数量。审核通过后处理退款。'"/>
                 <form t-attf-action="/refund-item/#{order['id']}/submit" method="post" data-refund-submit-form="1"><input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/><input type="hidden" name="refund_attempt_id" t-att-value="refund_attempt_id"/>
                     <div class="x_refund_table"><div t-foreach="order.get('items') or []" t-as="item" t-if="item.get('refundable')" class="x_refund_row"><div class="x_product_name_with_options"><strong t-out="item.get('name')"/><t t-call="storefront_api_bridge.remote_product_option_subtitle"/><small class="d-block text-muted"><t t-out="'Purchased quantity: ' if is_english else '购买数量：'"/><t t-out="item.get('quantity')"/></small></div><span><t t-out="currency_symbol(order.get('currency'))"/><t t-out="'{:,.2f}'.format(item.get('unit_price') or 0)"/></span><input type="number" min="0" t-att-max="item.get('quantity')" step="1" value="0" t-att-name="'quantity_' + item.get('product_id')"/></div></div>

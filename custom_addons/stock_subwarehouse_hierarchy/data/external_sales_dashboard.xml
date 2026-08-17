@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="spreadsheet_dashboard_external_sales" model="spreadsheet.dashboard">
+        <field name="name">外部销售</field>
+        <field name="main_data_model_ids" eval="[(4, ref('sale.model_sale_order'))]"/>
+        <field name="dashboard_group_id" ref="spreadsheet_dashboard.spreadsheet_dashboard_group_sales"/>
+        <field name="group_ids" eval="[Command.link(ref('sales_team.group_sale_manager'))]"/>
+        <field name="sequence">150</field>
+        <field name="is_published">True</field>
+    </record>
+    <function model="spreadsheet.dashboard" name="_configure_separate_sales_dashboards"/>
+</odoo>

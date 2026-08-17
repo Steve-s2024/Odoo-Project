@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
     <record id="ir_cron_shop_api_expire_reservations" model="ir.cron">
-        <field name="name">Shop API：释放过期库存预留</field>
+        <field name="name">网站 API：释放过期库存预留</field>
         <field name="model_id" ref="model_shop_api_reservation"/>
         <field name="state">code</field>
         <field name="code">model._cron_expire_reservations()</field>
@@ -9,11 +9,19 @@
         <field name="interval_type">minutes</field>
     </record>
     <record id="ir_cron_shop_api_dispatch_events" model="ir.cron">
-        <field name="name">Shop API：投递 Webhook 事件</field>
+        <field name="name">网站 API：投递 Webhook 事件</field>
         <field name="model_id" ref="model_shop_api_event"/>
         <field name="state">code</field>
         <field name="code">model._cron_dispatch_events()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">minutes</field>
+    </record>
+    <record id="ir_cron_shop_api_flush_product_sync_set" model="ir.cron">
+        <field name="name">网站 API：每24小时推送产品更新</field>
+        <field name="model_id" ref="model_shop_api_product_sync_pending"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_flush_pending_products()</field>
+        <field name="interval_number">24</field>
+        <field name="interval_type">hours</field>
     </record>
 </odoo>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="sequence_distributor" model="ir.sequence">
+        <field name="name">Distributor</field>
+        <field name="code">stock.subwarehouse.distributor</field>
+        <field name="prefix">DIST/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="sequence_supplier" model="ir.sequence">
+        <field name="name">Supplier</field>
+        <field name="code">stock.subwarehouse.supplier</field>
+        <field name="prefix">SUP/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <function model="res.partner" name="action_backfill_supplier_codes"/>
+</odoo>

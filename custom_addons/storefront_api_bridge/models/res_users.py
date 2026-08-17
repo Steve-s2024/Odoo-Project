@@ -1,5 +1,7 @@
+import uuid
+
 from odoo import Command, _, api, fields, models
-from odoo.exceptions import AccessDenied
+from odoo.exceptions import AccessDenied, UserError
 
 from .api_client import StorefrontApiError
 
@@ -13,6 +15,45 @@ class ResUsers(models.Model):
         readonly=True,
         index=True,
     )
+
+    @api.model
+    def change_password(self, old_passwd, new_passwd):
+        """Change the authoritative ERP password without creating a Shop hash."""
+        try:
+            confirmation = self.env["storefront.erp.client"].post(
+                "/api/v1/customers/password/change",
+                {
+                    "login": self.env.user.login,
+                    "current_password": old_passwd,
+                    "new_password": new_passwd,
+                },
+                idempotency_key=f"storefront-password-change-{uuid.uuid4()}",
+                timeout_seconds=30,
+            )
+        except StorefrontApiError as error:
+            if error.code == "invalid_credentials":
+                raise AccessDenied() from None
+            raise UserError(_(
+                "ERP could not confirm the password change. "
+                "Your password was not changed."
+            )) from None
+        if (
+            not isinstance(confirmation, dict)
+            or confirmation.get("authoritative") is not True
+            or confirmation.get("changed") is not True
+        ):
+            raise UserError(_(
+                "ERP could not confirm the password change. "
+                "Your password was not changed."
+            ))
+        return True
+
+    def _change_password(self, new_passwd):
+        """Block Odoo wizards that would write only the presentation DB."""
+        raise UserError(_(
+            "The Shop does not store account passwords. Use the Shop password "
+            "reset page so ERP can change the authoritative password."
+        ))
 
     @api.model
     def authenticate(self, credential, user_agent_env):

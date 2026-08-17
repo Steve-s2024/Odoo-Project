@@ -37,6 +37,11 @@ class StockMove(models.Model):
     def _should_reserve_from_exact_source_location(self, location_id, strict):
         if strict:
             return True
+        # An internal transfer created for a warehouse/root location is allowed
+        # to consume its descendant subwarehouse stock. Outgoing website sales
+        # still keep their explicitly selected source location exact.
+        if len(self) == 1 and self.picking_type_id.code == "internal":
+            return False
         location = location_id.exists()
         if not location or location.should_bypass_reservation():
             return strict

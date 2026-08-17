@@ -1,6 +1,7 @@
 import logging
 import uuid
 
+from odoo import fields
 from odoo.http import content_disposition, request, route
 from odoo.addons.stock_subwarehouse_hierarchy.controllers.purchase_history import (
     WebsitePurchaseHistory,
@@ -44,10 +45,18 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
     def _status_label(order, is_english):
         payment_state = order.get("payment_state")
         state = order.get("state")
+        if payment_state == "expired" or order.get("payment_expired"):
+            return "Expired" if is_english else "已过期"
         if payment_state == "paid":
-            return "Completed" if is_english else "已完成"
+            delivery_state = order.get("delivery_state")
+            labels = {
+                "awaiting_delivery": ("Awaiting dispatch", "待发货"),
+                "delivering": ("Delivering", "配送中"),
+                "delivered": ("Delivered", "已送达"),
+            }
+            return labels.get(delivery_state, ("Paid", "已支付"))[0 if is_english else 1]
         if payment_state == "pending":
-            return "Payment processing" if is_english else "支付处理中"
+            return "Awaiting payment" if is_english else "待支付"
         if state == "cancel":
             return "Cancelled" if is_english else "已取消"
         return "Awaiting payment" if is_english else "待支付"
@@ -56,8 +65,9 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
     def _payment_label(order, is_english):
         labels = {
             "unpaid": ("Unpaid", "未支付"),
-            "pending": ("Payment processing", "支付处理中"),
+            "pending": ("Awaiting payment", "待支付"),
             "paid": ("Paid", "已支付"),
+            "expired": ("Expired", "已过期"),
             "error": ("Payment failed", "支付失败"),
         }
         return labels.get(order.get("payment_state"), ("Unknown", "未知"))[0 if is_english else 1]
@@ -77,6 +87,26 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         return labels.get(refund.get("state"), ("Unknown", "未知"))[0 if is_english else 1]
 
     @staticmethod
+    def _delivery_label(order, is_english):
+        labels = {
+            "awaiting_delivery": ("Awaiting dispatch", "待发货"),
+            "delivering": ("Delivering", "配送中"),
+            "delivered": ("Delivered", "已送达"),
+        }
+        return labels.get(order.get("delivery_state"), ("—", "—"))[0 if is_english else 1]
+
+    @staticmethod
+    def _return_delivery_label(refund, is_english):
+        labels = {
+            "awaiting_delivery": ("Awaiting return dispatch", "等待退货发出"),
+            "delivering": ("Return in transit", "退货运输中"),
+            "delivered": ("Return delivered", "退货已送达"),
+        }
+        return labels.get(refund.get("return_delivery_state"), ("—", "—"))[
+            0 if is_english else 1
+        ]
+
+    @staticmethod
     def _currency_symbol(currency_code):
         return {
             "CNY": "￥",
@@ -88,11 +118,14 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         return request.redirect(f"/web/login?redirect={target}")
 
     def _remote_order(self, order_id):
-        if request.env.user._is_public():
+        session = getattr(request, "session", {})
+        session_completed_order = session.get("x_storefront_completed_order_id")
+        if request.env.user._is_public() and str(order_id) != str(session_completed_order or ""):
             return None
         internal_user = request.env.user._is_internal()
         customer_id = self._remote_customer_id()
-        if not internal_user and not customer_id:
+        session_authorized = str(order_id) == str(session_completed_order or "")
+        if not internal_user and not customer_id and not session_authorized:
             return None
         try:
             order = request.env["storefront.erp.client"].get(
@@ -103,7 +136,11 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
             return None
         # ERP-authorized internal website editors may inspect any storefront
         # order. Portal users remain restricted to their own ERP customer ID.
-        return order if internal_user or order.get("customer_id") == customer_id else None
+        return order if (
+            internal_user
+            or session_authorized
+            or order.get("customer_id") == customer_id
+        ) else None
 
     @staticmethod
     def _can_view_remote_orders():
@@ -111,6 +148,49 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         return not user._is_public() and (
             user._is_internal() or bool(user.sudo().x_storefront_remote_customer_id)
         )
+
+    @staticmethod
+    def _remote_order_is_payable(order):
+        """Accept only an explicitly unpaid, non-cancelled ERP order."""
+        if not order:
+            return False
+        try:
+            expires_at = fields.Datetime.to_datetime(order.get("payment_expires_at"))
+        except (TypeError, ValueError):
+            expires_at = False
+        return bool(
+            order.get("state") in {"draft", "sent"}
+            and order.get("payment_state") in {"unpaid", "pending", "error"}
+            and order.get("payment_expired") is not True
+            and expires_at
+            and expires_at > fields.Datetime.now()
+        )
+
+    def _resumable_local_order(self, order):
+        """Return the current account's matching Shop presentation order.
+
+        ERP remains authoritative for the order/payment state.  The local
+        record is used only to prove that this Shop account owns the checkout
+        presentation that can be restored.  This also lets an internal website
+        editor resume an order it actually placed without allowing that editor
+        to pay an arbitrary customer order visible through the admin history.
+        """
+        if request.env.user._is_public() or not self._remote_order_is_payable(order):
+            return request.env["sale.order"].browse()
+        customer_id = order.get("customer_id")
+        if not customer_id:
+            return request.env["sale.order"].browse()
+        return request.env["sale.order"].sudo().search([
+            ("x_storefront_remote_order_id", "=", order.get("id")),
+            ("x_storefront_remote_customer_id", "=", customer_id),
+            (
+                "partner_id.commercial_partner_id",
+                "=",
+                request.env.user.partner_id.commercial_partner_id.id,
+            ),
+            ("website_id", "=", request.website.id),
+            ("state", "=", "draft"),
+        ], order="id desc", limit=1)
 
     def _render_purchase_history_page(self, orders, error=False):
         is_english = self._is_english()
@@ -203,21 +283,78 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         payment = completed_payments[-1] if completed_payments else (
             (order.get("payments") or [])[-1] if order.get("payments") else {}
         )
+        can_pay = bool(self._resumable_local_order(order))
+        resume_payment_error = getattr(request, "session", {}).pop(
+            "x_storefront_resume_payment_error", False
+        )
         return request.render("storefront_api_bridge.remote_purchase_detail_page", {
             "order": order,
             "refunds": refunds,
             "is_english": is_english,
             "status": self._status_label(order, is_english),
             "payment_status": self._payment_label(order, is_english),
+            "delivery_status": self._delivery_label(order, is_english),
             "payment": payment,
             "payment_method": self._payment_method_label(
                 payment.get("provider"), is_english
             ) if payment else "—",
             "documents": documents,
+            "can_pay": can_pay,
+            "resume_payment_error": resume_payment_error,
             "refund_label": self._refund_label,
+            "return_delivery_label": self._return_delivery_label,
             "currency_symbol": self._currency_symbol,
             "additional_title": "Purchase Details" if is_english else "购买详情",
         })
+
+    @route(
+        "/purchase-detail/<string:order_uuid>/pay",
+        type="http", auth="user", website=True, methods=["POST"], sitemap=False,
+    )
+    def resume_remote_payment(self, order_uuid, **post):
+        """Restore only the owner's ERP-confirmed local presentation cart."""
+        order = self._remote_order(order_uuid)
+        if not order or not self._remote_order_is_payable(order):
+            return request.redirect(f"/purchase-detail/{order_uuid}")
+
+        local_order = self._resumable_local_order(order)
+        if not local_order:
+            request.session["x_storefront_resume_payment_error"] = True
+            return request.redirect(f"/purchase-detail/{order_uuid}")
+
+        payments = [
+            item for item in (order.get("payments") or [])
+            if item.get("operation") != "refund"
+            and item.get("state") in {"draft", "pending", "authorized"}
+        ]
+        payment = payments[-1] if payments else {}
+        if payment:
+            provider = payment.get("provider")
+            if not provider or not local_order._storefront_payment_is_authoritative(
+                payment,
+                order_uuid,
+                provider,
+                payment_id=payment.get("id"),
+            ):
+                request.session["x_storefront_resume_payment_error"] = True
+                return request.redirect(f"/purchase-detail/{order_uuid}")
+            local_order.write({
+                "x_storefront_remote_payment_id": payment["id"],
+                "x_storefront_remote_state": payment.get("state"),
+                "x_storefront_payment_provider": payment.get("provider"),
+                "x_storefront_payment_currency": payment.get("currency"),
+                "x_storefront_payment_amount": payment.get("amount") or 0.0,
+            })
+
+        request.session["sale_order_id"] = local_order.id
+        request.session["website_sale_cart_quantity"] = int(local_order.cart_quantity)
+        request.session["x_storefront_pending_local_order_id"] = local_order.id
+        request.session["x_storefront_pending_order_id"] = order_uuid
+        request.session["x_storefront_pending_payment_id"] = payment.get("id") or False
+        request.session.pop("x_storefront_completed_payment_state", None)
+        return request.redirect(
+            "/shop/payment/status" if payment else "/shop/payment"
+        )
 
     @route()
     def refund_item(self, order_id, **kwargs):
@@ -250,6 +387,7 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
             "refunds": refunds,
             "is_english": is_english,
             "refund_label": self._refund_label,
+            "return_delivery_label": self._return_delivery_label,
             "currency_symbol": self._currency_symbol,
             "refund_attempt_id": str(uuid.uuid4()),
             "refund_flash": session.pop("x_storefront_refund_flash", False),

@@ -100,25 +100,6 @@
                             <span class="x_refund_history_amount" t-field="refund_line.amount" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/>
                         </div>
                     </div>
-                    <div class="x_refund_return" t-if="refund_request.return_required and refund_request.state in ('returning', 'return_cancelled')">
-                        <strong t-out="'Product return required' if is_english else '需要退回商品'"/>
-                        <t t-if="refund_request.state == 'returning'">
-                            <span t-out="'Ship the listed products back to the return warehouse. The payment refund can only begin after the warehouse confirms receipt.' if is_english else '请将上述商品寄回退货仓库。仓库确认收货后，才能发起支付退款。'"/>
-                            <div t-if="refund_request.return_warehouse_id" class="mt-1">
-                                <t t-out="'Return address: ' if is_english else '退货地址：'"/>
-                                <t t-out="refund_request.return_warehouse_id.partner_id.contact_address"/>
-                            </div>
-                        </t>
-                        <t t-elif="refund_request.state == 'return_cancelled'">
-                            <span t-out="'The return arrangement was cancelled. Please contact customer service for a new return reference.' if is_english else '退货安排已取消，请联系客服重新生成退货单号。'"/>
-                        </t>
-                        <div class="x_refund_return_refs" t-if="refund_request.return_picking_ids">
-                            <t t-out="'Return reference: ' if is_english else '退货单号：'"/>
-                            <t t-foreach="refund_request.return_picking_ids" t-as="return_picking">
-                                <span t-if="return_picking.state != 'cancel'" t-out="return_picking.name"/>
-                            </t>
-                        </div>
-                    </div>
                 </article>
             </div>
         </section>

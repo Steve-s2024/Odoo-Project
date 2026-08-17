@@ -85,6 +85,15 @@ class TestWebsiteRefundReturn(TransactionCase):
         transaction._set_done()
         return transaction
 
+    def test_refund_history_hides_return_location_warning(self):
+        arch = self.env.ref(
+            "stock_subwarehouse_hierarchy.refund_history_section"
+        ).arch_db
+        self.assertNotIn("需要退回商品", arch)
+        self.assertNotIn("Product return required", arch)
+        self.assertNotIn("return_warehouse_id.partner_id.contact_address", arch)
+        self.assertIn("refund_request_status", arch)
+
     def _create_refund_request(self, order, line, transaction):
         return self.env["stock.subwarehouse.website.refund.request"].create({
             "order_id": order.id,
@@ -161,12 +170,30 @@ class TestWebsiteRefundReturn(TransactionCase):
             self.assertEqual(return_picking.move_ids.product_uom_qty, 1.0)
             self.assertEqual(refund_request.return_location_id, self.warehouse.lot_stock_id)
             self.assertEqual(return_picking.move_ids.location_dest_id, self.warehouse.lot_stock_id)
+            self.assertEqual(refund_request.x_return_delivery_state, "awaiting_delivery")
+            before_return = self.env["stock.quant"]._get_available_quantity(
+                self.product, self.warehouse.lot_stock_id, strict=True,
+            )
 
-            return_picking.move_ids.quantity = 1.0
-            return_picking.move_ids.picked = True
-            return_picking.button_validate()
+            refund_request.action_start_customer_return_delivery()
+
+            self.assertEqual(refund_request.x_return_delivery_state, "delivering")
+            self.assertEqual(
+                self.env["stock.quant"]._get_available_quantity(
+                    self.product, self.warehouse.lot_stock_id, strict=True,
+                ),
+                before_return,
+            )
+            refund_request.action_mark_customer_return_delivered()
             self.assertEqual(return_picking.state, "done")
+            self.assertEqual(refund_request.x_return_delivery_state, "delivered")
             self.assertEqual(refund_request.state, "return_received")
+            self.assertEqual(
+                self.env["stock.quant"]._get_available_quantity(
+                    self.product, self.warehouse.lot_stock_id, strict=True,
+                ),
+                before_return + 1,
+            )
             refund_mock.assert_not_called()
 
             refund_request.action_submit_wechat_refund()

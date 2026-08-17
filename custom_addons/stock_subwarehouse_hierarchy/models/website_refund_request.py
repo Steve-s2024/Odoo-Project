@@ -42,6 +42,27 @@ class WebsiteRefundRequest(models.Model):
     return_picking_count = fields.Integer(
         string="退货单数量", compute="_compute_return_picking_count"
     )
+    x_return_delivery_state = fields.Selection(
+        [
+            ("awaiting_delivery", "等待退货发出"),
+            ("delivering", "退货运输中"),
+            ("delivered", "退货已送达"),
+        ],
+        string="退货配送状态",
+        copy=False,
+        tracking=True,
+        index=True,
+    )
+    x_return_delivery_started_at = fields.Datetime(
+        string="退货发出时间",
+        copy=False,
+        readonly=True,
+    )
+    x_return_delivered_at = fields.Datetime(
+        string="退货送达时间",
+        copy=False,
+        readonly=True,
+    )
     currency_id = fields.Many2one(related="source_transaction_id.currency_id")
     line_ids = fields.One2many(
         "stock.subwarehouse.website.refund.request.line", "request_id", string="退款商品"
@@ -201,6 +222,7 @@ class WebsiteRefundRequest(models.Model):
                     return_pickings |= refund_request._create_customer_return_pickings(
                         quantities_by_picking
                     )
+                    refund_request.x_return_delivery_state = "awaiting_delivery"
                     continue
 
             refund_request._submit_payment_refund()
@@ -401,9 +423,72 @@ class WebsiteRefundRequest(models.Model):
         quantities_by_picking = self._get_return_quantities_by_picking()
         if not quantities_by_picking:
             raise ValidationError(_("没有可重新创建的已交付退货数量。"))
-        return self._return_pickings_action(
-            self._create_customer_return_pickings(quantities_by_picking)
-        )
+        pickings = self._create_customer_return_pickings(quantities_by_picking)
+        self.write({
+            "x_return_delivery_state": "awaiting_delivery",
+            "x_return_delivery_started_at": False,
+            "x_return_delivered_at": False,
+        })
+        return self._return_pickings_action(pickings)
+
+    def action_start_customer_return_delivery(self):
+        """Start customer return transit without changing ERP inventory."""
+        for refund_request in self:
+            if (
+                not refund_request.return_required
+                or refund_request.x_return_delivery_state != "awaiting_delivery"
+            ):
+                raise ValidationError(_("只有等待退货发出的申请可以开始退货配送。"))
+            if not refund_request.return_picking_ids.filtered(
+                lambda picking: picking.state != "cancel"
+            ):
+                raise ValidationError(_("该退款申请没有有效的客户退货单。"))
+            refund_request.write({
+                "x_return_delivery_state": "delivering",
+                "x_return_delivery_started_at": fields.Datetime.now(),
+            })
+            refund_request.message_post(
+                body=_("客户退货已经发出，当前处于运输途中；ERP库存尚未增加。"),
+                message_type="comment",
+                subtype_xmlid="mail.mt_note",
+            )
+        return {"type": "ir.actions.client", "tag": "reload"}
+
+    def action_mark_customer_return_delivered(self):
+        """Receive the return and restore stock only at confirmed delivery."""
+        for refund_request in self:
+            if refund_request.x_return_delivery_state != "delivering":
+                raise ValidationError(_("只有退货运输中的申请可以确认送达。"))
+            pickings = refund_request.return_picking_ids.filtered(
+                lambda picking: picking.state != "cancel"
+            )
+            if not pickings:
+                raise ValidationError(_("该退款申请没有有效的客户退货单。"))
+            for picking in pickings.filtered(lambda item: item.state != "done"):
+                if picking.state == "draft":
+                    picking.action_confirm()
+                picking.action_assign()
+                for move in picking.move_ids.filtered(
+                    lambda stock_move: stock_move.product_id.tracking == "none"
+                ):
+                    move.quantity = move.product_uom_qty
+                    move.picked = True
+                picking.with_context(
+                    skip_refund_delivery_sync=True,
+                    shop_api_skip_event=True,
+                ).button_validate()
+                if picking.state != "done":
+                    raise ValidationError(_("退货单尚未完成，请先处理退货单中的待确认步骤。"))
+            refund_request.write({
+                "x_return_delivery_state": "delivered",
+                "x_return_delivered_at": fields.Datetime.now(),
+            })
+            refund_request.message_post(
+                body=_("客户退货已送达并完成入库，ERP库存已经恢复。"),
+                message_type="comment",
+                subtype_xmlid="mail.mt_note",
+            )
+        return {"type": "ir.actions.client", "tag": "reload"}
 
     def action_view_return_pickings(self):
         self.ensure_one()

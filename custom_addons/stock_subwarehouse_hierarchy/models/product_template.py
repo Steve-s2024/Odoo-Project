@@ -11,6 +11,31 @@ PRODUCT_IMPORT_TEMPLATE_ROUTE = "/stock_subwarehouse_hierarchy/import_template/p
 IMPORT_CUSTOM_ATTRIBUTE_SLOT_COUNT = 20
 
 
+class _ProductCodeTrie:
+    """In-memory exact lookup with O(length(code)) membership checks."""
+
+    _END = object()
+
+    def __init__(self, values=()):
+        self.root = {}
+        for value in values:
+            self.add(value)
+
+    def add(self, value):
+        node = self.root
+        for character in value:
+            node = node.setdefault(character, {})
+        node[self._END] = True
+
+    def contains(self, value):
+        node = self.root
+        for character in value:
+            node = node.get(character)
+            if node is None:
+                return False
+        return self._END in node
+
+
 class ProductAttribute(models.Model):
     _inherit = "product.attribute"
 
@@ -205,6 +230,62 @@ class ProductTemplate(models.Model):
              WHERE x_website_description_zh IS NULL
                AND description_ecommerce IS NOT NULL
         """)
+        # The ERP product name is the canonical Chinese business name.  English
+        # storefront copy belongs in x_website_english_name and must not replace
+        # the product name used by inventory, sales, manufacturing, and imports.
+        # Keep the two language keys aligned for legacy rows; the separated shop
+        # reads its English label from the dedicated website field/API payload.
+        self.env.cr.execute("""
+            UPDATE product_template
+               SET name = jsonb_set(
+                       jsonb_set(
+                           COALESCE(name, '{}'::jsonb),
+                           '{zh_CN}',
+                           to_jsonb(COALESCE(name->>'zh_CN', name->>'en_US')),
+                           TRUE
+                       ),
+                       '{en_US}',
+                       to_jsonb(COALESCE(name->>'zh_CN', name->>'en_US')),
+                       TRUE
+                   )
+             WHERE name IS NOT NULL
+               AND name->>'en_US' IS DISTINCT FROM COALESCE(name->>'zh_CN', name->>'en_US')
+        """)
+
+    def _get_safe_english_website_name_for_slug(self):
+        self.ensure_one()
+        english_name = " ".join((self.x_website_english_name or "").split())
+        if not english_name or not re.search(r"[A-Za-z0-9]", english_name):
+            return ""
+        if not self.env["ir.http"]._slugify(english_name):
+            return ""
+        return english_name
+
+    def _sync_english_website_name_translation(self):
+        for product in self:
+            # Read the persisted map because the language-aware ORM cache can
+            # temporarily expose en_US as the zh_CN fallback during imports.
+            product.flush_recordset(["name"])
+            self.env.cr.execute(
+                "SELECT name FROM product_template WHERE id = %s",
+                [product.id],
+            )
+            translations = self.env.cr.fetchone()[0] or {}
+            chinese_name = (
+                translations.get("zh_CN")
+                or translations.get("en_US")
+                or product.name
+            )
+            if not chinese_name:
+                continue
+            chinese_product = product.with_context(lang="zh_CN")
+            super(ProductTemplate, chinese_product).write({"name": chinese_name})
+            product.invalidate_recordset(["name"])
+            # Do not copy x_website_english_name into `name`: doing so makes
+            # backend product lists and exports appear English.  The dedicated
+            # field remains the authoritative English storefront label.
+            english_product = product.with_context(lang="en_US")
+            super(ProductTemplate, english_product).write({"name": chinese_name})
 
     def _normalize_shop_group_name(self):
         self.ensure_one()
@@ -215,7 +296,9 @@ class ProductTemplate(models.Model):
         self.ensure_one()
         if is_english and self.x_website_english_name:
             return self.x_website_english_name
-        return self.name
+        if not is_english:
+            return self.with_context(lang="zh_CN").name
+        return self.with_context(lang="en_US").name
 
     def _get_website_display_price_label(self, is_english=False):
         self.ensure_one()
@@ -702,14 +785,25 @@ class ProductTemplate(models.Model):
             vals.setdefault("supplier_taxes_id", [Command.clear()])
         products = super().create(vals_list)
         products._ensure_global_attribute_lines()
+        products._sync_english_website_name_translation()
         return products
+
+    def write(self, vals):
+        result = super().write(vals)
+        if "x_website_english_name" in vals:
+            self._sync_english_website_name_translation()
+        return result
 
     @api.model
     def load(self, fields, data):
+        import_result = self._filter_unique_product_import_rows(fields, data)
+        fields = import_result["fields"]
+        data = import_result["data"]
         fields, data = self._ensure_inventory_product_import_storable(fields, data)
         custom_pairs = self._extract_custom_attribute_import_pairs(fields, data)
         if not custom_pairs:
-            return super().load(fields, data)
+            result = super().load(fields, data) if data else self._empty_product_import_result()
+            return self._complete_unique_product_import_result(result, import_result)
 
         custom_field_names = {
             "x_custom_attribute_value_ids/attribute_id",
@@ -730,12 +824,192 @@ class ProductTemplate(models.Model):
             for row in data
         ]
 
-        result = super().load(cleaned_fields, cleaned_data)
+        result = super().load(cleaned_fields, cleaned_data) if cleaned_data else self._empty_product_import_result()
         if result.get("ids"):
             products = self.browse(result["ids"])
             for product, row_pairs in zip(products, custom_pairs):
                 product._write_imported_custom_attribute_values(row_pairs)
+        return self._complete_unique_product_import_result(result, import_result)
+
+    @api.model
+    def _empty_product_import_result(self):
+        return {"ids": [], "messages": [], "nextrow": 0}
+
+    @api.model
+    def _normalize_import_product_code(self, value):
+        return str(value or "").strip().casefold()
+
+    @api.model
+    def _filter_unique_product_import_rows(self, import_fields, import_data):
+        original_import_data = import_data
+        result = {
+            "fields": import_fields,
+            "data": import_data,
+            "kept_source_indexes": list(range(len(import_data))),
+            "failures": [],
+            "applied": False,
+            "source_window_size": len(import_data),
+            "has_more_source_rows": False,
+        }
+        if not self.env.context.get("import_file"):
+            return result
+
+        original_data_length = len(original_import_data)
+        import_limit = self.env.context.get("_import_limit")
+        source_window_size = (
+            min(len(import_data), import_limit)
+            if import_limit
+            else len(import_data)
+        )
+        import_data = original_import_data[:source_window_size]
+        result.update({
+            "data": import_data,
+            "kept_source_indexes": list(range(len(import_data))),
+            "applied": True,
+            "source_window_size": source_window_size,
+            "has_more_source_rows": source_window_size < original_data_length,
+        })
+
+        name_index = import_fields.index("name") if "name" in import_fields else None
+        source_offset = self.env.context.get("product_import_source_offset", 0)
+        header_offset = 2 if self.env.context.get("product_import_has_headers") else 1
+        if "default_code" not in import_fields:
+            result["data"] = []
+            result["kept_source_indexes"] = []
+            result["failures"] = [
+                {
+                    "source_index": source_index,
+                    "source_row": source_offset + source_index + header_offset,
+                    "product_name": str(row[name_index] or "").strip() if name_index is not None else "",
+                    "default_code": "",
+                    "reason": "必须映射产品编码（内部编号）字段。",
+                }
+                for source_index, row in enumerate(import_data)
+            ]
+            return result
+
+        code_index = import_fields.index("default_code")
+        # Serialize product imports so two concurrent files cannot both pass
+        # the pre-check before either transaction commits.
+        self.env.cr.execute(
+            "SELECT pg_advisory_xact_lock(hashtext(%s))",
+            ["stock_subwarehouse_hierarchy.product_default_code_import"],
+        )
+        self.env["product.product"].flush_model(["default_code"])
+        # Build once from indexed database rows, then perform every membership
+        # lookup in O(length(code)); do not issue one ORM query per input row.
+        self.env.cr.execute("""
+            SELECT default_code
+              FROM product_product
+             WHERE default_code IS NOT NULL
+               AND btrim(default_code) != ''
+        """)
+        existing_codes = _ProductCodeTrie(
+            self._normalize_import_product_code(row[0])
+            for row in self.env.cr.fetchall()
+        )
+        accepted_codes = _ProductCodeTrie()
+        kept_rows = []
+        kept_source_indexes = []
+        failures = []
+        for source_index, row in enumerate(import_data):
+            display_code = str(row[code_index] or "").strip()
+            normalized_code = self._normalize_import_product_code(display_code)
+            product_name = (
+                str(row[name_index] or "").strip()
+                if name_index is not None
+                else ""
+            )
+            if not normalized_code:
+                reason = "产品编码不能为空。"
+            elif existing_codes.contains(normalized_code):
+                reason = "产品编码已存在于 ERP。"
+            elif accepted_codes.contains(normalized_code):
+                reason = "产品编码在本次导入文件中重复。"
+            else:
+                accepted_codes.add(normalized_code)
+                kept_rows.append(row)
+                kept_source_indexes.append(source_index)
+                continue
+
+            failures.append({
+                "source_index": source_index,
+                "source_row": source_offset + source_index + header_offset,
+                "product_name": product_name,
+                "default_code": display_code,
+                "reason": reason,
+            })
+
+        return {
+            "fields": import_fields,
+            "data": kept_rows,
+            "kept_source_indexes": kept_source_indexes,
+            "failures": failures,
+            "applied": True,
+            "source_window_size": source_window_size,
+            "has_more_source_rows": result["has_more_source_rows"],
+        }
+
+    @api.model
+    def _complete_unique_product_import_result(self, result, import_result):
+        failures = import_result["failures"]
+        result["x_product_import_failures"] = [
+            {
+                "source_row": failure["source_row"],
+                "default_code": failure["default_code"],
+                "reason": failure["reason"],
+            }
+            for failure in failures
+        ]
+        if import_result.get("applied"):
+            result["nextrow"] = (
+                import_result["source_window_size"]
+                if import_result["has_more_source_rows"]
+                else 0
+            )
+
+        batch_id = self.env.context.get("product_import_result_batch_id")
+        if batch_id:
+            self._record_product_import_results(result, import_result, batch_id)
         return result
+
+    @api.model
+    def _record_product_import_results(self, result, import_result, batch_id):
+        line_model = self.env["stock.subwarehouse.product.import.result.line"]
+        source_offset = self.env.context.get("product_import_source_offset", 0)
+        header_offset = 2 if self.env.context.get("product_import_has_headers") else 1
+        fields_list = import_result["fields"]
+        name_index = fields_list.index("name") if "name" in fields_list else None
+        code_index = fields_list.index("default_code") if "default_code" in fields_list else None
+        created_ids = list(result.get("ids") or [])
+        success_values = []
+        for result_index, (source_index, product_id) in enumerate(zip(
+            import_result["kept_source_indexes"],
+            created_ids,
+        )):
+            row = import_result["data"][result_index]
+            success_values.append({
+                "batch_id": batch_id,
+                "source_row": source_offset + source_index + header_offset,
+                "status": "success",
+                "product_name": str(row[name_index] or "").strip() if name_index is not None else "",
+                "default_code": str(row[code_index] or "").strip() if code_index is not None else "",
+                "product_tmpl_id": product_id,
+                "reason": "导入成功。",
+            })
+        failed_values = [
+            {
+                "batch_id": batch_id,
+                "source_row": failure["source_row"],
+                "status": "failed",
+                "product_name": failure["product_name"],
+                "default_code": failure["default_code"],
+                "reason": failure["reason"],
+            }
+            for failure in import_result["failures"]
+        ]
+        if success_values or failed_values:
+            line_model.create(success_values + failed_values)
 
     @api.model
     def _ensure_inventory_product_import_storable(self, import_fields, import_data):

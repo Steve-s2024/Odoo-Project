@@ -1,7 +1,7 @@
 {
     "name": "Storefront ERP API Bridge",
     "summary": "Keep Odoo website presentation local while ERP remains transaction authority",
-    "version": "19.0.2.5.3",
+    "version": "19.0.2.11.9",
     "category": "Website/Website",
     "author": "Local",
     "license": "LGPL-3",
@@ -16,9 +16,12 @@
     ],
     "assets": {
         "web.assets_frontend": [
+            "storefront_api_bridge/static/src/js/checkout_address_visual_validation.js",
+            "storefront_api_bridge/static/src/js/payment_status_poll.js",
             "storefront_api_bridge/static/src/js/mandatory_erp_confirmation.js",
             "storefront_api_bridge/static/src/js/refund_submission_feedback.js",
             "storefront_api_bridge/static/src/js/erp_confirmed_signup.js",
+            "storefront_api_bridge/static/src/scss/checkout_address_visual_validation.scss",
             "storefront_api_bridge/static/src/scss/mandatory_erp_confirmation.scss",
         ],
     },

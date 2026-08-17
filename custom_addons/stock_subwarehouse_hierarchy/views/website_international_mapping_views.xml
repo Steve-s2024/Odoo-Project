@@ -16,7 +16,12 @@
     </template>
 
     <template id="product_title_international_mapping" inherit_id="website_sale.product_title" name="Localized Product Detail Name">
-        <xpath expr="//h1[@t-field='product.name']" position="replace"/>
+        <xpath expr="//h1[@t-field='product.name']" position="replace">
+            <h1
+                t-attf-class="h3 {{'mb-3' if not product.description_ecommerce and not is_view_active('website_sale.product_comment') else ''}}"
+                t-out="product.sudo()._get_website_display_name(bool(request.lang and (request.lang.code or '').lower().startswith('en')))"
+            >Product Name</h1>
+        </xpath>
     </template>
 
     <template id="product_price_international_mapping" inherit_id="website_sale.product_price" name="Localized Product Detail Price">
@@ -53,6 +58,9 @@
     </template>
 
     <template id="checkout_address_country_language_filter" inherit_id="website_sale.address_form_fields" name="Language-specific checkout countries">
+        <xpath expr="//select[@name='country_id']/option[@t-foreach='countries']" position="attributes">
+            <attribute name="t-out">'中国(大陆)' if c.code == 'CN' and not (request.lang and (request.lang.code or '').lower().startswith('en')) else c.name</attribute>
+        </xpath>
         <xpath expr="//div[@id='div_country']" position="after">
             <!-- The country selector is already filtered for the active
                  language, so an always-visible language warning is redundant. -->

@@ -1,11 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <template id="storefront_localized_login_fields" inherit_id="web.login" priority="80" name="Localized storefront login fields">
+        <xpath expr="//label[@for='login']" position="replace">
+            <label for="login" class="form-label d-flex justify-content-between">
+                <t t-out="'邮箱' if request.env.lang == 'zh_CN' else 'Email'"/>
+            </label>
+        </xpath>
+        <xpath expr="//input[@id='login']" position="attributes">
+            <attribute name="t-att-placeholder">'请输入电子邮箱' if request.env.lang == 'zh_CN' else 'Enter your email'</attribute>
+        </xpath>
+        <xpath expr="//label[@for='password']" position="replace">
+            <label for="password" class="form-label">
+                <t t-out="'密码' if request.env.lang == 'zh_CN' else 'Password'"/>
+            </label>
+        </xpath>
+        <xpath expr="//input[@id='password']" position="attributes">
+            <attribute name="t-att-placeholder">'请输入密码' if request.env.lang == 'zh_CN' else 'Enter your password'</attribute>
+        </xpath>
+        <xpath expr="//div[hasclass('oe_login_buttons')]/button[@type='submit'][1]" position="replace">
+            <button type="submit" class="btn btn-primary">
+                <t t-out="'登录' if request.env.lang == 'zh_CN' else 'Log in'"/>
+            </button>
+        </xpath>
+    </template>
+
     <template id="storefront_erp_confirmed_signup" inherit_id="auth_signup.signup" name="ERP-confirmed storefront signup">
         <xpath expr="//form[hasclass('oe_signup_form')]/input[@name='csrf_token']" position="after">
             <input type="hidden" name="signup_attempt_id" t-att-value="signup_attempt_id"/>
         </xpath>
         <xpath expr="//form[hasclass('oe_signup_form')]" position="attributes">
             <attribute name="data-storefront-erp-signup">1</attribute>
+        </xpath>
+        <xpath expr="//input[@id='name']" position="attributes">
+            <attribute name="t-att-placeholder">'请输入姓名' if request.env.lang == 'zh_CN' else 'John Doe'</attribute>
+        </xpath>
+        <xpath expr="//input[@id='login']" position="attributes">
+            <attribute name="t-att-placeholder">'请输入电子邮箱' if request.env.lang == 'zh_CN' else 'name@example.com'</attribute>
+        </xpath>
+    </template>
+
+    <template id="storefront_localized_signup_password_fields" inherit_id="auth_signup.fields" priority="80" name="Localized storefront signup password placeholders">
+        <xpath expr="//input[@id='password']" position="attributes">
+            <attribute name="t-att-placeholder">'请输入密码' if request.env.lang == 'zh_CN' else '••••••••••'</attribute>
+        </xpath>
+        <xpath expr="//input[@id='confirm_password']" position="attributes">
+            <attribute name="t-att-placeholder">'请再次输入密码' if request.env.lang == 'zh_CN' else '••••••••••'</attribute>
+        </xpath>
+    </template>
+
+    <template id="storefront_erp_confirmed_password_reset" inherit_id="auth_signup.reset_password" name="ERP-confirmed storefront password reset">
+        <xpath expr="//form[hasclass('oe_reset_password_form')]/input[@name='csrf_token']" position="after">
+            <input t-if="not token" type="hidden" name="password_reset_attempt_id" t-att-value="password_reset_attempt_id"/>
+        </xpath>
+        <xpath expr="//form[hasclass('oe_reset_password_form')]" position="attributes">
+            <attribute name="data-storefront-erp-password-reset">1</attribute>
         </xpath>
     </template>
 </odoo>

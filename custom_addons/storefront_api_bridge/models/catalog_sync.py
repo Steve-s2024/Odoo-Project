@@ -99,6 +99,7 @@ class StorefrontCatalogSync(models.AbstractModel):
             "x_website_usd_price": float(payload_en.get("price_usd") or 0.0),
             "website_published": bool(payload_zh.get("published")),
             "sale_ok": bool(payload_zh.get("sale_ok")),
+            "x_shop_group_cover": bool(payload_zh.get("group_cover")),
             "active": True,
         }
         if category:
@@ -110,6 +111,18 @@ class StorefrontCatalogSync(models.AbstractModel):
             product.write(values)
         else:
             product = Product.create({"shop_api_uuid": external_id, **values})
+
+        if values["x_shop_group_cover"]:
+            # The ERP guarantees one selected cover per same-name group.  Also
+            # clear any obsolete local flag immediately so a partially applied
+            # event batch can never display two representatives.
+            stale_covers = product._get_all_shop_group_siblings().filtered(
+                lambda sibling: sibling != product and sibling.x_shop_group_cover
+            )
+            if stale_covers:
+                stale_covers.with_context(
+                    shop_api_skip_event=True, tracking_disable=True,
+                ).write({"x_shop_group_cover": False})
 
         material_type = payload_zh.get("material_type")
         if material_type and material_type in dict(product._fields["x_material_type"].selection):

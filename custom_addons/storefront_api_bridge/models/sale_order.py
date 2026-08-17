@@ -84,6 +84,8 @@ class SaleOrder(models.Model):
         self.ensure_one()
         if not remote or remote.get("id") != self.x_storefront_remote_order_id:
             return False
+        if remote.get("payment_expired") or remote.get("payment_state") == "expired":
+            return False
         payment_states = {payment.get("state") for payment in remote.get("payments") or []}
         if remote.get("state") not in {"draft", "sent"} or payment_states & {"authorized", "done"}:
             return False
@@ -96,6 +98,36 @@ class SaleOrder(models.Model):
         return self._storefront_aggregate_items(remote.get("items")) == (
             self._storefront_aggregate_items(self._storefront_api_items())
         )
+
+    def _storefront_assert_remote_payment_window(self, client=None, remote=None):
+        """Fail closed unless ERP confirms this order's original hold is live."""
+        self.ensure_one()
+        if not self.x_storefront_remote_order_id:
+            raise StorefrontApiError(
+                _("ERP has not confirmed an order for payment."),
+                code="order_required", status=409,
+            )
+        client = client or self.env["storefront.erp.client"]
+        remote = remote or client.get(
+            f"/api/v1/orders/{self.x_storefront_remote_order_id}"
+        ) or {}
+        try:
+            expires_at = fields.Datetime.to_datetime(remote.get("payment_expires_at"))
+        except (TypeError, ValueError):
+            expires_at = False
+        if (
+            remote.get("authoritative") is not True
+            or remote.get("id") != self.x_storefront_remote_order_id
+            or remote.get("payment_expired") is True
+            or remote.get("payment_state") == "expired"
+            or not expires_at
+            or expires_at <= fields.Datetime.now()
+        ):
+            raise StorefrontApiError(
+                _("The 15-minute ERP inventory reservation has expired."),
+                code="payment_window_expired", status=409,
+            )
+        return remote
 
     def _storefront_clear_remote_checkout(self):
         self.ensure_one()
@@ -111,6 +143,45 @@ class SaleOrder(models.Model):
             "x_storefront_payment_currency": False,
             "x_storefront_payment_amount": 0.0,
         })
+
+    def _storefront_retire_expired_attempt(self, remote):
+        """Detach an ERP-confirmed expired attempt while preserving cart lines.
+
+        The expired ERP order remains immutable purchase history.  Only its
+        local checkout pointers and idempotency attempt are retired, allowing
+        the same cart to request a new authoritative reservation.  Never use a
+        cached timestamp alone for this transition.
+        """
+        self.ensure_one()
+        if (
+            remote.get("authoritative") is not True
+            or remote.get("id") != self.x_storefront_remote_order_id
+            or not (
+                remote.get("payment_expired") is True
+                or remote.get("payment_state") == "expired"
+            )
+        ):
+            raise StorefrontApiError(
+                _("ERP did not authoritatively confirm order expiry."),
+                code="invalid_expiry_confirmation", status=502,
+            )
+        payment_states = {
+            payment.get("state") for payment in remote.get("payments") or []
+        }
+        if payment_states & {"authorized", "done"}:
+            raise StorefrontApiError(
+                _("ERP reported a completed payment on an expired order."),
+                code="expiry_payment_conflict", status=409,
+            )
+
+        expired_attempt_id = self._storefront_attempt_key()
+        self._storefront_clear_remote_checkout()
+        self.write({
+            "x_storefront_attempt_id": str(uuid.uuid4()),
+            "x_storefront_remote_state": False,
+            "x_storefront_shortage_product_uuids": [],
+        })
+        return expired_attempt_id
 
     def _storefront_fingerprint(self):
         payload = json.dumps({
@@ -249,28 +320,31 @@ class SaleOrder(models.Model):
         if self.x_storefront_remote_order_id:
             old_remote_order_id = self.x_storefront_remote_order_id
             remote = client.get(f"/api/v1/orders/{old_remote_order_id}") or {}
-            if self._storefront_remote_order_matches(remote, desired_customer_id):
+            if remote.get("payment_expired") or remote.get("payment_state") == "expired":
+                self._storefront_retire_expired_attempt(remote)
+                attempt_id = self._storefront_attempt_key()
+            elif self._storefront_remote_order_matches(remote, desired_customer_id):
                 return old_remote_order_id
-
-            payment_states = {
-                payment.get("state") for payment in remote.get("payments") or []
-            }
-            completed = remote.get("state") in {"sale", "done"} or bool(
-                payment_states & {"authorized", "done"}
-            )
-            if not completed and remote.get("state") in {"draft", "sent"}:
-                client.post(
-                    f"/api/v1/orders/{old_remote_order_id}/cancel",
-                    {},
-                    idempotency_key=(
-                        f"stale-cancel-{attempt_id}-{old_remote_order_id}"
-                    ),
+            else:
+                payment_states = {
+                    payment.get("state") for payment in remote.get("payments") or []
+                }
+                completed = remote.get("state") in {"sale", "done"} or bool(
+                    payment_states & {"authorized", "done"}
                 )
-            # Completed ERP orders are immutable history. Detach the changed local
-            # cart instead of cancelling or reusing the completed transaction.
-            self._storefront_clear_remote_checkout()
-            attempt_id = str(uuid.uuid4())
-            self.x_storefront_attempt_id = attempt_id
+                if not completed and remote.get("state") in {"draft", "sent"}:
+                    client.post(
+                        f"/api/v1/orders/{old_remote_order_id}/cancel",
+                        {},
+                        idempotency_key=(
+                            f"stale-cancel-{attempt_id}-{old_remote_order_id}"
+                        ),
+                    )
+                # Completed ERP orders are immutable history. Detach the changed local
+                # cart instead of cancelling or reusing the completed transaction.
+                self._storefront_clear_remote_checkout()
+                attempt_id = str(uuid.uuid4())
+                self.x_storefront_attempt_id = attempt_id
 
         self._storefront_ensure_quote()
         if account:
@@ -370,8 +444,46 @@ class SaleOrder(models.Model):
 
     def _storefront_create_payment(self, provider_code):
         self.ensure_one()
-        remote_order_id = self._storefront_sync_remote_order()
         client = self.env["storefront.erp.client"]
+        # A browser retry, double click, or back/forward restoration must never
+        # turn an already-created payment into a new ERP order.  Read the
+        # recorded payment first and reuse it when ERP still confirms that it
+        # belongs to this checkout.  This is the final safety net behind the
+        # controller's POST-redirect-GET flow.
+        if self.x_storefront_remote_order_id and self.x_storefront_remote_payment_id:
+            self._storefront_assert_remote_payment_window(client=client)
+            existing = client.get(
+                f"/api/v1/payments/{self.x_storefront_remote_payment_id}"
+            ) or {}
+            existing_provider = existing.get("provider")
+            if (
+                existing_provider
+                and self._storefront_payment_is_authoritative(
+                    existing,
+                    self.x_storefront_remote_order_id,
+                    existing_provider,
+                    payment_id=self.x_storefront_remote_payment_id,
+                )
+                and existing.get("state") in {"draft", "pending", "authorized", "done"}
+            ):
+                if existing.get("state") != "done" and existing_provider != provider_code:
+                    raise StorefrontApiError(
+                        _(
+                            "This order already has a pending payment. Resume it "
+                            "before choosing another payment method."
+                        ),
+                        code="payment_already_pending",
+                        status=409,
+                    )
+                self.x_storefront_remote_state = existing.get("state")
+                return {
+                    "authoritative": True,
+                    "payment": existing,
+                    "processing": {},
+                    "reused": True,
+                }
+
+        remote_order_id = self._storefront_sync_remote_order()
         try:
             response = client.post(
                 f"/api/v1/orders/{remote_order_id}/payments",
@@ -553,6 +665,37 @@ class SaleOrder(models.Model):
 
 class SaleOrderLine(models.Model):
     _inherit = "sale.order.line"
+
+    def _storefront_delivery_method_name(self):
+        """Return the carrier name in the checkout language, not the worker context."""
+        self.ensure_one()
+        if not self.is_delivery:
+            return False
+        language = self.order_id.x_website_checkout_language or "zh_CN"
+        language = "en_US" if str(language).lower().startswith("en") else "zh_CN"
+        carrier = self.order_id.carrier_id
+        if carrier:
+            return carrier.with_context(lang=language).name
+        if self.product_id:
+            return self.product_id.with_context(lang=language, display_default_code=False).display_name
+        return self.name
+
+    @api.depends(
+        "product_id.display_name",
+        "order_id.carrier_id.name",
+        "order_id.x_website_checkout_language",
+        "is_delivery",
+    )
+    def _compute_name_short(self):
+        super()._compute_name_short()
+        for line in self.filtered("is_delivery"):
+            line.name_short = line._storefront_delivery_method_name()
+
+    def _get_line_header(self):
+        self.ensure_one()
+        if self.is_delivery:
+            return self._storefront_delivery_method_name()
+        return super()._get_line_header()
 
     @staticmethod
     def _storefront_option_semantic_key(label):

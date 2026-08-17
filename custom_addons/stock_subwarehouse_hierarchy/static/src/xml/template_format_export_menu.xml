@@ -2,12 +2,17 @@
 <templates xml:space="preserve">
     <t t-name="stock_subwarehouse_hierarchy.TemplateFormatExportMenu">
         <DropdownItem class="'o_template_format_export_menu'" onSelected.bind="onExportTemplateFormat">
-            <i class="fa fa-fw fa-download me-1"/>按导入模板导出
+            <i class="fa fa-fw fa-download me-1"/>&#25353;&#27169;&#26495;&#23548;&#20986;&#20840;&#37096;
         </DropdownItem>
     </t>
     <t t-name="stock_subwarehouse_hierarchy.ProductBomImportMenu">
         <DropdownItem class="'o_product_bom_import_menu'" onSelected.bind="onImportProductBom">
             <i class="fa fa-fw fa-upload me-1"/>&#23548;&#20837;&#20135;&#21697;BOM
+        </DropdownItem>
+    </t>
+    <t t-name="stock_subwarehouse_hierarchy.PartnerChannelExportAllMenu">
+        <DropdownItem class="'o_partner_channel_export_all_menu'" onSelected.bind="onExportAll">
+            <i class="fa fa-fw fa-upload me-1"/>&#23548;&#20986;&#20840;&#37096;
         </DropdownItem>
     </t>
 </templates>

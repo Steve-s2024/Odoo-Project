@@ -37,7 +37,7 @@
                                 <strong t-out="'Payment information' if is_english else '支付信息'"/>
                                 <div><t t-out="'Order number: ' if is_english else '订单号：'"/><span t-out="order.name if order else '-'"/></div>
                                 <div><t t-out="'Payment method: ' if is_english else '支付方式：'"/><span t-out="tx.provider_id.name if tx else '-'"/></div>
-                                <div><t t-out="'Transaction reference: ' if is_english else '微信交易号：'"/><span t-out="tx.provider_reference if tx else '-'"/></div>
+                                <div><t t-out="'Transaction reference: ' if is_english else '交易号：'"/><span t-out="tx.provider_reference if tx else '-'"/></div>
                             </div>
                         </div>
                         <table class="table table-sm">
@@ -76,7 +76,7 @@
     </template>
 
     <template id="website_payment_receipt" name="Website Payment Receipt">
-        <t t-set="is_english" t-value="request.lang and request.lang.code == 'en_US'"/>
+        <t t-set="is_english" t-value="order.x_website_checkout_language == 'en_US'"/>
         <t t-set="receipt_payment" t-value="order._get_website_payment_receipt()"/>
         <t t-set="receipt_tx" t-value="receipt_payment.payment_transaction_id if receipt_payment else False"/>
         <section t-if="receipt_payment" class="card mt-3" id="website_payment_receipt">
@@ -92,7 +92,7 @@
                     <div class="col-sm-6"><span class="text-muted small d-block" t-out="'Order number' if is_english else '订单号'"/><strong t-out="order.name"/></div>
                     <div class="col-sm-6"><span class="text-muted small d-block" t-out="'Receipt number' if is_english else '收据编号'"/><strong t-out="receipt_payment.name"/></div>
                     <div class="col-sm-6"><span class="text-muted small d-block" t-out="'Payment method' if is_english else '支付方式'"/><strong t-out="receipt_tx.provider_id.name if receipt_tx else '-'"/></div>
-                    <div class="col-sm-6"><span class="text-muted small d-block" t-out="'Transaction reference' if is_english else '微信交易号'"/><strong t-out="receipt_tx.provider_reference if receipt_tx else '-'"/></div>
+                    <div class="col-sm-6"><span class="text-muted small d-block" t-out="'Transaction reference' if is_english else '交易号'"/><strong t-out="receipt_tx.provider_reference if receipt_tx else '-'"/></div>
                     <div class="col-sm-6"><span class="text-muted small d-block" t-out="'Payment time' if is_english else '支付时间'"/><strong t-field="receipt_payment.date"/></div>
                     <div class="col-sm-6"><span class="text-muted small d-block" t-out="'Amount paid' if is_english else '实付金额'"/><strong t-field="receipt_payment.amount" t-options="{'widget': 'monetary', 'display_currency': receipt_payment.currency_id}"/></div>
                 </div>
@@ -114,12 +114,12 @@
         <xpath expr="//div[@id='payment_method']" position="before">
             <t t-if="website_sale_order.x_website_stock_reservation_expiry_epoch">
                 <t t-set="is_english" t-value="request.lang and request.lang.code == 'en_US'"/>
-                <section class="alert alert-info d-flex align-items-center justify-content-between gap-3" id="x_website_stock_hold" t-att-data-expiry-epoch="website_sale_order.x_website_stock_reservation_expiry_epoch" t-att-data-expired-message="'Reservation expired. Please refresh it.' if is_english else '已到期，请刷新库存保留。'">
+                <section class="alert alert-info d-flex align-items-center justify-content-between gap-3" id="x_website_stock_hold" t-att-data-expiry-epoch="website_sale_order.x_website_stock_reservation_expiry_epoch" t-att-data-expired-url="'/purchase-detail/%s' % website_sale_order.id" t-att-data-expired-message="'Order expired' if is_english else '订单已过期'">
                     <div>
                         <strong t-out="'Your stock is reserved' if is_english else '库存已为您保留'"/>
                         <span class="ms-2 text-muted"><t t-out="'Please complete payment within ' if is_english else '请在 '"/><strong class="x_stock_hold_timer">15:00</strong><t t-out="'.' if is_english else ' 内完成支付。'"/></span>
                     </div>
-                    <a class="btn btn-outline-secondary btn-sm" href="/shop/payment" t-out="'Refresh reservation' if is_english else '刷新库存保留'"/>
+                    <a class="btn btn-outline-secondary btn-sm" href="/purchase-history" t-out="'Purchase history' if is_english else '购买记录'"/>
                 </section>
                 <script type="text/javascript">
                     <![CDATA[
@@ -137,6 +137,9 @@
                                 hold.classList.remove("alert-info");
                                 hold.classList.add("alert-warning");
                                 timer.textContent = hold.dataset.expiredMessage;
+                                window.setTimeout(function () {
+                                    window.location.assign(hold.dataset.expiredUrl || "/purchase-history");
+                                }, 500);
                                 return;
                             }
                             window.setTimeout(refresh, 1000);

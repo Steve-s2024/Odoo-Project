@@ -1,6 +1,7 @@
 import uuid
+from urllib.parse import urlencode
 
-from odoo import _
+from odoo import _, http
 from odoo.exceptions import UserError
 from odoo.http import request
 from odoo.addons.stock_subwarehouse_hierarchy.controllers.erp_auth import (
@@ -37,6 +38,123 @@ class StorefrontAuthSignup(SunErpAuthSignupHome):
         attempt_id = str(uuid.uuid4())
         request.session["storefront_signup_attempt_id"] = attempt_id
         qcontext["signup_attempt_id"] = attempt_id
+
+    @staticmethod
+    def _new_password_reset_attempt(qcontext=None):
+        attempt_id = str(uuid.uuid4())
+        request.session["storefront_password_reset_attempt_id"] = attempt_id
+        if qcontext is not None:
+            qcontext["password_reset_attempt_id"] = attempt_id
+        return attempt_id
+
+    def _password_reset_attempt(self, qcontext, *, validate=False):
+        submitted = str(
+            request.params.get("password_reset_attempt_id") or ""
+        ).strip()
+        active = str(
+            request.session.get("storefront_password_reset_attempt_id") or ""
+        ).strip()
+        if validate:
+            if not submitted or submitted != active:
+                self._new_password_reset_attempt(qcontext)
+                raise UserError(_(
+                    "The password reset request expired. Please submit the form again."
+                ))
+            try:
+                uuid.UUID(submitted)
+            except (ValueError, TypeError, AttributeError):
+                self._new_password_reset_attempt(qcontext)
+                raise UserError(_(
+                    "The password reset request is invalid. Please submit the form again."
+                )) from None
+            qcontext["password_reset_attempt_id"] = submitted
+            return submitted
+        if active:
+            try:
+                uuid.UUID(active)
+            except (ValueError, TypeError, AttributeError):
+                active = ""
+        if not active:
+            active = self._new_password_reset_attempt()
+        qcontext["password_reset_attempt_id"] = active
+        return active
+
+    @staticmethod
+    def _render_password_reset(qcontext):
+        response = request.render("auth_signup.reset_password", qcontext)
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'self'"
+        return response
+
+    @staticmethod
+    def _request_erp_password_reset(login, attempt_id):
+        try:
+            confirmation = request.env["storefront.erp.client"].post(
+                "/api/v1/customers/password-reset/request",
+                {"login": login},
+                idempotency_key=f"storefront-password-reset-{attempt_id}",
+                timeout_seconds=30,
+            )
+        except StorefrontApiError:
+            raise UserError(_(
+                "ERP could not confirm the password reset request. "
+                "Please try again or contact customer support."
+            )) from None
+        if (
+            not isinstance(confirmation, dict)
+            or confirmation.get("authoritative") is not True
+            or confirmation.get("accepted") is not True
+        ):
+            raise UserError(_(
+                "ERP could not confirm the password reset request. "
+                "Please try again or contact customer support."
+            ))
+
+    @http.route()
+    def web_auth_reset_password(self, *args, **kw):
+        # The ERP host keeps its native token-completion page. On the separated
+        # shop, only the initial request is proxied; ERP owns the token, sends
+        # the email, and changes the password without exposing credentials.
+        if _erp_login_enabled():
+            return super().web_auth_reset_password(*args, **kw)
+
+        # A reset token belongs to ERP, never to the presentation-only Shop
+        # user database.  Completing it locally would store a second unrelated
+        # hash and the next ERP-authoritative login would still fail.
+        if request.params.get("token"):
+            query = {
+                key: request.params.get(key)
+                for key in ("token", "db")
+                if request.params.get(key)
+            }
+            target = request.env["storefront.erp.client"].erp_public_url()
+            return request.redirect(
+                f"{target}/web/reset_password?{urlencode(query)}",
+                code=303,
+                local=False,
+            )
+
+        qcontext = self.get_auth_signup_qcontext()
+        if not qcontext.get("reset_password_enabled"):
+            return super().web_auth_reset_password(*args, **kw)
+
+        if request.httprequest.method != "POST":
+            self._password_reset_attempt(qcontext)
+            return self._render_password_reset(qcontext)
+
+        try:
+            attempt_id = self._password_reset_attempt(qcontext, validate=True)
+            login = str(qcontext.get("login") or "").strip()
+            if not login:
+                raise UserError(_("No login provided."))
+            self._request_erp_password_reset(login, attempt_id)
+            request.session.pop("storefront_password_reset_attempt_id", None)
+            qcontext["message"] = _(
+                "Password reset instructions sent to your email address."
+            )
+        except UserError as error:
+            qcontext["error"] = error.args[0]
+        return self._render_password_reset(qcontext)
 
     def get_auth_signup_config(self):
         config = super().get_auth_signup_config()

@@ -5,6 +5,10 @@
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_start_website_delivery" type="object" string="开始配送" class="btn-primary" invisible="x_website_delivery_state != 'awaiting_delivery'" groups="stock.group_stock_user,sales_team.group_sale_manager"/>
+                <button name="action_mark_website_delivery_delivered" type="object" string="确认已送达" class="btn-primary" invisible="x_website_delivery_state != 'delivering'" groups="stock.group_stock_user,sales_team.group_sale_manager"/>
+            </xpath>
             <xpath expr="//div[@name='button_box']" position="inside">
                 <button
                     name="action_view_website_payments"
@@ -29,15 +33,28 @@
                 <button name="action_view_website_refund_requests" type="object" class="oe_stat_button" icon="fa-undo" invisible="x_website_refund_request_count == 0" groups="sales_team.group_sale_manager,account.group_account_invoice">
                     <field name="x_website_refund_request_count" widget="statinfo" string="退款申请"/>
                 </button>
+                <button name="action_view_pending_website_deliveries" type="object" class="oe_stat_button text-danger" icon="fa-truck" invisible="x_pending_website_delivery_count == 0" groups="stock.group_stock_user,sales_team.group_sale_manager">
+                    <field name="x_pending_website_delivery_count" widget="statinfo" string="待发货"/>
+                </button>
             </xpath>
             <xpath expr="//sheet//field[@name='user_id']" position="after">
                 <field name="x_platform"/>
                 <field name="x_channel"/>
-                <field name="x_sale_nature"/>
+                <field name="x_sale_nature" options="{'no_create': False}"/>
+                <field name="x_is_external_order" readonly="state not in ['draft', 'sent', 'external_done']"/>
+                <field name="x_external_order_status" readonly="1" invisible="not x_is_external_order"/>
+                <field name="x_external_completed_at" readonly="1" invisible="not x_is_external_order"/>
+                <field name="x_official_total" widget="monetary" readonly="1"/>
+                <field name="x_processing_fee" widget="monetary"/>
+                <field name="x_amount_received" widget="monetary"/>
                 <field name="x_finance_remark"/>
                 <field name="x_website_payment_state" readonly="1" invisible="not website_id"/>
                 <field name="x_website_payment_reference" readonly="1" invisible="not website_id"/>
+                <field name="x_website_payment_expired_at" readonly="1" invisible="not x_website_payment_expired_at"/>
                 <field name="x_website_stock_reserved_until" readonly="1" invisible="not website_id or state not in ['draft', 'sent']"/>
+                <field name="x_website_delivery_state" widget="badge" readonly="1" invisible="not x_website_delivery_state"/>
+                <field name="x_website_delivery_started_at" readonly="1" invisible="not x_website_delivery_started_at"/>
+                <field name="x_website_delivered_at" readonly="1" invisible="not x_website_delivered_at"/>
             </xpath>
             <xpath expr="//page[@name='order_lines']" position="after">
                 <page name="website_refunds" string="退款申请" invisible="not x_website_refund_request_ids">
@@ -123,6 +140,11 @@
         <field name="inherit_id" ref="sale.sale_order_tree"/>
         <field name="arch" type="xml">
             <field name="amount_total" position="after">
+                <field name="x_is_external_order" string="外部订单" optional="show"/>
+                <field name="x_external_order_status" string="外部状态" optional="show"/>
+                <field name="x_official_total" string="总金额" sum="总金额" optional="show"/>
+                <field name="x_processing_fee" string="手续费" sum="手续费" optional="show"/>
+                <field name="x_amount_received" string="实收" sum="实收" optional="show"/>
                 <field
                     name="x_pending_website_refund_request_count"
                     string="待处理退款"
@@ -131,7 +153,97 @@
                     optional="show"
                     groups="sales_team.group_sale_manager,account.group_account_invoice"
                 />
+                <field
+                    name="x_pending_website_delivery_count"
+                    string="待发货"
+                    widget="badge"
+                    decoration-danger="x_pending_website_delivery_count &gt; 0"
+                    optional="show"
+                    groups="stock.group_stock_user,sales_team.group_sale_manager"
+                />
+                <field name="x_website_delivery_state" string="配送状态" widget="badge" optional="show"/>
             </field>
         </field>
     </record>
+
+    <record id="view_sale_order_pending_website_delivery_queue" model="ir.ui.view">
+        <field name="name">sale.order.pending.website.delivery.queue</field>
+        <field name="model">sale.order</field>
+        <field name="arch" type="xml">
+            <list create="0" delete="0" default_order="date_order asc,id asc" decoration-danger="x_website_delivery_state == 'awaiting_delivery'">
+                <field name="date_order" string="下单时间"/>
+                <field name="name" string="订单"/>
+                <field name="partner_id" string="客户"/>
+                <field name="partner_shipping_id" string="收货地址" optional="show"/>
+                <field name="amount_total" widget="monetary"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="x_website_payment_state" string="支付状态" widget="badge"/>
+                <field name="x_website_delivery_state" string="配送状态" widget="badge" decoration-danger="x_website_delivery_state == 'awaiting_delivery'"/>
+                <field name="x_pending_website_delivery_count" string="待发货" widget="badge" decoration-danger="x_pending_website_delivery_count &gt; 0"/>
+                <button name="action_start_website_delivery" type="object" string="开始配送" class="btn-primary"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_pending_website_deliveries" model="ir.actions.act_window">
+        <field name="name">待发货订单</field>
+        <field name="res_model">sale.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('x_website_delivery_state', '=', 'awaiting_delivery')]</field>
+        <field name="views" eval="[(ref('view_sale_order_pending_website_delivery_queue'), 'list'), (ref('sale.view_order_form'), 'form')]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">当前没有已支付但尚未发货的订单。</p>
+            <p>待发货订单会按下单时间从早到晚排列。</p>
+        </field>
+    </record>
+
+    <menuitem
+        id="menu_pending_website_deliveries"
+        name="待发货订单"
+        parent="sale.sale_order_menu"
+        action="action_pending_website_deliveries"
+        sequence="24"
+        groups="stock.group_stock_user,sales_team.group_sale_manager"
+    />
+
+    <record id="view_sale_order_search_external_filter" model="ir.ui.view">
+        <field name="name">sale.order.search.external.filter</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.sale_order_view_search_inherit_quotation"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <separator/>
+                <filter name="external_orders" string="外部订单" domain="[('x_is_external_order', '=', True)]"/>
+                <filter name="internal_orders" string="内部销售" domain="[('x_is_external_order', '=', False)]"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_sale_nature_list" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.sale.nature.list</field>
+        <field name="model">stock.subwarehouse.sale.nature</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="active" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_sale_nature" model="ir.actions.act_window">
+        <field name="name">销售性质</field>
+        <field name="res_model">stock.subwarehouse.sale.nature</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem
+        id="menu_sale_nature"
+        name="销售性质"
+        parent="sale.menu_sales_config"
+        action="action_sale_nature"
+        sequence="20"
+        groups="sales_team.group_sale_manager"
+    />
 </odoo>

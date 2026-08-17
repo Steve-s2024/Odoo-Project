@@ -42,7 +42,10 @@ function showConfirmationOverlay(source) {
     if (source instanceof HTMLFormElement) {
         requestAnimationFrame(() => {
             source.querySelectorAll("button[type='submit'], input[type='submit']")
-                .forEach((button) => { button.disabled = true; });
+                .forEach((button) => {
+                    button.disabled = true;
+                    button.dataset.erpConfirmationDisabled = "1";
+                });
         });
     }
 }
@@ -60,3 +63,16 @@ document.addEventListener("click", (event) => {
         showConfirmationOverlay(link);
     }
 }, true);
+
+// Browsers can restore the payment-selection page from the back/forward cache
+// together with the pre-navigation overlay.  Remove that stale UI state so a
+// customer can always leave or resume a pending payment.
+window.addEventListener("pageshow", () => {
+    document.querySelectorAll(".x_erp_confirmation_overlay").forEach((overlay) => {
+        overlay.remove();
+    });
+    document.querySelectorAll("[data-erp-confirmation-disabled='1']").forEach((button) => {
+        button.disabled = false;
+        delete button.dataset.erpConfirmationDisabled;
+    });
+});

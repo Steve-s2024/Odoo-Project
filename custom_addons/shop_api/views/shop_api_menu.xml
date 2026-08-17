@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <menuitem id="menu_shop_api_root" name="Shop APIs" action="action_shop_api_endpoints" sequence="5" web_icon="sales_team,static/description/icon.png" groups="shop_api.group_shop_api_auditor"/>
+    <menuitem id="menu_shop_api_root" name="&#32593;&#31449; API" parent="stock_subwarehouse_hierarchy.menu_other_root" action="action_shop_api_endpoints" sequence="40" groups="shop_api.group_shop_api_auditor"/>
 
     <menuitem id="menu_shop_api_overview" name="接口总览" parent="menu_shop_api_root" sequence="10" groups="shop_api.group_shop_api_auditor"/>
     <menuitem id="menu_shop_api_endpoints" name="接口目录" parent="menu_shop_api_overview" action="action_shop_api_endpoints" sequence="10" groups="shop_api.group_shop_api_auditor"/>

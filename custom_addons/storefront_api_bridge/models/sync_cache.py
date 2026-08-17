@@ -97,7 +97,121 @@ class StorefrontCacheEntry(models.Model):
                 })
         if existing:
             self.sudo().browse([entry.id for entry in existing.values()]).unlink()
+        if generated_at:
+            self.upsert(
+                "inventory_authority", "erp",
+                {"generated_at": generated_at},
+                version=generated_at,
+            )
         return rows
+
+    @api.model
+    def apply_authoritative_product_inventory(self, payload):
+        """Immediately apply a signed ERP product snapshot to Shop inventory.
+
+        Product/media synchronization remains asynchronous, but availability
+        must not wait behind image downloads.  A global ERP watermark allows
+        every product event from the same snapshot while rejecting delayed
+        events from an older snapshot.  The first authoritative event repairs
+        any legacy/future-dated local cache by deliberately forcing replacement.
+        """
+        incoming_version = payload.get("inventory_version")
+        if not incoming_version:
+            return {}
+        watermark = self.sudo().search([
+            ("namespace", "=", "inventory_authority"),
+            ("external_id", "=", "erp"),
+        ], limit=1)
+        if watermark.version and watermark.version > incoming_version:
+            return {}
+        rows = self.upsert_product_inventory(payload, force=True)
+        self.upsert(
+            "inventory_authority", "erp",
+            {"generated_at": incoming_version},
+            version=incoming_version,
+        )
+        return rows
+
+    @api.model
+    def upsert_product_inventory(self, payload, force=False):
+        """Apply one product event to the persistent availability cache.
+
+        ``force`` is reserved for ERP-authored replacement snapshots.  It
+        deliberately bypasses a Shop-local version value: the ERP is the
+        inventory authority and a manual push must repair, rather than defer
+        to, a stale or accidentally future-dated local cache row.
+        """
+        version = payload.get("inventory_version") or payload.get("version") or False
+        rows = {}
+        product_id = payload.get("id")
+        if product_id:
+            rows[product_id] = {
+                "available": bool(payload.get("available")),
+                "available_quantity": float(payload.get("available_quantity") or 0.0),
+                "record_type": "template",
+            }
+        for variant in payload.get("variants") or []:
+            variant_id = variant.get("id")
+            if variant_id:
+                rows[variant_id] = {
+                    "available": bool(variant.get("available")),
+                    "available_quantity": float(variant.get("available_quantity") or 0.0),
+                    "record_type": "variant",
+                    "template_id": product_id,
+                }
+
+        grouped_templates = {}
+        for variant in payload.get("group_variants") or []:
+            variant_id = variant.get("id")
+            template_id = variant.get("product_id")
+            quantity = float(variant.get("available_quantity") or 0.0)
+            if variant_id:
+                rows[variant_id] = {
+                    "available": bool(variant.get("available")),
+                    "available_quantity": quantity,
+                    "record_type": "variant",
+                    "template_id": template_id,
+                }
+            if template_id:
+                grouped = grouped_templates.setdefault(template_id, {
+                    "available": False,
+                    "available_quantity": 0.0,
+                    "record_type": "template",
+                })
+                grouped["available"] = grouped["available"] or bool(
+                    variant.get("available")
+                )
+                grouped["available_quantity"] = max(
+                    grouped["available_quantity"], quantity,
+                )
+        rows.update(grouped_templates)
+
+        for external_id, inventory in rows.items():
+            existing = self.sudo().search([
+                ("namespace", "=", "inventory"),
+                ("external_id", "=", external_id),
+                ("language", "=", "und"),
+            ], limit=1)
+            if not force and version and existing.version and existing.version > version:
+                continue
+            self.upsert(
+                "inventory", external_id, inventory,
+                version=version,
+            )
+        return rows
+
+    @api.model
+    def remove_product_inventory(self, payload):
+        external_ids = [payload.get("id")]
+        external_ids.extend(
+            variant.get("id") for variant in payload.get("variants") or []
+        )
+        external_ids = [external_id for external_id in external_ids if external_id]
+        if external_ids:
+            self.sudo().search([
+                ("namespace", "=", "inventory"),
+                ("external_id", "in", external_ids),
+            ]).unlink()
 
 
 class StorefrontWebhookEvent(models.Model):
@@ -138,22 +252,53 @@ class StorefrontWebhookEvent(models.Model):
         self.env.cr.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", [event_id])
         existing = self.sudo().search([("event_id", "=", event_id)], limit=1)
         if existing:
+            existing._apply_authoritative_inventory_hint()
             return existing, False
         occurred_at = document.get("occurred_at") or False
-        return self.sudo().create({
+        event = self.sudo().create({
             "event_id": event_id,
             "event_type": str(document.get("event_type") or "").strip(),
             "occurred_at": fields.Datetime.to_datetime(occurred_at) if occurred_at else False,
             "resource_id": document.get("resource_id") or False,
             "resource_version": document.get("resource_version") or False,
             "payload": document.get("data") if document.get("data") else {"_empty": True},
-        }), True
+        })
+        event._apply_authoritative_inventory_hint()
+        return event, True
+
+    def _apply_authoritative_inventory_hint(self):
+        """Apply stock before the asynchronous catalogue/media queue runs."""
+        cache = self.env["storefront.cache.entry"]
+        applied = False
+        for event in self:
+            data = event.payload or {}
+            if (
+                event.event_type not in {
+                    "product.created", "product.updated", "product.image.updated",
+                }
+                or data.get("authoritative") is not True
+                or data.get("replace") is not True
+            ):
+                continue
+            snapshot = (data.get("snapshots") or {}).get("zh_CN") or {}
+            if not isinstance(snapshot, dict) or not snapshot.get("id"):
+                continue
+            if snapshot.get("published") is False:
+                cache.remove_product_inventory(snapshot)
+                applied = True
+            elif snapshot.get("inventory_version"):
+                cache.apply_authoritative_product_inventory(snapshot)
+                applied = True
+        if applied:
+            self.env["storefront.erp.client"].clear_inventory_snapshot_cache()
+        return applied
 
     @api.model
-    def _cron_process_pending(self, limit=40):
-        # A bilingual product refresh makes two ERP API calls. Keep the cron
-        # batch below the 120 requests/minute endpoint limit and reserve room
-        # for inventory checks and ordinary storefront traffic.
+    def _cron_process_pending(self, limit=10):
+        # Product media can be several megabytes and is downloaded before the
+        # transaction commits.  Ten rows keeps each cron transaction bounded
+        # while remaining below the ERP endpoint rate limit and leaving room
+        # for live inventory/payment traffic.
         events = self.sudo().search([
             ("state", "in", ("pending", "error")),
             "|",
@@ -309,9 +454,35 @@ class StorefrontWebhookEvent(models.Model):
         if not product_id:
             raise ValueError("Product event has no resource identifier")
         client = self.env["storefront.erp.client"]
-        payload_zh = client.get(f"/api/v1/products/{product_id}", params={"language": "zh_CN"})
-        payload_en = client.get(f"/api/v1/products/{product_id}", params={"language": "en_US"})
+        snapshots = self.payload.get("snapshots") or {}
+        payload_zh = snapshots.get("zh_CN") if self.payload.get("authoritative") is True else None
+        payload_en = snapshots.get("en_US") if self.payload.get("authoritative") is True else None
+        if not isinstance(payload_zh, dict) or payload_zh.get("id") != product_id:
+            payload_zh = client.get(
+                f"/api/v1/products/{product_id}", params={"language": "zh_CN"}
+            )
+        if not isinstance(payload_en, dict) or payload_en.get("id") != product_id:
+            payload_en = client.get(
+                f"/api/v1/products/{product_id}", params={"language": "en_US"}
+            )
         cache = self.env["storefront.cache.entry"]
+        previous_cache = cache.sudo().search([
+            ("namespace", "=", "product"),
+            ("external_id", "=", product_id),
+            ("language", "=", "zh_CN"),
+        ], limit=1)
+        previous_payload = previous_cache.payload if previous_cache else {}
+        incoming_version = payload_zh.get("version") or self.resource_version
+        cached_versions = cache.sudo().search([
+            ("namespace", "=", "product"),
+            ("external_id", "=", product_id),
+            ("version", "!=", False),
+        ]).mapped("version")
+        # A delayed retry must not overwrite a newer product batch that the
+        # storefront has already applied. Odoo datetime versions are emitted
+        # in a lexicographically sortable UTC format.
+        if incoming_version and any(version > incoming_version for version in cached_versions):
+            return True
         product = self.env["product.template"].sudo().with_context(active_test=False).search([
             ("shop_api_uuid", "=", product_id),
         ], limit=1)
@@ -325,12 +496,22 @@ class StorefrontWebhookEvent(models.Model):
                 ("namespace", "=", "product"),
                 ("external_id", "=", product_id),
             ]).unlink()
+            cache.remove_product_inventory(payload_zh)
+            client.clear_inventory_snapshot_cache()
             if product:
                 product.with_context(
                     shop_api_skip_event=True, tracking_disable=True,
                 ).write({"website_published": False})
             return True
 
+        catalog_sync = self.env["storefront.catalog.sync"]
+        catalog_sync._validate_variant_mapping({product_id: payload_zh})
+        product = catalog_sync._upsert_product(payload_zh, payload_en)
+        media_is_current = self._product_media_is_current(
+            product,
+            previous_payload.get("images") if isinstance(previous_payload, dict) else [],
+            payload_zh.get("images") or [],
+        )
         cache.upsert(
             "product", product_id, payload_zh, language="zh_CN",
             version=payload_zh.get("version") or self.resource_version,
@@ -339,31 +520,67 @@ class StorefrontWebhookEvent(models.Model):
             "product", product_id, payload_en, language="en_US",
             version=payload_en.get("version") or self.resource_version,
         )
-
-        if not product:
-            # New catalogue rows remain cached until the later full-reconciliation
-            # phase creates complete templates, variants and attribute relations.
-            return True
-
-        field_values = {
-            "name": payload_zh.get("name_zh") or payload_zh.get("name") or product.name,
-            "x_website_english_name": payload_en.get("name_en") or payload_en.get("name") or "",
-            "x_website_description_zh": payload_zh.get("description_zh") or "",
-            "x_website_description_en": payload_en.get("description_en") or "",
-            "list_price": float(payload_zh.get("price_cny") or 0.0),
-            "x_website_usd_price": float(payload_en.get("price_usd") or 0.0),
-            "website_published": bool(payload_zh.get("published")),
-            "sale_ok": bool(payload_zh.get("sale_ok")),
-            "active": True,
-        }
-        material_type = payload_zh.get("material_type")
-        if material_type in dict(product._fields["x_material_type"].selection):
-            field_values["x_material_type"] = material_type
-        product.with_context(
-            lang="zh_CN", shop_api_skip_event=True, tracking_disable=True,
-        ).write(field_values)
-        self._sync_product_images(product, payload_zh.get("images") or [])
+        authoritative_inventory = bool(
+            self.payload.get("authoritative") is True
+            and self.payload.get("replace") is True
+            and payload_zh.get("inventory_version")
+        )
+        if authoritative_inventory:
+            cache.apply_authoritative_product_inventory(payload_zh)
+        else:
+            cache.upsert_product_inventory(payload_zh)
+        client.clear_inventory_snapshot_cache()
+        if not media_is_current:
+            self._sync_product_images(product, payload_zh.get("images") or [])
         return True
+
+    @api.model
+    def _product_media_is_current(self, product, cached_images, incoming_images):
+        """Return true only when versioned ERP media is already present locally.
+
+        Catalogue cache and product media are committed in one transaction, so
+        matching versioned metadata is a reliable fast path.  The local binary
+        and gallery identifiers are checked as an additional guard against old
+        or manually altered cache rows.
+        """
+        cached_images = cached_images if isinstance(cached_images, list) else []
+        incoming_images = incoming_images if isinstance(incoming_images, list) else []
+
+        def signature(images):
+            rows = []
+            for image in images:
+                if not isinstance(image, dict) or not image.get("id") or not image.get("version"):
+                    return None
+                rows.append((
+                    str(image["id"]),
+                    str(image.get("kind") or "gallery"),
+                    str(image["version"]),
+                    int(image.get("sequence") or 0),
+                ))
+            return sorted(rows)
+
+        if signature(cached_images) != signature(incoming_images):
+            return False
+        if incoming_images and signature(incoming_images) is None:
+            return False
+
+        expects_cover = any(
+            isinstance(image, dict) and image.get("kind") == "cover"
+            for image in incoming_images
+        )
+        if bool(product.image_1920) != expects_cover:
+            return False
+        expected_gallery_ids = {
+            str(image["id"])
+            for image in incoming_images
+            if isinstance(image, dict) and image.get("kind") != "cover" and image.get("id")
+        }
+        actual_gallery_ids = set(
+            self.env["product.image"].sudo().with_context(active_test=False).search([
+                ("product_tmpl_id", "=", product.id),
+            ]).mapped("shop_api_uuid")
+        )
+        return actual_gallery_ids == expected_gallery_ids
 
     def _sync_product_images(self, product, images):
         client = self.env["storefront.erp.client"]

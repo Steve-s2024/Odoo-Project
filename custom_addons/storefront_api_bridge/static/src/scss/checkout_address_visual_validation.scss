@@ -1,0 +1,24 @@
+.o_customer_address_fill form.address_autoformat {
+    .form-control,
+    .form-select {
+        transition:
+            background-color 320ms ease,
+            border-color 320ms ease,
+            box-shadow 320ms ease;
+    }
+
+    .x_checkout_address_invalid {
+        background-color: rgba(220, 53, 69, 0.12) !important;
+        border-color: rgba(220, 53, 69, 0.92) !important;
+        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.16) !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .o_customer_address_fill form.address_autoformat {
+        .form-control,
+        .form-select {
+            transition: none;
+        }
+    }
+}

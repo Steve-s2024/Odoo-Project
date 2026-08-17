@@ -25,6 +25,40 @@ class ShopApiError(Exception):
 
 class ShopApiController(Controller):
     @staticmethod
+    def _active_credential_user(submitted_login):
+        submitted_login = str(submitted_login or "").strip()
+        if not submitted_login:
+            return request.env["res.users"]
+        Users = request.env["res.users"].sudo().with_context(active_test=False)
+        user = Users.search([
+            ("login", "=", submitted_login),
+            ("active", "=", True),
+        ], limit=1)
+        if not user and "@" in submitted_login:
+            candidates = Users.search([
+                ("partner_id.email", "=ilike", submitted_login),
+                ("active", "=", True),
+            ], limit=2)
+            user = candidates if len(candidates) == 1 else Users.browse()
+        is_anonymous_website_user = bool(
+            user
+            and request.env["website"].sudo().search_count([
+                ("user_id", "=", user.id),
+            ], limit=1)
+        )
+        if (
+            not user
+            # Portal users can inherit the public group.  Identify anonymous
+            # users by the website's configured public-user record instead of
+            # group inheritance, otherwise valid customer credentials are
+            # rejected before ERP ever verifies their password.
+            or is_anonymous_website_user
+            or user.has_group("shop_api.group_shop_api_integration")
+        ):
+            return Users.browse()
+        return user
+
+    @staticmethod
     def _body():
         if not request.httprequest.data:
             return {}
@@ -380,6 +414,10 @@ class ShopApiController(Controller):
             providers = request.env["payment.provider"].sudo().search([
                 ("state", "in", ("enabled", "test")),
             ], order="state asc, id desc")
+            providers = providers.filtered(
+                lambda provider: provider.code != "custom"
+                and not self._is_cash_on_delivery_provider(provider)
+            )
             # A database may retain an older test provider beside the enabled
             # provider. Expose one deterministic choice per provider code.
             providers_by_code = {}
@@ -390,7 +428,7 @@ class ShopApiController(Controller):
             providers = providers.browse(
                 [provider.id for provider in providers_by_code.values()]
             )
-            return [{
+            methods = [{
                 "code": provider.code,
                 "name": standard_names.get(provider.code, {}).get(language)
                         or provider.with_context(lang=language).name,
@@ -398,8 +436,29 @@ class ShopApiController(Controller):
                 "state": provider.state,
                 "currencies": provider._get_supported_currencies().mapped("name"),
                 "supports_refund": bool(provider.support_refund),
-            } for provider in providers], 200, None
+                "available": True,
+                "shell": False,
+            } for provider in providers]
+            methods.append({
+                "code": "bank_card",
+                "name": "Bank card (coming soon)" if language == "en_US" else "银行卡支付（即将开放）",
+                "language": language,
+                "state": "disabled",
+                "currencies": ["CNY", "USD"],
+                "supports_refund": False,
+                "available": False,
+                "shell": True,
+            })
+            return methods, 200, None
         return self._run("payment_methods", handler)
+
+    @staticmethod
+    def _is_cash_on_delivery_provider(provider):
+        names = {
+            str(provider.with_context(lang=language).name or "").strip().casefold()
+            for language in ("en_US", "zh_CN")
+        }
+        return bool(names.intersection({"cash on delivery", "货到付款"}))
 
     @route("/api/v1/openapi.json", type="http", auth="bearer", methods=["GET"], csrf=False)
     def openapi(self):
@@ -694,15 +753,8 @@ class ShopApiController(Controller):
             if not submitted_login or not password:
                 raise ShopApiError("invalid_credentials", "用户名或密码错误。", 401)
 
-            Users = request.env["res.users"].sudo().with_context(active_test=False)
-            user = Users.search([("login", "=", submitted_login), ("active", "=", True)], limit=1)
-            if not user and "@" in submitted_login:
-                candidates = Users.search([
-                    ("partner_id.email", "=ilike", submitted_login),
-                    ("active", "=", True),
-                ], limit=2)
-                user = candidates if len(candidates) == 1 else Users.browse()
-            if not user or user._is_public() or user.has_group("shop_api.group_shop_api_integration"):
+            user = self._active_credential_user(submitted_login)
+            if not user:
                 raise ShopApiError("invalid_credentials", "用户名或密码错误。", 401)
 
             credential = {
@@ -790,6 +842,24 @@ class ShopApiController(Controller):
                 "partner_id": partner.id,
                 "group_ids": [Command.set([request.env.ref("base.group_portal").id])],
             })
+            if self._active_credential_user(user.login) != user:
+                raise ShopApiError(
+                    "registration_not_verified",
+                    "ERP 未能将新账户识别为有效登录账户，注册已回滚。",
+                    500,
+                )
+            try:
+                user.with_user(user).sudo()._check_credentials({
+                    "type": "password",
+                    "login": user.login,
+                    "password": password,
+                }, {"interactive": True})
+            except AccessDenied:
+                raise ShopApiError(
+                    "registration_not_verified",
+                    "ERP 未能验证新账户密码，注册已回滚。",
+                    500,
+                ) from None
             customer = user.partner_id.commercial_partner_id.sudo()
             customer._shop_api_ensure_uuid()
             request.env["shop.api.external.reference"].set_reference(
@@ -802,6 +872,79 @@ class ShopApiController(Controller):
                 "login": user.login,
             }, 201, None
         return self._run("customer_register", handler)
+
+    @route(
+        "/api/v1/customers/password-reset/request",
+        type="http",
+        auth="bearer",
+        methods=["POST"],
+        csrf=False,
+    )
+    def customer_password_reset_request(self):
+        def handler(body, client):
+            submitted_login = str(body.get("login") or body.get("email") or "").strip()
+            if not submitted_login:
+                raise ShopApiError(
+                    "login_required",
+                    "请输入登录名或电子邮箱。",
+                    400,
+                )
+
+            # Deliberately return the same accepted response for an unknown,
+            # ambiguous, or valid account. This prevents account enumeration.
+            # Password hashes and reset tokens never leave ERP.
+            user = self._active_credential_user(submitted_login)
+            if user:
+                user.action_reset_password()
+            return {
+                "authoritative": True,
+                "accepted": True,
+            }, 202, None
+
+        return self._run("customer_password_reset_request", handler)
+
+    @route(
+        "/api/v1/customers/password/change",
+        type="http",
+        auth="bearer",
+        methods=["POST"],
+        csrf=False,
+    )
+    def customer_password_change(self):
+        def handler(body, client):
+            submitted_login = str(body.get("login") or body.get("email") or "").strip()
+            current_password = str(body.get("current_password") or "")
+            new_password = str(body.get("new_password") or "")
+            if not submitted_login or not current_password or not new_password:
+                raise ShopApiError(
+                    "invalid_password_change",
+                    "登录名、当前密码和新密码不能为空。",
+                    400,
+                )
+
+            Users = request.env["res.users"]
+            Users._shop_api_assert_plaintext_password(new_password)
+            user = self._active_credential_user(submitted_login)
+            if not user:
+                raise ShopApiError("invalid_credentials", "用户名或密码错误。", 401)
+
+            if user._mfa_url():
+                raise ShopApiError(
+                    "mfa_required",
+                    "此账户启用了双重验证，不能通过商城修改密码。",
+                    409,
+                )
+
+            try:
+                user._shop_api_change_password(current_password, new_password)
+            except AccessDenied:
+                raise ShopApiError("invalid_credentials", "用户名或密码错误。", 401) from None
+            return {
+                "authoritative": True,
+                "changed": True,
+            }, 200, None
+
+        return self._run("customer_password_change", handler)
 
     @route("/api/v1/customers/by-external-id/<string:external_id>", type="http", auth="bearer", methods=["GET"], csrf=False)
     def customer_external(self, external_id):
@@ -1145,7 +1288,9 @@ class ShopApiController(Controller):
             # caller is authenticated through the Shop API instead of an Odoo
             # browser session.
             order._check_cart_is_ready_to_be_paid()
-            order._prepare_website_stock_for_payment()
+            # The deadline was created by ERP when the reservation became an
+            # order. Re-entering this endpoint must never refresh that deadline.
+            order._assert_website_payment_reservation_active()
             if order.currency_id.compare_amounts(
                 order.amount_paid, order.amount_total,
             ) == 0:
@@ -1154,11 +1299,22 @@ class ShopApiController(Controller):
                     "The order has already been paid. Please refresh the page.",
                     409,
                 )
+            if body.get("provider") == "bank_card":
+                raise ShopApiError(
+                    "payment_provider_unavailable",
+                    "银行卡支付尚未开放。",
+                    409,
+                )
             provider = request.env["payment.provider"].sudo().search([
                 ("code", "=", body.get("provider")),
                 ("state", "in", ("enabled", "test")),
             ], limit=1)
-            if not provider or order.currency_id not in provider._get_supported_currencies():
+            if (
+                not provider
+                or provider.code == "custom"
+                or self._is_cash_on_delivery_provider(provider)
+                or order.currency_id not in provider._get_supported_currencies()
+            ):
                 raise ShopApiError("payment_provider_unavailable", "支付方式不可用。", 409)
             payment_method = provider.payment_method_ids[:1]
             if not payment_method:
@@ -1355,13 +1511,21 @@ class ShopApiController(Controller):
     def return_shipped(self, refund_uuid):
         def handler(body, client):
             refund = self._refund_record(refund_uuid, client)
-            if not refund.return_required or refund.state != "returning":
+            if (
+                not refund.return_required
+                or refund.state != "returning"
+                or refund.x_return_delivery_state != "awaiting_delivery"
+            ):
                 raise ShopApiError("return_not_expected", "该退款申请当前不等待客户退货。", 409)
-            refund.write({
+            refund.with_context(shop_api_skip_event=True).write({
                 "shop_api_return_carrier": body.get("carrier") or False,
                 "shop_api_return_tracking": body.get("tracking_number") or False,
                 "shop_api_return_shipped_at": fields.Datetime.now(),
             })
+            # This transition records that the goods are in transit only. The
+            # incoming picking remains untouched, so ERP stock is not restored
+            # until an administrator confirms physical receipt.
+            refund.action_start_customer_return_delivery()
             return refund._shop_api_payload(), 200, None
         return self._run("return_shipped", handler)
 
