@@ -36,12 +36,19 @@ if [[ "$(id -u)" -ne 0 ]]; then
     exit 1
 fi
 
+export DEBIAN_FRONTEND=noninteractive
+export UCF_FORCE_CONFFOLD=1
+
+# Preserve provider-managed SSH/network configuration during unattended
+# upgrades, and never block provisioning on a dpkg conffile prompt.
+APT_GET=(apt-get -o Dpkg::Options::="--force-confold")
+
 echo "==> Updating Ubuntu packages"
-apt-get update
-apt-get upgrade -y
+"${APT_GET[@]}" update
+"${APT_GET[@]}" upgrade -y
 
 echo "==> Installing system dependencies"
-apt-get install -y \
+"${APT_GET[@]}" install -y \
     build-essential \
     ca-certificates \
     curl \
@@ -84,7 +91,7 @@ if ! command -v wkhtmltopdf >/dev/null 2>&1; then
     WKHTML_DEB="wkhtmltox_0.12.6.1-3.bookworm_${WKHTML_ARCH}.deb"
     WKHTML_URL="https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/${WKHTML_DEB}"
     curl --fail --location --retry 4 --output "/tmp/${WKHTML_DEB}" "$WKHTML_URL"
-    apt-get install -y "/tmp/${WKHTML_DEB}"
+    "${APT_GET[@]}" install -y "/tmp/${WKHTML_DEB}"
     rm -f "/tmp/${WKHTML_DEB}"
 fi
 
@@ -258,7 +265,7 @@ if [[ "$INSTALL_SSL" == "1" ]]; then
         exit 1
     fi
     echo "==> Installing HTTPS certificate for $DOMAIN"
-    apt-get install -y certbot python3-certbot-nginx
+    "${APT_GET[@]}" install -y certbot python3-certbot-nginx
     certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$ADMIN_EMAIL" --redirect
 fi
 
