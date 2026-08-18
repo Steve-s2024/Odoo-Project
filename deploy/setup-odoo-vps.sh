@@ -134,7 +134,17 @@ fi
 
 echo "==> Creating Python virtual environment"
 sudo -u "$ODOO_USER" python3 -m venv "$ODOO_HOME/venv"
-sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/python" -m pip install --upgrade pip wheel setuptools
+sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/python" -m pip install --upgrade \
+    pip wheel "setuptools<70" "Cython<3"
+
+# Odoo's Python 3.10 dependency set pins gevent 21.8.0. Its source build is
+# incompatible with Cython 3 in pip's isolated build environment, so build it
+# once against the compatible Cython already installed in this venv.
+if sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/python" -c \
+    'import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 10) else 1)'; then
+    sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/pip" install \
+        --no-build-isolation "gevent==21.8.0"
+fi
 sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/pip" install -r "$ODOO_SRC/requirements.txt"
 sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/pip" install openpyxl
 if [[ -f "$PROJECT_DIR/deploy/payment-sdk-requirements.txt" ]]; then
