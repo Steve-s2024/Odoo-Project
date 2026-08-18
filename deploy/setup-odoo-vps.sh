@@ -109,10 +109,16 @@ mkdir -p "$ODOO_HOME"
 chown -R "$ODOO_USER:$ODOO_USER" "$ODOO_HOME"
 
 echo "==> Creating PostgreSQL role and database"
+if [[ ! "$ODOO_DB" =~ ^[A-Za-z0-9_-]+$ || ! "$ODOO_DB_USER" =~ ^[A-Za-z0-9_-]+$ ]]; then
+    echo "Database and role names may contain only letters, numbers, underscores, and hyphens."
+    exit 1
+fi
 sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$ODOO_DB_USER'" | grep -q 1 || \
     sudo -u postgres createuser --createdb "$ODOO_DB_USER"
 sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$ODOO_DB'" | grep -q 1 || \
     sudo -u postgres createdb --owner="$ODOO_DB_USER" "$ODOO_DB"
+sudo -u postgres psql -d postgres -c \
+    "ALTER DATABASE \"$ODOO_DB\" OWNER TO \"$ODOO_DB_USER\";"
 
 if [[ ! -d "$ODOO_SRC/.git" ]]; then
     echo "==> Cloning Odoo $ODOO_VERSION"
