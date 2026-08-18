@@ -88,7 +88,10 @@ if ! command -v wkhtmltopdf >/dev/null 2>&1; then
             exit 1
             ;;
     esac
-    WKHTML_DEB="wkhtmltox_0.12.6.1-3.bookworm_${WKHTML_ARCH}.deb"
+    # This bootstrap targets Ubuntu 22.04 (Jammy). Use the official Jammy
+    # build, matching Odoo's own 19.0 container, rather than the incompatible
+    # Debian Bookworm package (which requires libjpeg62-turbo).
+    WKHTML_DEB="wkhtmltox_0.12.6.1-3.jammy_${WKHTML_ARCH}.deb"
     WKHTML_URL="https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/${WKHTML_DEB}"
     curl --fail --location --retry 4 --output "/tmp/${WKHTML_DEB}" "$WKHTML_URL"
     "${APT_GET[@]}" install -y "/tmp/${WKHTML_DEB}"
