@@ -17,6 +17,7 @@ ODOO_SRC="${ODOO_SRC:-$ODOO_HOME/odoo-src}"
 PROJECT_DIR="${PROJECT_DIR:-$ODOO_HOME/project}"
 CUSTOM_ADDONS_DIR="${CUSTOM_ADDONS_DIR:-$PROJECT_DIR/custom_addons}"
 ODOO_CONFIG="${ODOO_CONFIG:-/etc/odoo.conf}"
+ODOO_ENV_FILE="${ODOO_ENV_FILE:-}"
 ODOO_DB="${ODOO_DB:-odoo_prod}"
 ODOO_DB_USER="${ODOO_DB_USER:-odoo}"
 ODOO_PORT="${ODOO_PORT:-8069}"
@@ -189,6 +190,10 @@ mkdir -p "$ODOO_HOME/data" "$ODOO_LOG_DIR"
 chown -R "$ODOO_USER:$ODOO_USER" "$ODOO_HOME/data" "$ODOO_LOG_DIR"
 
 echo "==> Writing systemd service"
+ENVIRONMENT_FILE_DIRECTIVE=""
+if [[ -n "$ODOO_ENV_FILE" ]]; then
+    ENVIRONMENT_FILE_DIRECTIVE="EnvironmentFile=-$ODOO_ENV_FILE"
+fi
 cat > "/etc/systemd/system/$ODOO_SERVICE.service" <<EOF
 [Unit]
 Description=Odoo $ODOO_SERVICE
@@ -198,6 +203,7 @@ After=network.target postgresql.service
 Type=simple
 User=$ODOO_USER
 Group=$ODOO_USER
+$ENVIRONMENT_FILE_DIRECTIVE
 ExecStart=$ODOO_HOME/venv/bin/python $ODOO_SRC/odoo-bin -c $ODOO_CONFIG
 Restart=always
 RestartSec=5
