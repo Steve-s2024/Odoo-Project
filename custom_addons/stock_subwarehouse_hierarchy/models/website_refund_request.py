@@ -204,7 +204,7 @@ class WebsiteRefundRequest(models.Model):
     def action_submit_wechat_refund(self):
         return_pickings = self.env["stock.picking"]
         for refund_request in self:
-            if refund_request.state not in ("requested", "return_received"):
+            if refund_request.state not in ("requested", "return_received", "failed"):
                 raise ValidationError(_("该退款申请当前不能提交退款。"))
             refund_request._validate_payment_refund()
 
@@ -233,26 +233,28 @@ class WebsiteRefundRequest(models.Model):
 
     def _validate_payment_refund(self):
         self.ensure_one()
-        if (
-            self.source_transaction_id.provider_code not in ("wechatpay", "alipay")
-            or not self.source_transaction_id.provider_id.support_refund
-        ):
-            raise ValidationError(_("该支付方式不支持原路退款。"))
-        if self.amount_total <= 0:
-            raise ValidationError(_("退款金额必须大于零。"))
-        available = self.source_transaction_id.amount - sum(
-            -transaction.amount
-            for transaction in self.source_transaction_id.child_transaction_ids
-            if transaction.operation == "refund"
-            and transaction.state in ("draft", "pending", "authorized", "done")
-        )
-        if self.amount_total > available:
-            raise ValidationError(_("退款金额超过当前可退款金额。"))
+        self.source_transaction_id._validate_website_original_refund(self.amount_total)
 
     def _submit_payment_refund(self):
         self.ensure_one()
         if self.refund_transaction_id:
-            return self.refund_transaction_id
+            transaction = self.refund_transaction_id
+            if transaction.state != "error":
+                return transaction
+            if transaction.provider_code != "lianlian":
+                raise ValidationError(_("该退款交易失败，请联系客户支持后重试。"))
+            try:
+                transaction._lianlian_refresh_status(force=True)
+            except ValidationError:
+                # A rejected request might not exist in LianLian yet.  Reuse
+                # the same merchant refund ID exactly as required by the
+                # provider's idempotency contract.
+                pass
+            if transaction.state == "error":
+                transaction._send_refund_request()
+            if transaction.state == "done":
+                self._ensure_credit_note()
+            return transaction
         if self.return_required and self.state != "return_received":
             raise ValidationError(_("必须先完成客户退货入库，才能提交支付退款。"))
         transaction = self.source_transaction_id._refund(self.amount_total)

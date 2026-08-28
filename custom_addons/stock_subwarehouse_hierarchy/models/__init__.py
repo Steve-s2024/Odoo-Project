@@ -20,6 +20,7 @@ from . import res_users
 from . import res_currency
 from . import sale_order
 from . import sale_order_line
+from . import sale_product_selection
 from . import sale_report
 from . import spreadsheet_dashboard
 from . import stock_location

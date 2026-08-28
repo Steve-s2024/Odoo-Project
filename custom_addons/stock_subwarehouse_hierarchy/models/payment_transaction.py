@@ -1,9 +1,48 @@
 from odoo import _, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 
 class PaymentTransaction(models.Model):
     _inherit = "payment.transaction"
+
+    def _supports_website_original_refund(self):
+        """Return whether this completed payment supports an API refund.
+
+        Odoo uses the string ``none`` for an unsupported provider, so a plain
+        truth-value check is unsafe (``bool("none")`` is true).  Keeping this
+        provider-neutral also lets newly installed providers participate in
+        the established refund workflow without another hard-coded whitelist.
+        """
+        self.ensure_one()
+        return (
+            self.state == "done"
+            and self.operation != "refund"
+            and self.provider_id.support_refund in ("full_only", "partial")
+        )
+
+    def _website_refund_available_amount(self):
+        self.ensure_one()
+        refunded = sum(
+            -transaction.amount
+            for transaction in self.child_transaction_ids
+            if transaction.operation == "refund"
+            and transaction.state in ("draft", "pending", "authorized", "done")
+        )
+        return max(self.amount - refunded, 0.0)
+
+    def _validate_website_original_refund(self, amount):
+        self.ensure_one()
+        if not self._supports_website_original_refund():
+            raise ValidationError(_("该支付方式不支持原路退款。"))
+        available = self._website_refund_available_amount()
+        if amount <= 0 or self.currency_id.compare_amounts(amount, available) > 0:
+            raise ValidationError(_("退款金额必须大于零且不能超过当前可退款金额。"))
+        if (
+            self.provider_id.support_refund == "full_only"
+            and self.currency_id.compare_amounts(amount, available)
+        ):
+            raise ValidationError(_("该支付方式只支持全额退款。"))
+        return available
 
     def _set_done(self, *, state_message=None, extra_allowed_states=()):
         done_transactions = super()._set_done(

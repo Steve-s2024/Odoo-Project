@@ -43,6 +43,7 @@
                     <button name="action_start_customer_return_delivery" type="object" string="开始退货配送" class="btn-primary" invisible="x_return_delivery_state != 'awaiting_delivery'"/>
                     <button name="action_mark_customer_return_delivered" type="object" string="确认退货送达并入库" class="btn-primary" invisible="x_return_delivery_state != 'delivering'"/>
                     <button name="action_submit_wechat_refund" type="object" string="退货已收货，提交原路退款" class="btn-primary" invisible="state != 'return_received'"/>
+                    <button name="action_submit_wechat_refund" type="object" string="重新提交原路退款" class="btn-primary" invisible="state != 'failed'"/>
                     <button name="action_recreate_customer_return" type="object" string="重新创建客户退货单" class="btn-primary" invisible="state != 'return_cancelled'"/>
                     <button name="action_reject" type="object" string="拒绝" invisible="state != 'requested'"/>
                     <field name="state" widget="statusbar" statusbar_visible="requested,returning,return_received,processing,refunded,failed,rejected"/>

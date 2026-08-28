@@ -321,6 +321,35 @@ class DeliveryCarrier(models.Model):
     _name = "delivery.carrier"
     _inherit = ["delivery.carrier", "shop.api.uuid.mixin"]
 
+    def _shop_api_display_name(self, language="zh_CN"):
+        """Return the delivery label in the website language requested by the Shop."""
+        self.ensure_one()
+        language = "en_US" if str(language or "").lower().startswith("en") else "zh_CN"
+        localized_name = str(self.with_context(lang=language).name or "").strip()
+        known_names = {
+            str(self.with_context(lang=lang).name or "").strip().casefold()
+            for lang in ("zh_CN", "en_US")
+        }
+        explicit_english = ""
+        if self.product_id:
+            template = self.product_id.product_tmpl_id
+            known_names.update({
+                str(template.with_context(lang=lang).name or "").strip().casefold()
+                for lang in ("zh_CN", "en_US")
+            })
+            if language == "en_US":
+                explicit_english = str(
+                    getattr(template, "x_website_english_name", "") or ""
+                ).strip()
+        standard_names = {
+            "标准送货", "标准配送", "standard delivery", "standard shipping",
+        }
+        if known_names.intersection(standard_names):
+            return "Standard delivery" if language == "en_US" else "标准送货"
+        if re.search(r"[A-Za-z]", explicit_english):
+            return explicit_english
+        return localized_name or ("Delivery" if language == "en_US" else "配送")
+
 
 class ResPartner(models.Model):
     _name = "res.partner"
@@ -365,6 +394,19 @@ class ResPartner(models.Model):
 class SaleOrderLine(models.Model):
     _inherit = "sale.order.line"
 
+    def _shop_api_is_delivery_line(self):
+        """Recognize normal delivery rows and legacy carrier-product rows."""
+        self.ensure_one()
+        carrier = self.order_id.carrier_id
+        return bool(
+            self.is_delivery
+            or (
+                carrier
+                and carrier.product_id
+                and self.product_id == carrier.product_id
+            )
+        )
+
     @staticmethod
     def _shop_api_option_semantic_key(label):
         normalized = re.sub(r"[\s_\-/]+", "", str(label or "").casefold())
@@ -381,6 +423,8 @@ class SaleOrderLine(models.Model):
         self.ensure_one()
         language = "en_US" if str(language or "").lower().startswith("en") else "zh_CN"
         is_english = language == "en_US"
+        if self._shop_api_is_delivery_line() or not self.product_id:
+            return []
         product_template = self.product_id.product_tmpl_id
         raw_values = product_template._get_shop_variant_display_values(is_english=False)
         display_values = product_template._get_shop_variant_display_values(is_english=is_english)
@@ -437,7 +481,11 @@ class SaleOrderLine(models.Model):
         """Return the website-facing name in the language requested by the shop."""
         self.ensure_one()
         language = "en_US" if str(language or "").lower().startswith("en") else "zh_CN"
-        if self.is_delivery or not self.product_id:
+        if self._shop_api_is_delivery_line():
+            carrier = self.order_id.carrier_id
+            if carrier:
+                return carrier._shop_api_display_name(language=language)
+        if not self.product_id:
             localized = self.with_context(lang=language)
             return localized.name_short or localized.name
         return self.product_id.product_tmpl_id._get_website_display_name(
@@ -506,8 +554,11 @@ class SaleOrder(models.Model):
                     "subtotal": line.price_subtotal,
                     "total": line.price_total,
                     "uom": line.product_uom_id.name,
-                    "is_delivery": bool(line.is_delivery),
-                    "refundable": bool(not line.is_delivery and line.product_uom_qty > 0),
+                    "is_delivery": line._shop_api_is_delivery_line(),
+                    "refundable": bool(
+                        not line._shop_api_is_delivery_line()
+                        and line.product_uom_qty > 0
+                    ),
                     "selected_options": line._shop_api_selected_options(language=language),
                 }
                 for line in self.order_line.filtered(lambda item: not item.display_type)
@@ -545,11 +596,24 @@ class SaleOrder(models.Model):
                         )
         return result
 
-    def _get_available_qty_for_source_location(self, product, location, exclude_order=False):
+    def _get_available_qty_for_source_location(
+        self,
+        product,
+        location,
+        exclude_order=False,
+        exclude_reservation=False,
+    ):
         available = super()._get_available_qty_for_source_location(
-            product, location, exclude_order=exclude_order,
+            product,
+            location,
+            exclude_order=exclude_order,
+            exclude_reservation=exclude_reservation,
         )
-        reserved = self.env["shop.api.reservation.line"].sudo()._active_reserved_qty(product, location)
+        reserved = self.env["shop.api.reservation.line"].sudo()._active_reserved_qty(
+            product,
+            location,
+            exclude_reservation=exclude_reservation,
+        )
         return max(available - reserved, 0.0)
 
     def action_confirm(self):
@@ -619,6 +683,9 @@ class PaymentTransaction(models.Model):
             )
             qr_method = getattr(self, "_get_alipay_qr_data_uri", None)
             payload["qr_code_data_uri"] = qr_method() if qr_method else None
+        elif self.provider_code == "lianlian":
+            payload["simulation_mode"] = False
+            payload["checkout_url"] = getattr(self, "lianlian_payment_url", False) or None
         payload["post_processed"] = bool(self.is_post_processed)
         return payload
 

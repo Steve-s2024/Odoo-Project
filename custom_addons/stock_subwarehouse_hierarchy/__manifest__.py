@@ -1,7 +1,7 @@
 {
     "name": "库存子仓库层级",
     "summary": "使用库存库位树跟踪仓库和子仓库。",
-    "version": "19.0.1.0.41",
+    "version": "19.0.1.0.47",
     "category": "库存/库存",
     "author": "Local",
     "license": "LGPL-3",
@@ -22,6 +22,7 @@
         "account_payment",
         "payment_wechatpay",
         "payment_alipay",
+        "payment_lianlian",
     ],
     "data": [
         "security/ir.model.access.csv",
@@ -51,6 +52,7 @@
         "views/stock_location_views.xml",
         "views/stock_warehouse_views.xml",
         "views/warehouse_history_views.xml",
+        "views/sale_product_selection_views.xml",
         "views/sale_order_views.xml",
         "views/external_sale_report_views.xml",
         "views/website_video_views.xml",

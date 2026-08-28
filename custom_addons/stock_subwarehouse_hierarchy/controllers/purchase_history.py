@@ -196,8 +196,7 @@ class WebsitePurchaseHistory(CustomerPortal):
             return request.redirect("/")
         transaction = order.transaction_ids.filtered(
             lambda tx: tx.state == "done"
-            and tx.provider_code in ("wechatpay", "alipay")
-            and bool(tx.provider_id.support_refund)
+            and tx._supports_website_original_refund()
         ).sorted("id")[-1:]
         if not transaction:
             return request.redirect(f"/purchase-detail/{order.id}?refund_error=payment")

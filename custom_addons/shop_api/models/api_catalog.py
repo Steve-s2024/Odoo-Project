@@ -67,7 +67,8 @@ BUILTIN_ENDPOINTS = [
     ("reservation_confirm", "POST", "/api/v1/reservations/{uuid}/confirm", "reservation:write", True, "确认库存预留", "Confirm reservation"),
     ("reservation_release", "POST", "/api/v1/reservations/{uuid}/release", "reservation:write", True, "释放库存预留", "Release reservation"),
     ("customer_upsert", "POST", "/api/v1/customers/upsert", "customer:write", True, "新增或更新客户", "Upsert customer"),
-    ("customer_authenticate", "POST", "/api/v1/customers/authenticate", "customer:read", False, "验证商城客户账户", "Authenticate storefront customer"),
+    ("customer_authenticate", "POST", "/api/v1/customers/authenticate", "customer:read", False, "已停用的旧版登录接口", "Retired legacy customer login"),
+    ("native_login", "POST", "/api/v2/native-auth/login", "customer:read", False, "Odoo 原生账户登录确认", "Odoo native account login confirmation"),
     ("customer_register", "POST", "/api/v1/customers/register", "customer:write", True, "注册商城客户账户", "Register storefront customer"),
     ("customer_password_reset_request", "POST", "/api/v1/customers/password-reset/request", "customer:write", True, "申请重置商城账户密码", "Request storefront customer password reset"),
     ("customer_password_change", "POST", "/api/v1/customers/password/change", "customer:write", True, "永久修改商城账户密码", "Permanently change storefront customer password"),
@@ -206,6 +207,7 @@ class ShopApiEndpoint(models.Model):
             }
             if code in (
                 "customer_authenticate",
+                "native_login",
                 "customer_register",
                 "customer_password_reset_request",
                 "customer_password_change",

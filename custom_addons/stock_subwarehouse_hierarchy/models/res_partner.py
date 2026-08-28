@@ -304,38 +304,37 @@ class ResPartner(models.Model):
     @api.model
     def _get_distributor_import_columns(self):
         return [
-            ("name", "公司名称", "是", "文本"),
-            ("x_is_distributor", "是经销商", "是", "1 / 0"),
-            ("company_type", "联系人类型", "是", "company"),
-            ("customer_rank", "客户等级标记", "否", "1"),
-            ("email", "电子邮箱", "否", "文本"),
-            ("phone", "电话", "否", "文本"),
-            ("street", "地址", "否", "文本"),
-            ("city", "城市", "否", "文本"),
-            ("country_id", "国家/地区", "否", "系统中的国家名称"),
+            ("name", "公司名称", "是", "填写公司全称"),
+            ("company_type", "联系人类型", "是", "固定填写：公司（company）"),
+            ("customer_rank", "客户等级标记", "否", "客户标记填写 1"),
+            ("email", "电子邮箱", "否", "填写有效的电子邮箱地址"),
+            ("phone", "电话", "否", "填写联系电话，可包含国家/地区代码"),
+            ("street", "地址", "否", "填写街道及门牌地址"),
+            ("city", "城市", "否", "填写城市名称"),
+            ("country_id", "国家/地区", "否", "填写系统中已有的国家/地区名称"),
             (
                 "x_distributor_status",
                 "经销商状态",
                 "是",
-                "draft / review / active / suspended / terminated",
+                "草稿（draft）/ 待审核（review）/ 生效（active）/ 暂停（suspended）/ 终止（terminated）",
             ),
             (
                 "x_distributor_level",
                 "经销商等级",
                 "是",
-                "standard / silver / gold / strategic",
+                "标准（standard）/ 银级（silver）/ 金级（gold）/ 战略（strategic）",
             ),
-            ("x_distributor_territory", "销售区域", "否", "文本"),
-            ("x_distributor_exclusive", "独家区域", "否", "1 / 0"),
-            ("x_distributor_agreement_start", "协议开始日期", "否", "YYYY-MM-DD"),
-            ("x_distributor_agreement_end", "协议到期日期", "否", "YYYY-MM-DD"),
-            ("x_distributor_annual_target", "年度采购目标", "否", "数字"),
-            ("x_distributor_currency_id", "目标币种", "否", "币种代码，如 CNY"),
-            ("x_distributor_default_warehouse_id", "默认发货仓库", "否", "仓库名称"),
-            ("user_id", "负责人", "否", "系统用户名称"),
-            ("property_product_pricelist", "销售价目表", "否", "价目表名称"),
-            ("property_payment_term_id", "客户付款条款", "否", "付款条款名称"),
-            ("x_distributor_notes", "经销商备注", "否", "文本或 HTML"),
+            ("x_distributor_territory", "销售区域", "否", "填写销售区域名称"),
+            ("x_distributor_exclusive", "独家区域", "否", "填 1 表示是，填 0 表示否"),
+            ("x_distributor_agreement_start", "协议开始日期", "否", "按 YYYY-MM-DD 格式填写，如 2026-01-01"),
+            ("x_distributor_agreement_end", "协议到期日期", "否", "按 YYYY-MM-DD 格式填写，如 2026-12-31"),
+            ("x_distributor_annual_target", "年度采购目标", "否", "填写数字，不要包含货币符号或千位分隔符"),
+            ("x_distributor_currency_id", "目标币种", "否", "填写币种代码，如 CNY"),
+            ("x_distributor_default_warehouse_id", "默认发货仓库", "否", "填写系统中已有的仓库名称"),
+            ("user_id", "负责人", "否", "填写系统中已有的用户名称"),
+            ("property_product_pricelist", "销售价目表", "否", "填写系统中已有的价目表名称"),
+            ("property_payment_term_id", "客户付款条款", "否", "填写系统中已有的付款条款名称"),
+            ("x_distributor_notes", "经销商备注", "否", "填写普通文本或 HTML 内容"),
         ]
 
     @api.model
@@ -392,18 +391,30 @@ class ResPartner(models.Model):
         import_sheet = workbook.active
         import_sheet.title = import_sheet_name
         import_sheet.append([field_name for field_name, _label, _required, _accepted in columns])
+        if channel == "distributor":
+            import_sheet.append([label for _field_name, label, _required, _accepted in columns])
 
         instruction_sheet = workbook.create_sheet("字段说明")
         instruction_sheet.append(["字段", "中文说明", "必填", "填写规则"])
         for field_name, label, required, accepted in columns:
             instruction_sheet.append([field_name, label, required, accepted])
 
-        note_sheet = workbook.create_sheet("使用说明")
+        note_sheet = workbook.create_sheet(
+            "导入规则" if channel == "distributor" else "使用说明"
+        )
         note_sheet.append([title])
-        note_sheet.append(["1. 请在第一个工作表中从第 2 行开始填写数据，不要修改第 1 行字段名。"])
-        note_sheet.append(["2. 导入前可使用测试导入表验证；空白选填字段可以保留。"])
-        note_sheet.append(["3. 已有记录需要更新时，建议使用 Odoo 导出的数据库 ID 或外部 ID。"])
-        note_sheet.append(["4. 计算字段（未结清账单、欠款、预计到货）不参与导入，由系统自动汇总。"])
+        if channel == "distributor":
+            note_sheet.append(["1. 第 1 行是系统字段名，请勿修改；第 2 行是中文标题，仅供阅读。"])
+            note_sheet.append(["2. 请从第 3 行开始填写经销商数据；执行导入时忽略第 2 行中文标题。"])
+            note_sheet.append(["3. 导入前请先执行测试；选填字段可以留空，必填字段不得为空。"])
+            note_sheet.append(["4. 字段允许值及填写方法请查看“字段说明”工作表。"])
+            note_sheet.append(["5. 更新已有记录时，建议使用 Odoo 导出的数据库 ID 或外部 ID。"])
+            note_sheet.append(["6. 未结清账单、欠款、预计到货等计算字段不参与导入，由系统自动汇总。"])
+        else:
+            note_sheet.append(["1. 请在第一个工作表中从第 2 行开始填写数据，不要修改第 1 行字段名。"])
+            note_sheet.append(["2. 导入前可使用测试导入表验证；空白选填字段可以保留。"])
+            note_sheet.append(["3. 已有记录需要更新时，建议使用 Odoo 导出的数据库 ID 或外部 ID。"])
+            note_sheet.append(["4. 计算字段（未结清账单、欠款、预计到货）不参与导入，由系统自动汇总。"])
 
         header_fill = PatternFill("solid", fgColor="1F4E78")
         header_font = Font(bold=True, color="FFFFFF")
@@ -421,6 +432,12 @@ class ResPartner(models.Model):
                 sheet.column_dimensions[
                     get_column_letter(column_cells[0].column)
                 ].width = width
+        if channel == "distributor":
+            import_sheet.freeze_panes = "A3"
+            for cell in import_sheet[2]:
+                cell.font = Font(bold=True, color="1F1F1F")
+                cell.fill = section_fill
+                cell.alignment = Alignment(vertical="center")
         instruction_sheet["A2"].fill = section_fill
 
         output = BytesIO()
@@ -491,6 +508,13 @@ class ResPartner(models.Model):
     @api.model
     def _open_partner_channel_import(self, channel, name):
         context = dict(self.env.context, partner_channel_import_type=channel)
+        if channel == "distributor":
+            context.update({
+                "default_x_is_distributor": True,
+                "default_is_company": True,
+                "default_company_type": "company",
+                "default_customer_rank": 1,
+            })
         return {
             "type": "ir.actions.client",
             "name": name,

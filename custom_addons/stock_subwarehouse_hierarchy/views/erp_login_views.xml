@@ -1,108 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="sun_erp_login_page" inherit_id="web.login" name="SUN ERP Login Page">
-        <xpath expr="//t[@t-call='web.login_layout']" position="before">
-            <t t-if="erp_login" t-set="title">登录ERP系统</t>
-        </xpath>
-
-        <xpath expr="//form[@t-attf-action='/web/login']" position="before">
-            <t t-if="erp_login">
-                <style>
-                    body.bg-100 {
-                        background:
-                            radial-gradient(circle at 18% 15%, rgba(216, 232, 244, 0.88), transparent 34%),
-                            radial-gradient(circle at 82% 82%, rgba(226, 235, 241, 0.82), transparent 38%),
-                            linear-gradient(145deg, #f7fafc 0%, #e8eff4 100%);
-                    }
-                    #wrapwrap &gt; header,
-                    #wrapwrap &gt; footer,
-                    #o_footer_scrolltop_wrapper {
-                        display: none !important;
-                    }
-                    .o_database_list {
-                        max-width: 380px !important;
-                        border: 1px solid rgba(32, 54, 69, 0.08) !important;
-                        border-radius: 18px;
-                        box-shadow: 0 22px 60px rgba(32, 54, 69, 0.14);
-                    }
-                    .sun_erp_login_heading {
-                        color: #203645;
-                        font-family: Arial, "Microsoft YaHei", sans-serif;
-                        font-size: 25px;
-                        font-weight: 500;
-                        letter-spacing: 0.01em;
-                        line-height: 1.35;
-                        margin: 0;
-                    }
-                    .sun_erp_login_title_row {
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        gap: 12px;
-                    }
-                    .sun_erp_login_logo {
-                        display: block;
-                        width: auto;
-                        height: 30px;
-                        object-fit: contain;
-                    }
-                    .sun_erp_login_caption {
-                        color: #6b7c87;
-                        font-size: 13px;
-                        margin: 8px 0 22px;
-                    }
-                    .oe_login_form .form-label {
-                        color: #344b5a;
-                        font-weight: 400;
-                    }
-                    .oe_login_form .form-control {
-                        border-radius: 10px;
-                        min-height: 43px;
-                    }
-                    .oe_login_form .btn-primary {
-                        border-radius: 10px;
-                        min-height: 43px;
-                    }
-                </style>
-                <div class="text-center sun_erp_login_intro">
-                    <div class="sun_erp_login_title_row">
-                        <img class="sun_erp_login_logo"
-                            src="/stock_subwarehouse_hierarchy/static/img/logo.png"
-                            alt="SUN"/>
-                        <h1 class="sun_erp_login_heading">登录ERP系统</h1>
-                    </div>
-                    <p class="sun_erp_login_caption">请使用已授权的员工账户登录</p>
-                </div>
-            </t>
-        </xpath>
-
-        <xpath expr="//label[@for='login']" position="replace">
-            <label for="login" class="form-label d-flex justify-content-between">
-                <t t-if="erp_login">账号</t>
-                <t t-else="">Email</t>
-            </label>
-        </xpath>
-
-        <xpath expr="//input[@id='login']" position="attributes">
-            <attribute name="t-att-placeholder">'请输入账号或邮箱' if erp_login else 'Enter your email'</attribute>
-        </xpath>
-
-        <xpath expr="//label[@for='password']" position="replace">
-            <label for="password" class="form-label">
-                <t t-if="erp_login">密码</t>
-                <t t-else="">Password</t>
-            </label>
-        </xpath>
-
-        <xpath expr="//input[@id='password']" position="attributes">
-            <attribute name="t-att-placeholder">'请输入密码' if erp_login else 'Enter your password'</attribute>
-        </xpath>
-
-        <xpath expr="//div[hasclass('oe_login_buttons')]/button[@type='submit'][1]" position="replace">
-            <button type="submit" class="btn btn-primary">
-                <t t-if="erp_login">登录</t>
-                <t t-else="">Log in</t>
-            </button>
-        </xpath>
-    </template>
+    <!--
+        Keep the historical XML identifier only long enough for an upgrade to
+        deactivate the inherited login view already stored in existing
+        databases.  No Odoo login markup is customized after this release.
+    -->
+    <record id="sun_erp_login_page" model="ir.ui.view">
+        <field name="name">Retired SUN ERP login customization</field>
+        <field name="type">qweb</field>
+        <field name="arch" type="xml"><t/></field>
+        <field name="active" eval="False"/>
+    </record>
 </odoo>

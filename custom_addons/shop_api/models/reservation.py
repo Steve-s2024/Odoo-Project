@@ -81,8 +81,7 @@ class ShopApiReservation(models.Model):
 
     @api.model
     def _lock_products(self, products):
-        for product_id in sorted(products.ids):
-            self.env.cr.execute("SELECT pg_advisory_xact_lock(%s, %s)", [7421, product_id])
+        self.env["sale.order"]._lock_common_fulfillment_products(products)
 
     @api.model
     def check_inventory(self, items, client, exclude_reservation=None):
@@ -102,16 +101,12 @@ class ShopApiReservation(models.Model):
         locations = self._candidate_locations(company)
         result = []
         for product, quantity in normalized:
-            options = []
-            for location in locations:
-                available = self.env["stock.quant"].sudo()._get_available_quantity(
-                    product, location, strict=True,
-                )
-                available -= self.env["shop.api.reservation.line"].sudo()._active_reserved_qty(
-                    product, location, exclude_reservation=exclude_reservation,
-                )
-                if available > 0:
-                    options.append((location, max(available, 0.0)))
+            options = self.env["sale.order"]._get_common_fulfillment_stock_options(
+                product,
+                company=company,
+                candidate_locations=locations,
+                exclude_reservation=exclude_reservation,
+            )
             satisfying = [option for option in options if option[1] >= quantity]
             selected = sorted(satisfying, key=lambda option: (option[1], option[0].id))[:1]
             product._shop_api_ensure_uuid()
@@ -239,20 +234,19 @@ class ShopApiReservation(models.Model):
             "x_platform": "separated_shop",
             "x_channel": self.client_id.code,
             "x_website_checkout_language": language,
-            "order_line": [Command.create({
-                "product_id": line.product_id.id,
-                "product_uom_qty": line.quantity,
-                "product_uom_id": line.product_uom_id.id,
-                "price_unit": line_price(line),
-                "x_source_location_id": line.source_location_id.id,
-                "x_website_stock_reserved_until": self.expires_at,
-            }) for line in self.line_ids],
+            "order_line": [Command.create(
+                self.env["sale.order"]._prepare_common_fulfillment_order_line_values(
+                    line.product_id,
+                    line.quantity,
+                    line.source_location_id,
+                    product_uom=line.product_uom_id,
+                    price_unit=line_price(line),
+                    reserved_until=self.expires_at,
+                )
+            ) for line in self.line_ids],
         })
         if shipping_method:
-            rate = shipping_method.sudo().rate_shipment(order)
-            if not rate.get("success"):
-                raise UserError(rate.get("error_message") or _("配送方式不可用。"))
-            order.set_delivery_line(shipping_method.sudo(), rate["price"])
+            order._apply_common_delivery_carrier(shipping_method)
         order._shop_api_ensure_uuid()
         self.write({"state": "confirmed", "confirmed_order_id": order.id, "partner_id": partner.id})
         if external_id:

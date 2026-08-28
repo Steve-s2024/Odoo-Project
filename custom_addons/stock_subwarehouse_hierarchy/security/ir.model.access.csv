@@ -22,5 +22,7 @@ access_product_quick_encoder_wizard,stock.subwarehouse.product.quick.encoder.wiz
 access_product_quick_encoder_line,stock.subwarehouse.product.quick.encoder.line,model_stock_subwarehouse_product_quick_encoder_line,base.group_user,1,1,1,1
 access_sale_nature_user,stock.subwarehouse.sale.nature.user,model_stock_subwarehouse_sale_nature,sales_team.group_sale_salesman,1,0,1,0
 access_sale_nature_manager,stock.subwarehouse.sale.nature.manager,model_stock_subwarehouse_sale_nature,sales_team.group_sale_manager,1,1,1,1
+access_sale_product_selection_batch,stock.subwarehouse.sale.product.selection.batch,model_stock_subwarehouse_sale_product_selection_batch,sales_team.group_sale_salesman,1,1,1,1
+access_sale_product_selection_line,stock.subwarehouse.sale.product.selection.line,model_stock_subwarehouse_sale_product_selection_line,sales_team.group_sale_salesman,1,1,1,1
 access_business_import_result_batch,stock.subwarehouse.business.import.result.batch,model_stock_subwarehouse_business_import_result_batch,base.group_user,1,1,1,1
 access_business_import_result_line,stock.subwarehouse.business.import.result.line,model_stock_subwarehouse_business_import_result_line,base.group_user,1,1,1,1

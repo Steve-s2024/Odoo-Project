@@ -392,11 +392,17 @@ class ShopApiController(Controller):
     @route("/api/v1/shipping-methods", type="http", auth="bearer", methods=["GET"], csrf=False)
     def shipping_methods(self):
         def handler(_body, _client):
+            language = str(
+                request.httprequest.args.get("language")
+                or request.httprequest.args.get("lang")
+                or "zh_CN"
+            ).strip()
+            language = language if language in ("zh_CN", "en_US") else "zh_CN"
             carriers = request.env["delivery.carrier"].sudo().search([("active", "=", True)])
             carriers._shop_api_ensure_uuid()
             return [{
                 "id": carrier.shop_api_uuid,
-                "name": carrier.name,
+                "name": carrier._shop_api_display_name(language=language),
                 "delivery_type": carrier.delivery_type,
             } for carrier in carriers], 200, None
         return self._run("shipping_methods", handler)
@@ -747,6 +753,36 @@ class ShopApiController(Controller):
 
     @route("/api/v1/customers/authenticate", type="http", auth="bearer", methods=["POST"], csrf=False)
     def customer_authenticate(self):
+        """Retire the previous credential bridge explicitly.
+
+        This route intentionally does not parse or log the submitted body.  It
+        remains only as a deterministic migration signal for an outdated Shop.
+        """
+        request_id = (
+            request.httprequest.headers.get("X-Request-Id") or str(uuid.uuid4())
+        )[:128]
+        return self._error(
+            "legacy_auth_endpoint_retired",
+            "旧版登录接口已停用，请使用 Odoo 原生登录接口。",
+            410,
+            request_id,
+        )
+
+    @route(
+        "/api/v2/native-auth/login",
+        type="http",
+        auth="bearer",
+        methods=["POST"],
+        csrf=False,
+    )
+    def native_login(self):
+        """Authenticate against ERP's unmodified Odoo credential backend.
+
+        Passwords are accepted only over the authenticated server-to-server
+        channel, are redacted by the API audit layer, and never leave ERP in a
+        response.  The Shop receives only the authoritative identity/profile
+        required to create its own Odoo session.
+        """
         def handler(body, client):
             submitted_login = str(body.get("login") or "").strip()
             password = body.get("password") or ""
@@ -769,13 +805,15 @@ class ShopApiController(Controller):
                 "REMOTE_ADDR": request.httprequest.remote_addr,
             }
             try:
-                request.env["res.users"].authenticate(credential, user_agent)
+                auth_info = request.env["res.users"].authenticate(
+                    credential, user_agent
+                )
             except AccessDenied:
                 raise ShopApiError("invalid_credentials", "用户名或密码错误。", 401) from None
-            if user._mfa_url():
+            if auth_info.get("mfa") != "skip" and user._mfa_url():
                 raise ShopApiError(
                     "mfa_required",
-                    "此账户启用了双重验证，暂时无法通过商城代理登录。",
+                    "此账户启用了双重验证，暂时无法通过商城登录。",
                     409,
                 )
 
@@ -787,18 +825,21 @@ class ShopApiController(Controller):
             return {
                 **customer._shop_api_payload(),
                 "authoritative": True,
+                "authentication_backend": "odoo_native",
+                "authentication_version": 2,
                 "login": user.login,
                 "is_internal": user._is_internal(),
                 "website_editor": bool(
                     user._is_internal()
                     and (
-                        user.has_group("website.group_website_designer")
+                        user.has_group("base.group_system")
+                        or user.has_group("website.group_website_designer")
                         or user.has_group("website.group_website_restricted_editor")
                     )
                 ),
             }, 200, None
 
-        return self._run("customer_authenticate", handler)
+        return self._run("native_login", handler)
 
     @route("/api/v1/customers/register", type="http", auth="bearer", methods=["POST"], csrf=False)
     def customer_register(self):
@@ -1363,9 +1404,19 @@ class ShopApiController(Controller):
 
     @route("/api/v1/payments/<string:payment_uuid>", type="http", auth="bearer", methods=["GET"], csrf=False)
     def payment_detail(self, payment_uuid):
-        return self._run("payment_detail", lambda _body, client: (
-            self._payment_record(payment_uuid, client)._shop_api_payload(), 200, None,
-        ))
+        def handler(_body, client):
+            transaction = self._payment_record(payment_uuid, client)
+            refresh = getattr(transaction, "_lianlian_refresh_status", None)
+            if transaction.provider_code == "lianlian" and refresh:
+                # A checkout redirect never proves payment. Refresh only from
+                # LianLian's signed query response, while keeping transient
+                # provider outages fail-closed as a pending ERP transaction.
+                try:
+                    refresh()
+                except ValidationError:
+                    pass
+            return transaction._shop_api_payload(), 200, None
+        return self._run("payment_detail", handler)
 
     @route("/api/v1/payments/<string:payment_uuid>/simulate-success", type="http", auth="bearer", methods=["POST"], csrf=False)
     def payment_simulate_success(self, payment_uuid):
@@ -1407,10 +1458,16 @@ class ShopApiController(Controller):
 
     @route("/api/v1/payments/<string:payment_uuid>/reconcile", type="http", auth="bearer", methods=["POST"], csrf=False)
     def payment_reconcile(self, payment_uuid):
-        return self._run("payment_reconcile", lambda _body, client: (
-            self._payment_record(payment_uuid, client)._shop_api_payload(), 200,
-            {"provider_query_supported": False},
-        ))
+        def handler(_body, client):
+            transaction = self._payment_record(payment_uuid, client)
+            refresh = getattr(transaction, "_lianlian_refresh_status", None)
+            supported = bool(transaction.provider_code == "lianlian" and refresh)
+            if supported:
+                refresh(force=True)
+            return transaction._shop_api_payload(), 200, {
+                "provider_query_supported": supported,
+            }
+        return self._run("payment_reconcile", handler)
 
     @route("/api/v1/orders/<string:order_uuid>/shipments", type="http", auth="bearer", methods=["GET"], csrf=False)
     def order_shipments(self, order_uuid):
@@ -1443,8 +1500,7 @@ class ShopApiController(Controller):
             order = self._order_record(order_uuid, client)
             transaction = order.transaction_ids.filtered(
                 lambda tx: tx.state == "done"
-                and tx.provider_code in ("wechatpay", "alipay")
-                and bool(tx.provider_id.support_refund)
+                and tx._supports_website_original_refund()
             ).sorted("id")[-1:]
             if not transaction:
                 raise ShopApiError(

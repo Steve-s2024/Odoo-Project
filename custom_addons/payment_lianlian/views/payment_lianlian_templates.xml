@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="redirect_form">
+        <form t-att-action="api_url" t-att-method="http_method or 'get'">
+            <input t-foreach="form_values.items()" t-as="item" type="hidden"
+                   t-att-name="item[0]" t-att-value="item[1]"/>
+        </form>
+    </template>
+
+</odoo>

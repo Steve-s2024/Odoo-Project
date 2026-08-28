@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="payment_method_lianlian" model="payment.method">
+        <field name="name">连连收银台</field>
+        <field name="code">lianlian</field>
+        <field name="sequence">90</field>
+        <field name="active">False</field>
+        <field name="support_tokenization">False</field>
+        <field name="support_express_checkout">False</field>
+        <field name="support_manual_capture">none</field>
+        <field name="support_refund">partial</field>
+    </record>
+</odoo>

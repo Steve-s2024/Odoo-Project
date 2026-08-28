@@ -8,5 +8,22 @@
         <field name="sequence">150</field>
         <field name="is_published">True</field>
     </record>
+
+    <record id="action_external_sales_dashboard_report" model="ir.actions.client">
+        <field name="name">外部销售报表</field>
+        <field name="path">external-sales-report</field>
+        <field name="tag">action_spreadsheet_dashboard</field>
+        <field name="params" eval="{'dashboard_id': ref('spreadsheet_dashboard_external_sales')}"/>
+    </record>
+
+    <menuitem
+        id="menu_external_sales_dashboard_report"
+        name="外部销售报表"
+        parent="sale.menu_sale_report"
+        action="action_external_sales_dashboard_report"
+        sequence="40"
+        groups="sales_team.group_sale_manager"
+    />
+
     <function model="spreadsheet.dashboard" name="_configure_separate_sales_dashboards"/>
 </odoo>

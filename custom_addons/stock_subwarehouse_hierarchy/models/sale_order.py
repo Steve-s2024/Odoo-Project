@@ -3,6 +3,7 @@ import hashlib
 import logging
 import re
 from calendar import timegm
+from collections import defaultdict
 from dateutil.relativedelta import relativedelta
 from urllib.parse import urlencode
 
@@ -610,6 +611,171 @@ class SaleOrder(models.Model):
             orders.filtered("x_is_external_order")._finalize_external_orders()
         return orders
 
+    @api.model
+    def _lock_common_fulfillment_products(self, products):
+        """Serialize authoritative stock decisions for both ERP and Shop."""
+        for product_id in sorted(products.ids):
+            self.env.cr.execute(
+                "SELECT pg_advisory_xact_lock(%s, %s)",
+                [7421, product_id],
+            )
+
+    @api.model
+    def _prepare_common_fulfillment_order_line_values(
+        self,
+        product,
+        quantity,
+        source_location,
+        *,
+        product_uom=None,
+        price_unit=None,
+        reserved_until=False,
+    ):
+        """Build a sourced sales line identically for ERP and Shop orders."""
+        product = product.exists()
+        source_location = source_location.exists()
+        product_uom = product_uom.exists() if product_uom else product.uom_id
+        values = {
+            "product_id": product.id,
+            "product_uom_qty": quantity,
+            "product_uom_id": product_uom.id,
+            "x_source_location_id": source_location.id,
+        }
+        if price_unit is not None:
+            values["price_unit"] = price_unit
+        if reserved_until:
+            values["x_website_stock_reserved_until"] = reserved_until
+        return values
+
+    @api.model
+    def _get_common_fulfillment_stock_options(
+        self,
+        product,
+        *,
+        company=None,
+        candidate_locations=None,
+        exclude_order=False,
+        exclude_reservation=False,
+    ):
+        """Return positive per-location stock using the shared ERP/Shop gate."""
+        company = company or (exclude_order.company_id if exclude_order else self.env.company)
+        if candidate_locations is None:
+            warehouse_roots = self.env["stock.warehouse"].search([
+                ("company_id", "=", company.id),
+            ]).mapped("view_location_id")
+            domain = [
+                ("usage", "=", "internal"),
+                "|",
+                ("company_id", "=", False),
+                ("company_id", "=", company.id),
+            ]
+            if warehouse_roots:
+                domain.append(("id", "child_of", warehouse_roots.ids))
+            candidate_locations = self.env["stock.location"].search(domain)
+        else:
+            candidate_locations = candidate_locations.exists().filtered(
+                lambda location: location.usage == "internal"
+                and (not location.company_id or location.company_id == company)
+            )
+
+        existing_demand = defaultdict(float)
+        if exclude_order:
+            for line in exclude_order.order_line.filtered(
+                lambda item: (
+                    not item.display_type
+                    and not item.is_delivery
+                    and item.product_id == product
+                    and item.x_source_location_id
+                    and item.product_uom_qty > 0
+                )
+            ):
+                existing_demand[line.x_source_location_id.id] += (
+                    line._get_required_qty_in_product_uom()
+                )
+
+        precision = self.env["decimal.precision"].precision_get("Product Unit")
+        options = []
+        for location in candidate_locations:
+            available = self._get_available_qty_for_source_location(
+                product,
+                location,
+                exclude_order=exclude_order,
+                exclude_reservation=exclude_reservation,
+            )
+            available -= existing_demand.get(location.id, 0.0)
+            if float_compare(available, 0.0, precision_digits=precision) > 0:
+                options.append((location, available))
+        return sorted(options, key=lambda option: (option[0].complete_name, option[0].id))
+
+    @api.model
+    def _get_default_common_delivery_carrier(self, company=None):
+        """Resolve the same standard carrier used by the separated Shop."""
+        company = company or self.env.company
+        domain = [
+            ("active", "=", True),
+            "|",
+            ("company_id", "=", False),
+            ("company_id", "=", company.id),
+        ]
+        Carrier = self.env["delivery.carrier"].sudo()
+        carrier = Carrier.search(
+            domain + [("product_id.default_code", "=", "Delivery_007")],
+            order="company_id desc, id",
+            limit=1,
+        )
+        if carrier:
+            return carrier
+        standard_names = {
+            "标准送货",
+            "标准配送",
+            "standard delivery",
+            "standard shipping",
+        }
+        return Carrier.search(domain, order="company_id desc, id").filtered(
+            lambda item: (item.name or "").strip().casefold() in standard_names
+        )[:1]
+
+    def _apply_common_delivery_carrier(self, carrier):
+        """Rate and add a carrier line through one ERP/Shop implementation."""
+        for order in self:
+            selected_carrier = carrier.exists()
+            if not selected_carrier or not selected_carrier.active:
+                raise UserError(_("配送方式不可用。"))
+            rate = selected_carrier.sudo().rate_shipment(order)
+            if not rate.get("success"):
+                raise UserError(rate.get("error_message") or _("配送方式不可用。"))
+            order.set_delivery_line(selected_carrier.sudo(), rate["price"])
+        return True
+
+    def _ensure_common_delivery_instruction(self):
+        """Give manual ERP quotations the same standard delivery instruction."""
+        for order in self.filtered(
+            lambda item: not item.x_is_external_order and item.state in ("draft", "sent")
+        ):
+            physical_lines = order.order_line.filtered(
+                lambda line: (
+                    not line.display_type
+                    and not line.is_delivery
+                    and line.product_id
+                    and line.is_storable
+                    and line.product_uom_qty > 0
+                )
+            )
+            if not physical_lines or order.order_line.filtered("is_delivery"):
+                continue
+            carrier = order.carrier_id or order._get_default_common_delivery_carrier(
+                order.company_id
+            )
+            if carrier:
+                order._apply_common_delivery_carrier(carrier)
+        return True
+
+    def action_open_product_selection_panel(self):
+        self.ensure_one()
+        return self.env[
+            "stock.subwarehouse.sale.product.selection.batch"
+        ].action_open_for_order(self)
+
     def write(self, vals):
         previous_delivery_states = {
             order.id: order.x_website_delivery_state for order in self
@@ -748,10 +914,16 @@ class SaleOrder(models.Model):
         activity_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
         if not activity_type:
             return
-        summary = _("已支付订单待发货")
         for order in self.filtered(
             lambda item: item.x_website_delivery_state == "awaiting_delivery"
         ):
+            # Preserve the established Shop activity label because its event
+            # box and integrations use it as a stable key. ERP-created orders
+            # share the same queue with a payment-neutral label.
+            shop_order = bool(
+                order.website_id or order.x_channel == "separated_shop"
+            )
+            summary = _("已支付订单待发货") if shop_order else _("订单待发货")
             reviewers = order._website_delivery_reviewer_users().filtered(
                 lambda user: not user.company_ids or order.company_id in user.company_ids
             )
@@ -767,13 +939,13 @@ class SaleOrder(models.Model):
                         user_id=reviewer.id,
                         summary=summary,
                         note=_(
-                            "订单 %(order)s 已支付，正在等待发货。请按下单时间顺序处理。",
+                            "订单 %(order)s 已确认可发货，正在等待处理。请按下单时间顺序处理。",
                             order=order.name,
                         ),
                     )
             order.message_post(
                 body=_(
-                    "订单已完成支付并加入待发货队列。库存将在开始配送时扣减。"
+                    "订单已加入待发货队列。库存将在开始配送时扣减。"
                 ),
                 message_type="comment",
                 subtype_xmlid="mail.mt_note",
@@ -781,20 +953,18 @@ class SaleOrder(models.Model):
             )
 
     def _complete_website_delivery_activities(self):
-        summary = _("已支付订单待发货")
+        summaries = {_("订单待发货"), _("已支付订单待发货")}
         activities = self.mapped("activity_ids").filtered(
-            lambda activity: activity.summary == summary
+            lambda activity: activity.summary in summaries
         )
         if activities:
             activities.sudo().action_feedback(feedback=_("订单已开始配送。"))
 
-    def _queue_paid_website_delivery(self):
-        """Idempotently place paid, physical website orders in the FIFO queue."""
+    def _queue_common_fulfillment_delivery(self):
+        """Place eligible Shop and ERP orders into one delivery lifecycle."""
         for order in self:
             if (
                 order.x_is_external_order
-                or not order.website_id
-                or order.x_website_payment_state != "paid"
                 or not order.order_line.filtered(
                     lambda line: not line.display_type
                     and not line.is_delivery
@@ -803,6 +973,11 @@ class SaleOrder(models.Model):
                     and line.product_uom_qty > 0
                 )
             ):
+                continue
+            shop_order = bool(order.website_id or order.x_channel == "separated_shop")
+            if shop_order and order.x_website_payment_state != "paid":
+                continue
+            if not shop_order and order.state not in ("sale", "done"):
                 continue
             if order.x_website_delivery_state:
                 continue
@@ -824,6 +999,10 @@ class SaleOrder(models.Model):
                 }
             order.write(values)
         return True
+
+    def _queue_paid_website_delivery(self):
+        """Backward-compatible entry point used by payment and recovery code."""
+        return self._queue_common_fulfillment_delivery()
 
     def _website_payment_deadline_is_expired(self, now=None):
         self.ensure_one()
@@ -881,7 +1060,8 @@ class SaleOrder(models.Model):
     def action_start_website_delivery(self):
         """Deduct stock at dispatch and move the order into the in-transit state."""
         for order in self:
-            if order.x_website_payment_state != "paid":
+            shop_order = bool(order.website_id or order.x_channel == "separated_shop")
+            if shop_order and order.x_website_payment_state != "paid":
                 raise UserError(_("只有已支付订单可以开始配送。"))
             if order.x_website_delivery_state != "awaiting_delivery":
                 raise UserError(_("只有待发货订单可以开始配送。"))
@@ -1071,10 +1251,7 @@ class SaleOrder(models.Model):
         if not payment:
             raise UserError(_("该网站订单没有可退款的已完成支付。"))
         transaction = payment.payment_transaction_id
-        if (
-            transaction.provider_code not in ("wechatpay", "alipay")
-            or not transaction.provider_id.support_refund
-        ):
+        if not transaction._supports_website_original_refund():
             raise UserError(_("该网站订单的支付方式暂不支持从此处退款。"))
         return {
             "type": "ir.actions.act_window",
@@ -1349,7 +1526,13 @@ class SaleOrder(models.Model):
             )
         return reserved_qty
 
-    def _get_available_qty_for_source_location(self, product, location, exclude_order=False):
+    def _get_available_qty_for_source_location(
+        self,
+        product,
+        location,
+        exclude_order=False,
+        exclude_reservation=False,
+    ):
         physical_qty = self.env["stock.quant"].sudo()._get_available_quantity(
             product,
             location,
@@ -1613,6 +1796,7 @@ class SaleOrder(models.Model):
         external_orders = self.filtered("x_is_external_order")
         external_orders._finalize_external_orders()
         regular_orders_to_confirm = self - external_orders
+        regular_orders_to_confirm._ensure_common_delivery_instruction()
         regular_orders_to_confirm._check_source_inventory_availability()
         website_orders = regular_orders_to_confirm.filtered(
             lambda order: order.website_id and self.env.context.get("send_email")
@@ -1631,7 +1815,7 @@ class SaleOrder(models.Model):
                     "Website orders %s were confirmed after payment, but their confirmation email failed.",
                     website_orders.mapped("name"),
                 )
-        regular_orders_to_confirm._queue_paid_website_delivery()
+        regular_orders_to_confirm._queue_common_fulfillment_delivery()
         return result
 
     def _create_invoices(self, grouped=False, final=False, date=None):

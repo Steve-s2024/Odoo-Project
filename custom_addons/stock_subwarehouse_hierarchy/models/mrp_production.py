@@ -359,6 +359,7 @@ class MrpProduction(models.Model):
         field_columns = self._get_dynamic_import_template_columns()
         headers = [field_name for field_name, _label in field_columns]
         import_sheet.append(headers)
+        import_sheet.append([label for _field_name, label in field_columns])
         import_sheet.append([
             "MO-IMPORT-001",
             "产品显示名称或外部 ID",
@@ -422,10 +423,14 @@ class MrpProduction(models.Model):
             ])
 
         for sheet in workbook.worksheets:
-            sheet.freeze_panes = "A2"
+            sheet.freeze_panes = "A3" if sheet == import_sheet else "A2"
             for cell in sheet[1]:
                 cell.font = Font(bold=True)
                 cell.fill = PatternFill("solid", fgColor="D9EAF7")
+            if sheet == import_sheet and sheet.max_row >= 2:
+                for cell in sheet[2]:
+                    cell.font = Font(italic=True)
+                    cell.fill = PatternFill("solid", fgColor="E2F0D9")
             for column_cells in sheet.columns:
                 max_length = max(len(str(cell.value or "")) for cell in column_cells)
                 sheet.column_dimensions[get_column_letter(column_cells[0].column)].width = min(max(max_length + 2, 12), 45)

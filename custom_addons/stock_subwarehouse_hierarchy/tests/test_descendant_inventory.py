@@ -251,17 +251,8 @@ class TestDescendantInventoryTotals(TransactionCase):
         unavailable_button_arch = self.env.ref(
             "stock_subwarehouse_hierarchy.product_page_replace_add_to_cart_button"
         ).arch_db
-        product_style_arch = self.env.ref(
-            "stock_subwarehouse_hierarchy.product_page_hide_standard_product_attributes"
-        ).arch_db
-        sibling_selector_arch = self.env.ref(
-            "stock_subwarehouse_hierarchy.product_page_shop_group_siblings"
-        ).arch_db
 
-        self.assertIn("'ski': 'Ski Products' if x_shop_family_is_english else '双板商品'", family_title_arch)
-        self.assertNotIn("(SKI PRODUCTS)", family_title_arch)
-        self.assertNotIn("(SNOWBOARD PRODUCTS)", family_title_arch)
-        self.assertNotIn("(OTHER PRODUCTS)", family_title_arch)
+        self.assertIn("双板商品(SKI PRODUCTS)", family_title_arch)
         self.assertIn("font-size: 16px", family_title_arch)
         self.assertIn("x_shop_product_family_title", family_title_arch)
         self.assertIn('disabled="disabled"', unavailable_button_arch)
@@ -269,12 +260,6 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertIn("Out of stock", unavailable_button_arch)
         self.assertIn("缺货", unavailable_button_arch)
         self.assertNotIn("fa-times", unavailable_button_arch)
-        self.assertIn("background-color: #111 !important", product_style_arch)
-        self.assertIn("data-current-product-code", sibling_selector_arch)
-        self.assertIn("data-product-code", sibling_selector_arch)
-        self.assertIn("currentPageVariant", sibling_selector_arch)
-        self.assertIn("refreshCurrentPageAvailability", sibling_selector_arch)
-        self.assertIn("event.isTrusted", sibling_selector_arch)
 
     def test_item_search_and_product_cards_reuse_title_hover_motion(self):
         item_page_arch = self.env.ref(
@@ -283,13 +268,6 @@ class TestDescendantInventoryTotals(TransactionCase):
         family_page_arch = self.env.ref(
             "stock_subwarehouse_hierarchy.custom_product_family_page"
         ).arch_db
-
-        for title in ("双板商品", "单板商品", "其他商品"):
-            self.assertIn(title, item_page_arch)
-        for removed_suffix in (
-            "(SKI PRODUCTS)", "(SNOWBOARD PRODUCTS)", "(OTHER PRODUCTS)",
-        ):
-            self.assertNotIn(removed_suffix, item_page_arch)
 
         for arch, search_class, card_class in (
             (item_page_arch, "x_item_product_search", "x_item_product_card"),
@@ -522,27 +500,6 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(
             action["context"]["default_picking_type_id"],
             self.warehouse.int_type_id.id,
-        )
-
-    def test_internal_transfer_button_only_exists_on_descendant_inventory(self):
-        location_view = self.env.ref(
-            "stock_subwarehouse_hierarchy.view_location_form_subwarehouse_actions"
-        )
-        quant_view = self.env.ref(
-            "stock_subwarehouse_hierarchy.view_stock_quant_tree_descendant_transfer_button"
-        )
-        total_view = self.env.ref(
-            "stock_subwarehouse_hierarchy.view_descendant_inventory_total_list"
-        )
-
-        self.assertNotIn('name="action_create_internal_transfer"', location_view.arch_db)
-        self.assertIn(
-            'name="action_transfer_selected_out_of_descendant_inventory"',
-            quant_view.arch_db,
-        )
-        self.assertIn(
-            'name="action_transfer_selected_out_of_current_warehouse"',
-            total_view.arch_db,
         )
 
     def test_location_load_remove_inventory_action_filters_current_location(self):

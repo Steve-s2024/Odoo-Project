@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="payment_provider_lianlian" model="payment.provider">
+        <field name="name">连连收银台</field>
+        <field name="code">lianlian</field>
+        <field name="state">disabled</field>
+        <field name="redirect_form_view_id" ref="payment_lianlian.redirect_form"/>
+        <field name="payment_method_ids" eval="[Command.set([ref('payment_lianlian.payment_method_lianlian')])]"/>
+        <field name="pending_msg">请在连连托管收银台完成支付；ERP 仅在签名回调或主动查询确认后更新订单。</field>
+        <field name="done_msg">连连收银台支付已完成。</field>
+        <field name="cancel_msg">连连收银台支付已取消。</field>
+    </record>
+</odoo>

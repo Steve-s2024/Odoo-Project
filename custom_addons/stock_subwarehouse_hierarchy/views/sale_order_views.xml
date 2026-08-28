@@ -6,6 +6,13 @@
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
             <xpath expr="//header" position="inside">
+                <button
+                    name="action_open_product_selection_panel"
+                    type="object"
+                    string="库存列表选品"
+                    class="btn-secondary"
+                    invisible="state not in ['draft', 'sent'] or x_is_external_order"
+                />
                 <button name="action_start_website_delivery" type="object" string="开始配送" class="btn-primary" invisible="x_website_delivery_state != 'awaiting_delivery'" groups="stock.group_stock_user,sales_team.group_sale_manager"/>
                 <button name="action_mark_website_delivery_delivered" type="object" string="确认已送达" class="btn-primary" invisible="x_website_delivery_state != 'delivering'" groups="stock.group_stock_user,sales_team.group_sale_manager"/>
             </xpath>
@@ -22,7 +29,7 @@
                 <button
                     name="action_refund_website_payment"
                     type="object"
-                    string="微信退款"
+                    string="原路退款"
                     class="oe_stat_button"
                     icon="fa-undo"
                     invisible="x_website_payment_state != 'paid' or x_website_payment_count != 1"
@@ -52,7 +59,7 @@
                 <field name="x_website_payment_reference" readonly="1" invisible="not website_id"/>
                 <field name="x_website_payment_expired_at" readonly="1" invisible="not x_website_payment_expired_at"/>
                 <field name="x_website_stock_reserved_until" readonly="1" invisible="not website_id or state not in ['draft', 'sent']"/>
-                <field name="x_website_delivery_state" widget="badge" readonly="1" invisible="not x_website_delivery_state"/>
+                <field name="x_website_delivery_state" string="配送状态" widget="badge" readonly="1" invisible="not x_website_delivery_state"/>
                 <field name="x_website_delivery_started_at" readonly="1" invisible="not x_website_delivery_started_at"/>
                 <field name="x_website_delivered_at" readonly="1" invisible="not x_website_delivered_at"/>
             </xpath>

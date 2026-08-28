@@ -13,7 +13,7 @@
                     <field name="amount_to_refund" widget="monetary"/>
                 </group>
                 <div class="alert alert-info" role="alert">
-                    退款会提交至微信支付；只有收到微信支付的成功确认后，ERP 才会将退款标记为完成。
+                    退款会提交至原支付平台；只有收到支付平台的成功确认后，ERP 才会将退款标记为完成。
                 </div>
                 <footer>
                     <button name="action_submit_refund" type="object" string="提交退款" class="btn-primary"/>

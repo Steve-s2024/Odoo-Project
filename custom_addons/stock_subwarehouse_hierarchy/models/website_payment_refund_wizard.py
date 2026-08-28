@@ -20,13 +20,9 @@ class WebsitePaymentRefundWizard(models.TransientModel):
     def _compute_amount_available(self):
         for wizard in self:
             transaction = wizard.transaction_id
-            refunded = sum(
-                -refund.amount
-                for refund in transaction.child_transaction_ids
-                if refund.operation == "refund"
-                and refund.state in ("pending", "authorized", "done")
+            wizard.amount_available = (
+                transaction._website_refund_available_amount() if transaction else 0.0
             )
-            wizard.amount_available = max(transaction.amount - refunded, 0.0)
 
     @api.onchange("transaction_id")
     def _onchange_transaction_id(self):
@@ -34,13 +30,7 @@ class WebsitePaymentRefundWizard(models.TransientModel):
 
     def action_submit_refund(self):
         self.ensure_one()
-        if (
-            self.transaction_id.provider_code not in ("wechatpay", "alipay")
-            or not self.transaction_id.provider_id.support_refund
-        ):
-            raise ValidationError(_("该支付方式不支持原路退款。"))
-        if not 0 < self.amount_to_refund <= self.amount_available:
-            raise ValidationError(_("退款金额必须大于零且不超过可退款金额。"))
+        self.transaction_id._validate_website_original_refund(self.amount_to_refund)
         refund_transaction = self.transaction_id._refund(self.amount_to_refund)
         message = (
             _("模拟退款已完成。")

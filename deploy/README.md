@@ -71,6 +71,13 @@ Use the repository-managed, key-based connection for all future ERP updates:
 Connection identity, deployment usage, automatic backups, and Shop API
 separation are documented in [ERP_PERMANENT_CONNECTION.md](ERP_PERMANENT_CONNECTION.md).
 
+## ERP server replacement
+
+An exact ERP relocation requires the Git-locked custom code plus PostgreSQL,
+the Odoo filestore, the current upstream Odoo source snapshot, and host-only
+secrets.  Follow [ERP_RELOCATION_RUNBOOK.md](ERP_RELOCATION_RUNBOOK.md) and use
+`export-erp-relocation-bundle.sh` for the rehearsal and final cutover exports.
+
 ## Outgoing Email
 
 Odoo needs a real SMTP account before it can send quotations, password reset

@@ -123,6 +123,36 @@ class TestWebsiteRefundReturn(TransactionCase):
         self.assertFalse(refund_request.return_picking_ids)
         self.assertEqual(refund_request.state, "refunded")
 
+    def test_lianlian_payment_is_accepted_by_shared_refund_workflow(self):
+        order, line = self._create_order(delivered=False)
+        provider = self.env.ref("payment_lianlian.payment_provider_lianlian")
+        transaction = self.env["payment.transaction"].create({
+            "provider_id": provider.id,
+            "payment_method_id": self.env.ref(
+                "payment_lianlian.payment_method_lianlian"
+            ).id,
+            "reference": "REFUND-LIANLIAN-ELIGIBILITY",
+            "amount": order.amount_total,
+            "currency_id": order.currency_id.id,
+            "partner_id": order.partner_id.id,
+            "operation": "online_redirect",
+            "sale_order_ids": [Command.set(order.ids)],
+        })
+        transaction._set_done()
+        refund_request = self._create_refund_request(order, line, transaction)
+
+        with patch.object(
+            self.env.registry["payment.transaction"],
+            "_refund",
+            autospec=True,
+            return_value=transaction,
+        ) as refund_mock:
+            refund_request.action_submit_wechat_refund()
+
+        refund_mock.assert_called_once()
+        self.assertEqual(refund_request.review_state, "approved")
+        self.assertEqual(refund_request.state, "refunded")
+
     def test_successful_paid_order_refund_posts_partial_credit_note(self):
         order, line = self._create_order(delivered=False)
         order.action_confirm()
