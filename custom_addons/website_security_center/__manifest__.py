@@ -1,7 +1,7 @@
 {
     "name": "网站安全中心",
     "summary": "商城 API、订单与支付安全监控和事件处置",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "category": "Administration/Security",
     "author": "Local",
     "license": "LGPL-3",

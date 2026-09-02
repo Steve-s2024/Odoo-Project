@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from odoo import fields
+from odoo import Command, fields
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -54,3 +54,59 @@ class TestWebsiteSecurityCenter(TransactionCase):
         self.assertFalse(incident.activity_ids.filtered(
             lambda activity: (activity.summary or "").startswith("网站安全事件：")
         ))
+
+    def test_account_cooldown_is_persistent_and_resets_after_success(self):
+        self.policy.write({
+            "login_cooldown_failure_threshold": 5,
+            "login_cooldown_minutes": 60,
+        })
+        partner = self.env["res.partner"].create({
+            "name": "Cooldown Test Customer",
+            "email": "cooldown-test@example.test",
+        })
+        user = self.env["res.users"].with_context(no_reset_password=True).create({
+            "name": partner.name,
+            "login": partner.email,
+            "password": "safe-test-password",
+            "partner_id": partner.id,
+            "group_ids": [Command.set([self.env.ref("base.group_portal").id])],
+        })
+
+        for attempt in range(1, 6):
+            status = user._website_security_register_login_failure(
+                source_ip="203.0.113.20"
+            )
+            self.assertEqual(status["failure_count"], attempt)
+
+        self.assertTrue(status["locked"])
+        self.assertGreaterEqual(status["retry_after_seconds"], 3590)
+        incident = self.env["website.security.incident"].search([
+            ("category", "=", "authentication"),
+            ("summary", "=", "账户因连续登录失败进入冷却"),
+        ], limit=1)
+        self.assertTrue(incident)
+        self.assertNotIn("safe-test-password", incident.safe_details)
+
+        user._website_security_clear_login_failures()
+        self.assertEqual(user.security_login_failure_count, 0)
+        self.assertFalse(user.security_login_cooldown_until)
+
+    def test_expired_cooldown_starts_a_new_failure_sequence(self):
+        partner = self.env["res.partner"].create({
+            "name": "Expired Cooldown Customer",
+            "email": "expired-cooldown@example.test",
+        })
+        user = self.env["res.users"].with_context(no_reset_password=True).create({
+            "name": partner.name,
+            "login": partner.email,
+            "password": "safe-test-password",
+            "partner_id": partner.id,
+            "group_ids": [Command.set([self.env.ref("base.group_portal").id])],
+            "security_login_failure_count": 5,
+            "security_login_cooldown_until": fields.Datetime.now() - timedelta(minutes=1),
+        })
+
+        status = user._website_security_register_login_failure()
+
+        self.assertFalse(status["locked"])
+        self.assertEqual(status["failure_count"], 1)

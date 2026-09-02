@@ -95,6 +95,23 @@
             <field name="errors_24h"/><field name="last_scan_at"/><field name="active"/>
         </list></field>
     </record>
+
+    <record id="view_security_login_cooldown_user_list" model="ir.ui.view">
+        <field name="name">res.users.website.security.cooldown.list</field>
+        <field name="model">res.users</field>
+        <field name="arch" type="xml">
+            <list string="登录冷却账户" create="0" edit="0" delete="0"
+                  default_order="security_login_cooldown_until asc">
+                <field name="name" string="账户"/>
+                <field name="login" string="登录名"/>
+                <field name="security_login_failure_count" string="连续失败次数"/>
+                <field name="security_login_last_failure_at" string="最近失败"/>
+                <field name="security_login_cooldown_until" string="冷却截止"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
     <record id="view_website_security_policy_form" model="ir.ui.view">
         <field name="name">website.security.policy.form</field><field name="model">website.security.policy</field>
         <field name="arch" type="xml"><form string="网站安全策略" create="0" delete="0">
@@ -103,6 +120,10 @@
             <sheet><div class="oe_button_box" name="button_box">
                 <button name="action_open_incidents" type="object" class="oe_stat_button" icon="fa-shield">
                     <field name="open_incident_count" widget="statinfo" string="待处理事件"/>
+                </button>
+                <button name="action_open_cooldown_accounts" type="object" class="oe_stat_button" icon="fa-clock-o"
+                        groups="website_security_center.group_website_security_admin">
+                    <field name="cooldown_account_count" widget="statinfo" string="冷却中账户"/>
                 </button>
             </div><div class="oe_title"><label for="name"/><h1><field name="name"/></h1></div>
             <group><group><field name="company_id" readonly="1"/><field name="active"/>
@@ -113,7 +134,11 @@
             <group string="自动检测阈值"><group><field name="authentication_window_minutes"/>
                 <field name="authentication_failure_threshold"/><field name="webhook_failure_threshold"/></group>
                 <group><field name="slow_request_threshold_ms"/><field name="payment_timeout_threshold_ms"/>
-                    <field name="incident_retention_days"/></group></group></sheet>
+                    <field name="incident_retention_days"/></group></group>
+            <group string="账户登录防护">
+                <group><field name="login_cooldown_failure_threshold"/></group>
+                <group><field name="login_cooldown_minutes"/></group>
+            </group></sheet>
         </form></field>
     </record>
 

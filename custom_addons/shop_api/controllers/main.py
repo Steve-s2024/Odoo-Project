@@ -784,6 +784,26 @@ class ShopApiController(Controller):
         required to create its own Odoo session.
         """
         def handler(body, client):
+            def cooldown_status(account):
+                method = getattr(
+                    account, "_website_security_login_cooldown_status", None
+                )
+                return method() if method else {"locked": False}
+
+            def reject_cooldown(status):
+                raise ShopApiError(
+                    "login_cooldown",
+                    "该账户因连续登录失败已暂停登录，请在冷却结束后重试。",
+                    429,
+                    details={
+                        "retry_after_seconds": status.get("retry_after_seconds", 0),
+                        "cooldown_until": status.get("cooldown_until") or False,
+                        "failure_threshold": status.get("failure_threshold", 5),
+                        "cooldown_minutes": status.get("cooldown_minutes", 60),
+                        "password_reset_available": True,
+                    },
+                )
+
             submitted_login = str(body.get("login") or "").strip()
             password = body.get("password") or ""
             if not submitted_login or not password:
@@ -792,6 +812,10 @@ class ShopApiController(Controller):
             user = self._active_credential_user(submitted_login)
             if not user:
                 raise ShopApiError("invalid_credentials", "用户名或密码错误。", 401)
+
+            status = cooldown_status(user)
+            if status.get("locked"):
+                reject_cooldown(status)
 
             credential = {
                 "type": "password",
@@ -809,6 +833,16 @@ class ShopApiController(Controller):
                     credential, user_agent
                 )
             except AccessDenied:
+                user.invalidate_recordset([
+                    field_name for field_name in (
+                        "security_login_failure_count",
+                        "security_login_last_failure_at",
+                        "security_login_cooldown_until",
+                    ) if field_name in user._fields
+                ])
+                status = cooldown_status(user)
+                if status.get("locked"):
+                    reject_cooldown(status)
                 raise ShopApiError("invalid_credentials", "用户名或密码错误。", 401) from None
             if auth_info.get("mfa") != "skip" and user._mfa_url():
                 raise ShopApiError(

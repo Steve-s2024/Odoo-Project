@@ -1,14 +1,16 @@
 import hashlib
+import logging
 import os
 from datetime import timedelta
 from urllib.parse import urlparse
 
-from odoo import _, api, fields, models
-from odoo.exceptions import AccessError, ValidationError
+from odoo import SUPERUSER_ID, _, api, fields, models
+from odoo.exceptions import AccessDenied, AccessError, ValidationError
 
 
 ACTIVITY_PREFIX = "网站安全事件："
 OPEN_STATES = ("open", "acknowledged")
+_logger = logging.getLogger(__name__)
 
 
 class WebsiteSecurityIncident(models.Model):
@@ -168,6 +170,14 @@ class WebsiteSecurityPolicy(models.Model):
     require_https = fields.Boolean(string="生产连接必须使用 HTTPS", default=True)
     authentication_window_minutes = fields.Integer(string="登录异常统计分钟", default=10, required=True)
     authentication_failure_threshold = fields.Integer(string="登录失败告警次数", default=5, required=True)
+    login_cooldown_failure_threshold = fields.Integer(
+        string="账户连续登录失败上限", default=5, required=True,
+        help="账户连续失败达到此次数后，暂停接受该账户的登录尝试。成功登录会清零失败次数。",
+    )
+    login_cooldown_minutes = fields.Integer(
+        string="账户登录冷却分钟", default=60, required=True,
+        help="账户进入登录冷却后，必须等待的分钟数。密码重置不受此冷却限制。",
+    )
     slow_request_threshold_ms = fields.Integer(string="普通接口慢请求阈值（毫秒）", default=5000, required=True)
     payment_timeout_threshold_ms = fields.Integer(string="支付接口慢请求阈值（毫秒）", default=25000, required=True)
     webhook_failure_threshold = fields.Integer(string="Webhook 失败告警次数", default=3, required=True)
@@ -178,11 +188,13 @@ class WebsiteSecurityPolicy(models.Model):
     critical_incident_count = fields.Integer(string="严重事件", compute="_compute_dashboard_counts")
     requests_24h = fields.Integer(string="24 小时请求", compute="_compute_dashboard_counts")
     errors_24h = fields.Integer(string="24 小时失败", compute="_compute_dashboard_counts")
+    cooldown_account_count = fields.Integer(string="冷却中账户", compute="_compute_dashboard_counts")
 
     _unique_company = models.Constraint("UNIQUE(company_id)", "每个公司只能设置一条网站安全策略。")
 
     @api.constrains(
         "authentication_window_minutes", "authentication_failure_threshold",
+        "login_cooldown_failure_threshold", "login_cooldown_minutes",
         "slow_request_threshold_ms", "payment_timeout_threshold_ms",
         "webhook_failure_threshold", "incident_retention_days",
     )
@@ -191,6 +203,8 @@ class WebsiteSecurityPolicy(models.Model):
             if min(
                 record.authentication_window_minutes,
                 record.authentication_failure_threshold,
+                record.login_cooldown_failure_threshold,
+                record.login_cooldown_minutes,
                 record.slow_request_threshold_ms,
                 record.payment_timeout_threshold_ms,
                 record.webhook_failure_threshold,
@@ -214,6 +228,11 @@ class WebsiteSecurityPolicy(models.Model):
             request_domain = [("create_date", ">=", since), ("client_id", "in", client_ids)]
             policy.requests_24h = request_model.search_count(request_domain)
             policy.errors_24h = request_model.search_count(request_domain + [("state", "=", "error")])
+            policy.cooldown_account_count = self.env["res.users"].sudo().search_count([
+                ("active", "=", True),
+                ("company_id", "=", policy.company_id.id),
+                ("security_login_cooldown_until", ">", fields.Datetime.now()),
+            ])
 
     @api.model
     def _ensure_defaults(self):
@@ -378,6 +397,45 @@ class WebsiteSecurityPolicy(models.Model):
         action["domain"] = [("company_id", "=", self.company_id.id), ("state", "in", OPEN_STATES)]
         return action
 
+    def action_open_cooldown_accounts(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("登录冷却账户"),
+            "res_model": "res.users",
+            "view_mode": "list,form",
+            "views": [
+                (self.env.ref("website_security_center.view_security_login_cooldown_user_list").id, "list"),
+                (False, "form"),
+            ],
+            "domain": [
+                ("active", "=", True),
+                ("company_id", "=", self.company_id.id),
+                ("security_login_cooldown_until", ">", fields.Datetime.now()),
+            ],
+        }
+
+    def _record_login_cooldown_incident(self, user, cooldown_until, source_ip=None):
+        self.ensure_one()
+        fingerprint = self._fingerprint("account_login_cooldown", user.id)
+        return self._upsert_incident({
+            "fingerprint": fingerprint,
+            "category": "authentication",
+            "severity": "high",
+            "summary": _("账户因连续登录失败进入冷却"),
+            "safe_details": _(
+                "账户：%(user)s（ID %(user_id)s）；连续失败达到 %(threshold)s 次；冷却至 %(until)s。"
+                "密码重置仍可使用。",
+                user=user.display_name,
+                user_id=user.id,
+                threshold=self.login_cooldown_failure_threshold,
+                until=fields.Datetime.to_string(cooldown_until),
+            ),
+            "occurred_at": fields.Datetime.now(),
+            "last_seen_at": fields.Datetime.now(),
+            "source_ip": (source_ip or "")[:128],
+        })
+
     @api.model
     def _cron_scan_and_check(self):
         self._ensure_defaults()
@@ -504,3 +562,185 @@ class WebsiteSecurityHealthCheck(models.Model):
                 "transport": check._run_transport_check,
             }[check.check_type]()
         return True
+
+
+class ResUsers(models.Model):
+    _inherit = "res.users"
+
+    security_login_failure_count = fields.Integer(
+        string="连续登录失败次数",
+        default=0,
+        readonly=True,
+        copy=False,
+        groups="website_security_center.group_website_security_admin",
+    )
+    security_login_last_failure_at = fields.Datetime(
+        string="最近登录失败时间",
+        readonly=True,
+        copy=False,
+        groups="website_security_center.group_website_security_admin",
+    )
+    security_login_cooldown_until = fields.Datetime(
+        string="登录冷却截止时间",
+        readonly=True,
+        copy=False,
+        index=True,
+        groups="website_security_center.group_website_security_admin",
+    )
+
+    def _website_security_login_policy(self):
+        self.ensure_one()
+        return self.env["website.security.policy"].sudo().search([
+            ("company_id", "=", self.company_id.id),
+            ("active", "=", True),
+        ], limit=1)
+
+    def _website_security_login_cooldown_status(self):
+        self.ensure_one()
+        now = fields.Datetime.now()
+        cooldown_until = self.security_login_cooldown_until
+        remaining_seconds = 0
+        if cooldown_until and cooldown_until > now:
+            remaining_seconds = max(
+                1, int((cooldown_until - now).total_seconds() + 0.999)
+            )
+        policy = self._website_security_login_policy()
+        return {
+            "locked": bool(remaining_seconds),
+            "retry_after_seconds": remaining_seconds,
+            "cooldown_until": (
+                fields.Datetime.to_string(cooldown_until)
+                if remaining_seconds else False
+            ),
+            "failure_count": self.security_login_failure_count,
+            "failure_threshold": policy.login_cooldown_failure_threshold if policy else 5,
+            "cooldown_minutes": policy.login_cooldown_minutes if policy else 60,
+        }
+
+    def _website_security_register_login_failure(self, source_ip=None):
+        """Persist one account failure with a database row lock.
+
+        This method is intentionally SQL-backed so parallel Shop workers cannot
+        lose increments.  It stores counters and timestamps only; credentials
+        and request bodies are never retained.
+        """
+        self.ensure_one()
+        policy = self._website_security_login_policy()
+        threshold = policy.login_cooldown_failure_threshold if policy else 5
+        cooldown_minutes = policy.login_cooldown_minutes if policy else 60
+        now = fields.Datetime.now()
+        self.env.cr.execute(
+            """
+                SELECT security_login_failure_count,
+                       security_login_cooldown_until
+                  FROM res_users
+                 WHERE id = %s
+                 FOR UPDATE
+            """,
+            [self.id],
+        )
+        row = self.env.cr.fetchone()
+        if not row:
+            return {"locked": False, "retry_after_seconds": 0}
+        failure_count, previous_cooldown_until = row
+        if previous_cooldown_until and previous_cooldown_until > now:
+            cooldown_until = previous_cooldown_until
+            failure_count = max(failure_count or 0, threshold)
+        else:
+            failure_count = 1 if previous_cooldown_until else (failure_count or 0) + 1
+            cooldown_until = (
+                now + timedelta(minutes=cooldown_minutes)
+                if failure_count >= threshold else None
+            )
+        self.env.cr.execute(
+            """
+                UPDATE res_users
+                   SET security_login_failure_count = %s,
+                       security_login_last_failure_at = %s,
+                       security_login_cooldown_until = %s
+                 WHERE id = %s
+            """,
+            [failure_count, now, cooldown_until, self.id],
+        )
+        self.invalidate_recordset([
+            "security_login_failure_count",
+            "security_login_last_failure_at",
+            "security_login_cooldown_until",
+        ])
+        if cooldown_until and (
+            not previous_cooldown_until or previous_cooldown_until <= now
+        ) and policy:
+            try:
+                with self.env.cr.savepoint():
+                    policy._record_login_cooldown_incident(
+                        self, cooldown_until, source_ip=source_ip
+                    )
+            except Exception:
+                # Incident delivery must never undo the authoritative lock.
+                _logger.exception(
+                    "Unable to create the login-cooldown incident for user id %s",
+                    self.id,
+                )
+        return self._website_security_login_cooldown_status()
+
+    def _website_security_clear_login_failures(self):
+        users = self.sudo().filtered(
+            lambda user: user.security_login_failure_count
+            or user.security_login_last_failure_at
+            or user.security_login_cooldown_until
+        )
+        if users:
+            users.write({
+                "security_login_failure_count": 0,
+                "security_login_last_failure_at": False,
+                "security_login_cooldown_until": False,
+            })
+
+    @api.model
+    def _website_security_register_login_failure_durable(
+        self, user_id, source_ip=None
+    ):
+        """Record a rejected login outside the request savepoint.
+
+        Odoo rolls back failed authentication transactions.  A short dedicated
+        cursor makes the security counter durable without retaining credentials.
+        """
+        try:
+            with self.env.registry.cursor() as security_cr:
+                security_env = api.Environment(security_cr, SUPERUSER_ID, {})
+                user = security_env["res.users"].sudo().browse(user_id).exists()
+                if user:
+                    user._website_security_register_login_failure(source_ip=source_ip)
+                security_cr.commit()
+        except Exception:
+            _logger.exception(
+                "Unable to persist the account login-failure counter for user id %s",
+                user_id,
+            )
+
+    @api.model
+    def authenticate(self, credential, user_agent_env):
+        if credential.get("type") != "password":
+            return super().authenticate(credential, user_agent_env)
+
+        login = str(credential.get("login") or "").strip()
+        user = self.sudo().with_context(active_test=False).search([
+            ("login", "=", login),
+            ("active", "=", True),
+        ], limit=1)
+        if user and user._website_security_login_cooldown_status()["locked"]:
+            raise AccessDenied(_("账户处于登录冷却期，请稍后重试。"))
+
+        try:
+            auth_info = super().authenticate(credential, user_agent_env)
+        except AccessDenied:
+            if user:
+                source_ip = (user_agent_env or {}).get("REMOTE_ADDR")
+                self._website_security_register_login_failure_durable(
+                    user.id, source_ip=source_ip
+                )
+            raise
+
+        if user:
+            user._website_security_clear_login_failures()
+        return auth_info
