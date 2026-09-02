@@ -1,0 +1,10 @@
+[nginx-shop-rate-limit]
+enabled = true
+filter = nginx-shop-rate-limit
+port = http,https
+logpath = /var/log/nginx/error.log
+backend = auto
+maxretry = 3
+findtime = 10m
+bantime = 1h
+banaction = ufw

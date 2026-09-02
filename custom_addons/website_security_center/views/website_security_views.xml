@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_website_security_incident_list" model="ir.ui.view">
+        <field name="name">website.security.incident.list</field>
+        <field name="model">website.security.incident</field>
+        <field name="arch" type="xml">
+            <list string="网站安全事件" create="0" delete="0" default_order="occurred_at asc,id asc"
+                  decoration-danger="state == 'open' and severity in ('high','critical')"
+                  decoration-warning="state == 'open' and severity == 'medium'"
+                  decoration-muted="state in ('resolved','ignored')">
+                <field name="occurred_at" string="首次发生"/>
+                <field name="name"/>
+                <field name="summary"/>
+                <field name="category"/>
+                <field name="severity" widget="badge"
+                       decoration-danger="severity in ('high','critical')"
+                       decoration-warning="severity == 'medium'"/>
+                <field name="occurrence_count"/>
+                <field name="client_id" optional="show"/>
+                <field name="assignee_id" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-danger="state == 'open'"
+                       decoration-info="state == 'acknowledged'"
+                       decoration-success="state == 'resolved'"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_website_security_incident_form" model="ir.ui.view">
+        <field name="name">website.security.incident.form</field>
+        <field name="model">website.security.incident</field>
+        <field name="arch" type="xml">
+            <form string="网站安全事件" create="0" delete="0">
+                <header>
+                    <button name="action_acknowledge" type="object" string="开始处理" class="btn-primary"
+                            invisible="state != 'open'" groups="website_security_center.group_website_security_operator"/>
+                    <button name="action_resolve" type="object" string="标记已解决" class="btn-primary"
+                            invisible="state not in ('open','acknowledged')" groups="website_security_center.group_website_security_operator"/>
+                    <button name="action_ignore" type="object" string="忽略" invisible="state not in ('open','acknowledged')"
+                            groups="website_security_center.group_website_security_operator"/>
+                    <button name="action_quarantine_client" type="object" string="停用关联 API 客户端"
+                            invisible="not client_id or state not in ('open','acknowledged')"
+                            confirm="停用后该商城将无法调用 ERP API。确定继续吗？"
+                            groups="website_security_center.group_website_security_admin"/>
+                    <field name="state" widget="statusbar" statusbar_visible="open,acknowledged,resolved,ignored"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_request_log" type="object" class="oe_stat_button" icon="fa-exchange"
+                                invisible="not request_log_id">
+                            <div class="o_stat_info"><span class="o_stat_text">查看 API 请求</span></div>
+                        </button>
+                    </div>
+                    <div class="oe_title"><label for="name"/><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group><field name="summary" readonly="1"/><field name="category" readonly="1"/>
+                            <field name="severity" readonly="1"/><field name="occurrence_count" readonly="1"/></group>
+                        <group><field name="occurred_at" readonly="1"/><field name="last_seen_at" readonly="1"/>
+                            <field name="assignee_id"/><field name="company_id" readonly="1" groups="base.group_multi_company"/></group>
+                    </group>
+                    <group string="关联信息">
+                        <group><field name="client_id" readonly="1"/><field name="endpoint_id" readonly="1"/>
+                            <field name="request_id" readonly="1"/></group>
+                        <group><field name="source_ip" readonly="1" groups="website_security_center.group_website_security_admin"/>
+                            <field name="request_log_id" readonly="1"/><field name="webhook_delivery_id" readonly="1"/></group>
+                    </group>
+                    <notebook>
+                        <page string="安全详情"><field name="safe_details" readonly="1" nolabel="1"/></page>
+                        <page string="处理说明"><field name="resolution_note" placeholder="记录调查结论、修复内容和验证结果。"/></page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="view_website_security_incident_search" model="ir.ui.view">
+        <field name="name">website.security.incident.search</field>
+        <field name="model">website.security.incident</field>
+        <field name="arch" type="xml">
+            <search string="搜索网站安全事件">
+                <field name="name"/><field name="summary"/><field name="client_id"/><field name="request_id"/>
+                <filter name="pending" string="待处理" domain="[('state','in',('open','acknowledged'))]"/>
+                <filter name="critical" string="高危与严重" domain="[('severity','in',('high','critical'))]"/>
+                <group><filter name="group_category" string="事件类型" context="{'group_by':'category'}"/>
+                    <filter name="group_severity" string="严重程度" context="{'group_by':'severity'}"/>
+                    <filter name="group_state" string="处理状态" context="{'group_by':'state'}"/></group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_website_security_policy_list" model="ir.ui.view">
+        <field name="name">website.security.policy.list</field><field name="model">website.security.policy</field>
+        <field name="arch" type="xml"><list string="网站安全策略" create="0" delete="0">
+            <field name="company_id"/><field name="name"/><field name="open_incident_count" widget="badge" decoration-danger="open_incident_count &gt; 0"/>
+            <field name="critical_incident_count" widget="badge" decoration-danger="critical_incident_count &gt; 0"/>
+            <field name="errors_24h"/><field name="last_scan_at"/><field name="active"/>
+        </list></field>
+    </record>
+    <record id="view_website_security_policy_form" model="ir.ui.view">
+        <field name="name">website.security.policy.form</field><field name="model">website.security.policy</field>
+        <field name="arch" type="xml"><form string="网站安全策略" create="0" delete="0">
+            <header><button name="action_run_scan" type="object" string="立即扫描" class="btn-primary"
+                            groups="website_security_center.group_website_security_admin"/></header>
+            <sheet><div class="oe_button_box" name="button_box">
+                <button name="action_open_incidents" type="object" class="oe_stat_button" icon="fa-shield">
+                    <field name="open_incident_count" widget="statinfo" string="待处理事件"/>
+                </button>
+            </div><div class="oe_title"><label for="name"/><h1><field name="name"/></h1></div>
+            <group><group><field name="company_id" readonly="1"/><field name="active"/>
+                <field name="fail_closed"/><field name="require_erp_confirmation"/><field name="require_https"/></group>
+                <group><field name="requests_24h" readonly="1"/><field name="errors_24h" readonly="1"/>
+                    <field name="critical_incident_count" readonly="1"/><field name="last_scan_at" readonly="1"/>
+                    <field name="last_scan_summary" readonly="1"/></group></group>
+            <group string="自动检测阈值"><group><field name="authentication_window_minutes"/>
+                <field name="authentication_failure_threshold"/><field name="webhook_failure_threshold"/></group>
+                <group><field name="slow_request_threshold_ms"/><field name="payment_timeout_threshold_ms"/>
+                    <field name="incident_retention_days"/></group></group></sheet>
+        </form></field>
+    </record>
+
+    <record id="view_website_security_health_check_list" model="ir.ui.view">
+        <field name="name">website.security.health.check.list</field><field name="model">website.security.health.check</field>
+        <field name="arch" type="xml"><list string="网站安全状态" create="0" delete="0"
+                decoration-danger="state == 'critical'" decoration-warning="state == 'warning'" decoration-success="state == 'healthy'">
+            <field name="sequence" column_invisible="True"/><field name="name"/><field name="check_type"/>
+            <field name="state" widget="badge" decoration-danger="state == 'critical'" decoration-warning="state == 'warning'" decoration-success="state == 'healthy'"/>
+            <field name="message"/><field name="response_time_ms"/><field name="last_checked_at"/><field name="company_id" groups="base.group_multi_company"/>
+        </list></field>
+    </record>
+    <record id="view_website_security_health_check_form" model="ir.ui.view">
+        <field name="name">website.security.health.check.form</field><field name="model">website.security.health.check</field>
+        <field name="arch" type="xml"><form string="网站安全检查" create="0" delete="0"><header>
+            <button name="action_run_check" type="object" string="立即检查" class="btn-primary" groups="website_security_center.group_website_security_admin"/>
+            <field name="state" widget="statusbar" statusbar_visible="unknown,healthy,warning,critical"/></header>
+            <sheet><group><group><field name="name"/><field name="check_type" readonly="1"/><field name="company_id" readonly="1"/></group>
+                <group><field name="last_checked_at" readonly="1"/><field name="response_time_ms" readonly="1"/><field name="message" readonly="1"/></group></group></sheet>
+        </form></field>
+    </record>
+
+    <record id="action_website_security_incidents_pending" model="ir.actions.act_window">
+        <field name="name">待处理安全事件</field><field name="res_model">website.security.incident</field>
+        <field name="view_mode">list,form</field><field name="domain">[('state','in',('open','acknowledged'))]</field>
+        <field name="context">{'search_default_pending': 1}</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">当前没有待处理的网站安全事件</p></field>
+    </record>
+    <record id="action_website_security_incidents_all" model="ir.actions.act_window">
+        <field name="name">全部安全事件</field><field name="res_model">website.security.incident</field><field name="view_mode">list,form</field>
+    </record>
+    <record id="action_website_security_policies" model="ir.actions.act_window">
+        <field name="name">安全策略</field><field name="res_model">website.security.policy</field><field name="view_mode">list,form</field>
+    </record>
+    <record id="action_website_security_health_checks" model="ir.actions.act_window">
+        <field name="name">安全状态</field><field name="res_model">website.security.health.check</field><field name="view_mode">list,form</field>
+    </record>
+</odoo>

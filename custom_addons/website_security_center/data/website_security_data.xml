@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="sequence_website_security_incident" model="ir.sequence">
+        <field name="name">网站安全事件</field>
+        <field name="code">website.security.incident</field>
+        <field name="prefix">SEC-</field>
+        <field name="padding">6</field>
+        <field name="company_id" eval="False"/>
+    </record>
+    <record id="ir_cron_website_security_scan" model="ir.cron">
+        <field name="name">网站安全：扫描异常并检查连接</field>
+        <field name="model_id" ref="model_website_security_policy"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_scan_and_check()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="active">True</field>
+    </record>
+</odoo>

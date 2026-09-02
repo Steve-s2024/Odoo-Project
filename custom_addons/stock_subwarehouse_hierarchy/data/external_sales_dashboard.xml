@@ -25,5 +25,11 @@
         groups="sales_team.group_sale_manager"
     />
 
-    <function model="spreadsheet.dashboard" name="_configure_separate_sales_dashboards"/>
+    <!--
+        The spreadsheet payload is a curated, versioned dashboard snapshot.
+        Do not regenerate it during an unrelated module upgrade: repeatedly
+        transforming the live attachment can damage formulas and empty KPI
+        cards.  Domain generation remains available as an explicit model
+        method for controlled migrations only.
+    -->
 </odoo>

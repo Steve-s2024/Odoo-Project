@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_website_security_root" name="网站安全中心"
+              action="action_website_security_incidents_pending" sequence="75"
+              groups="website_security_center.group_website_security_viewer"/>
+    <menuitem id="menu_website_security_pending" name="待处理事件" parent="menu_website_security_root"
+              action="action_website_security_incidents_pending" sequence="10"
+              groups="website_security_center.group_website_security_viewer"/>
+    <menuitem id="menu_website_security_all" name="事件历史" parent="menu_website_security_root"
+              action="action_website_security_incidents_all" sequence="20"
+              groups="website_security_center.group_website_security_viewer"/>
+    <menuitem id="menu_website_security_health" name="安全状态" parent="menu_website_security_root"
+              action="action_website_security_health_checks" sequence="30"
+              groups="website_security_center.group_website_security_viewer"/>
+    <menuitem id="menu_website_security_policy" name="安全策略" parent="menu_website_security_root"
+              action="action_website_security_policies" sequence="40"
+              groups="website_security_center.group_website_security_admin"/>
+    <menuitem id="menu_website_security_request_logs" name="API 请求日志" parent="menu_website_security_root"
+              action="shop_api.action_shop_api_request_logs" sequence="50"
+              groups="website_security_center.group_website_security_viewer"/>
+</odoo>

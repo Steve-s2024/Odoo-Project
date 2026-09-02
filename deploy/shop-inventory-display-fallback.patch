@@ -1,0 +1,29 @@
+diff --git a/custom_addons/storefront_api_bridge/models/product_template.py b/custom_addons/storefront_api_bridge/models/product_template.py
+--- a/custom_addons/storefront_api_bridge/models/product_template.py
++++ b/custom_addons/storefront_api_bridge/models/product_template.py
+@@ -1,4 +1,9 @@
+-from odoo import models
++import logging
++
++from odoo import models
+ from odoo.http import request
+
+ from .api_client import StorefrontApiError
++
++
++_logger = logging.getLogger(__name__)
+@@ -39,4 +44,12 @@ class ProductTemplate(models.Model):
+-        except StorefrontApiError:
+-            cache = {}
++        except StorefrontApiError as exc:
++            # Availability shown on catalogue pages may use the last persisted
++            # ERP snapshot during a short transport interruption.  This cache
++            # is display-only: checkout still performs a synchronous,
++            # fail-closed ERP reservation before the order can proceed.
++            cache = self.env["storefront.cache.entry"].inventory_map()
++            _logger.warning(
++                "ERP inventory snapshot unavailable; using persisted display cache (code=%s)",
++                exc.code,
++            )
+         request._storefront_erp_inventory_snapshot = cache
+         return cache
