@@ -1,0 +1,442 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <template id="sun_account_terms_conditions_page"
+              name="SUN bilingual terms of service"
+              inherit_id="account.account_terms_conditions_page">
+        <xpath expr="//div[@id='o_terms_conditions']" position="replace">
+            <div id="o_terms_conditions" class="sun_terms_page py-5">
+                <t t-set="is_english"
+                   t-value="request.env.lang and request.env.lang.startswith('en')"/>
+
+                <article t-if="is_english" class="sun_terms_document mx-auto" t-translation="off">
+                    <header class="sun_terms_header">
+                        <p class="sun_terms_eyebrow">SUN ONLINE SHOP</p>
+                        <h1>Terms of Service</h1>
+                        <p class="sun_terms_date">Last updated: 2 September 2026</p>
+                        <p class="sun_terms_intro">
+                            These Terms of Service govern purchases from the SUN online shop operated by
+                            思安奇冰雪科技（张家口）有限公司 (the “Company”, “SUN”, “we”, “us” or “our”).
+                            Please read them before creating an account or placing an order.
+                        </p>
+                    </header>
+
+                    <aside class="sun_terms_notice">
+                        Nothing in these Terms excludes or restricts rights that cannot lawfully be excluded,
+                        including mandatory consumer rights in your place of residence.
+                    </aside>
+
+                    <nav class="sun_terms_index" aria-label="Terms contents">
+                        <a href="#sun-terms-scope-en">1. Scope</a>
+                        <a href="#sun-terms-account-en">2. Accounts</a>
+                        <a href="#sun-terms-products-en">3. Products</a>
+                        <a href="#sun-terms-orders-en">4. Orders</a>
+                        <a href="#sun-terms-payment-en">5. Payment</a>
+                        <a href="#sun-terms-delivery-en">6. Delivery</a>
+                        <a href="#sun-terms-returns-en">7. Returns</a>
+                        <a href="#sun-terms-safety-en">8. Product safety</a>
+                        <a href="#sun-terms-conduct-en">9. Acceptable use</a>
+                        <a href="#sun-terms-ip-en">10. Intellectual property</a>
+                        <a href="#sun-terms-privacy-en">11. Privacy</a>
+                        <a href="#sun-terms-liability-en">12. Liability</a>
+                        <a href="#sun-terms-force-en">13. Force majeure</a>
+                        <a href="#sun-terms-changes-en">14. Changes</a>
+                        <a href="#sun-terms-law-en">15. Disputes</a>
+                        <a href="#sun-terms-contact-en">16. Contact</a>
+                    </nav>
+
+                    <section id="sun-terms-scope-en">
+                        <h2>1. Scope and acceptance</h2>
+                        <p>
+                            These Terms apply to this website, customer accounts and online orders placed with
+                            SUN. By submitting an order, you confirm that you have reviewed the order information
+                            and agree to these Terms and the policies linked at checkout. If you purchase for a
+                            business, you confirm that you are authorised to bind that business. A minor may use
+                            the shop only with the consent and supervision required by applicable law.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-account-en">
+                        <h2>2. Customer accounts</h2>
+                        <p>
+                            You must provide accurate and current information and keep your credentials secure.
+                            You are responsible for activity performed through your account unless caused by our
+                            breach of duty. Notify us promptly if you suspect unauthorised access. We may suspend
+                            an account where reasonably necessary to prevent fraud, misuse or a security incident,
+                            while preserving your access to lawful remedies and existing order support.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-products-en">
+                        <h2>3. Product information, availability and prices</h2>
+                        <p>
+                            We aim to present product descriptions, colours, sizes, flex ratings, images, prices
+                            and stock accurately. Screen settings and manufacturing tolerances may cause minor
+                            variations. The configuration shown in your cart and order record controls your
+                            selection. Prices are shown in the currency selected by the website and the final
+                            checkout total identifies included charges. Import taxes, customs duties or local
+                            charges are payable as disclosed at checkout or as required by law.
+                        </p>
+                        <p>
+                            Availability is confirmed against the ERP inventory system before payment. Adding an
+                            item to the cart alone does not reserve it. We may correct an obvious pricing or
+                            description error before fulfilment, but will obtain your agreement to a material
+                            change or offer cancellation and a full refund.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-orders-en">
+                        <h2>4. Orders and inventory reservation</h2>
+                        <p>
+                            Before submission you can review and correct products, options, quantities, delivery
+                            details and charges. Successful submission creates an electronic order record and a
+                            contract to the extent required by applicable law. Payment status is recorded
+                            separately. For a pending-payment order, available inventory is normally reserved for
+                            the 15-minute countdown displayed on the payment page. If the countdown expires before
+                            confirmed payment, the reservation is released and the order is marked expired; you
+                            may submit a new order, subject to current price and availability.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-payment-en">
+                        <h2>5. Payment</h2>
+                        <p>
+                            Available payment methods, currencies and providers are displayed at checkout. A
+                            payment is complete only after the payment provider and our ERP system authoritatively
+                            confirm it. A pending, declined, cancelled or timed-out attempt is not proof of
+                            payment. Do not use a method clearly labelled sandbox, test or under development for a
+                            real purchase. Hosted payment providers may collect card or wallet credentials on
+                            their own secure pages; their additional terms and privacy notices also apply.
+                        </p>
+                        <p>
+                            If your account appears to have been charged but the order remains unpaid, do not pay
+                            again immediately. Contact us with the order number so that we can verify the provider
+                            record and prevent duplicate payment.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-delivery-en">
+                        <h2>6. Delivery</h2>
+                        <p>
+                            Delivery options, costs and available destinations are shown during checkout. Delivery
+                            estimates are not guaranteed unless expressly stated. You are responsible for giving a
+                            complete, deliverable address and for checking the parcel promptly after receipt. Risk
+                            and delivery are determined by applicable law; for courier delivery, receipt by you or
+                            your authorised recipient will normally constitute delivery. If a parcel is damaged,
+                            missing or materially delayed, contact us promptly so we can investigate with the
+                            carrier.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-returns-en">
+                        <h2>7. Cancellations, returns and refunds</h2>
+                        <p>
+                            Return eligibility and instructions are shown in your Purchase History and refund
+                            request page. Consumers in mainland China may return eligible online purchases within
+                            seven days after receipt without giving a reason. Lawfully excluded goods—including
+                            customised goods or other goods whose nature makes them unsuitable for return—will be
+                            conspicuously identified and require confirmation before purchase where the law so
+                            requires. Reasonable inspection does not by itself make a product ineligible, but the
+                            returned product should remain complete and in good condition.
+                        </p>
+                        <p>
+                            For a change-of-mind return, you normally bear return shipping unless we state
+                            otherwise. We bear reasonable return costs for an incorrect, damaged or non-conforming
+                            product where required by law. After approval, follow the displayed return instructions
+                            and use the designated return location. When the goods are received and verified, an
+                            eligible refund is issued to the original payment route where supported. For mainland
+                            China consumer returns, the product price will be refunded within seven days after we
+                            receive the returned goods, unless a shorter period or another lawful arrangement
+                            applies. Provider and bank processing may affect when funds appear in your account.
+                            Mandatory rights in other countries or regions remain unaffected.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-safety-en">
+                        <h2>8. Product use and safety</h2>
+                        <p>
+                            Snow sports involve inherent risks. Select the correct size and specification, inspect
+                            equipment before use, follow product instructions and warnings, and obtain professional
+                            fitting or instruction where appropriate. Nothing in this section reduces our legal
+                            responsibility for product quality, safety or defects.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-conduct-en">
+                        <h2>9. Acceptable use</h2>
+                        <p>
+                            You must not misuse the website, probe or bypass security controls, introduce malicious
+                            code, scrape at a disruptive rate, impersonate another person, submit fraudulent
+                            transactions or interfere with other customers. We may take proportionate measures to
+                            protect customers, payment systems, inventory and the website.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-ip-en">
+                        <h2>10. Intellectual property</h2>
+                        <p>
+                            Website content, product photography, graphics, software, trade names and logos are
+                            owned by SUN or used under licence. You may view and retain order documents for personal
+                            or internal business use. No other reproduction, modification, resale or commercial use
+                            is permitted without prior written permission or another lawful basis.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-privacy-en">
+                        <h2>11. Privacy and communications</h2>
+                        <p>
+                            We process account, order, delivery, support and payment-status information to provide
+                            the shop, prevent fraud, fulfil orders and meet legal obligations. Please read our
+                            <a href="/en/privacy">Privacy Policy</a> for further information. Payment providers and
+                            carriers process information necessary for their services under their own notices.
+                            Service communications about an account, order, security event or refund are not
+                            marketing messages.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-liability-en">
+                        <h2>12. Warranties and liability</h2>
+                        <p>
+                            We provide products and the website with the warranties required by applicable law.
+                            To the maximum extent lawfully permitted, neither party is liable for indirect or
+                            unforeseeable loss not caused by its breach. Nothing excludes liability for fraud,
+                            wilful misconduct, death or personal injury caused by negligence, defective products,
+                            or any liability or consumer remedy that cannot legally be limited.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-force-en">
+                        <h2>13. Events outside reasonable control</h2>
+                        <p>
+                            We are not responsible for delay caused by an event outside our reasonable control,
+                            including severe weather, transport interruption, governmental action, natural disaster
+                            or widespread network failure. We will take reasonable steps to reduce disruption,
+                            inform affected customers and provide cancellation or refund rights required by law.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-changes-en">
+                        <h2>14. Changes to these Terms</h2>
+                        <p>
+                            We may update these Terms for legal, security or operational reasons. The date above
+                            identifies the current version. Material changes apply prospectively and will be
+                            communicated where required. The Terms shown when you placed an order continue to govern
+                            that order unless a mandatory legal change applies or you agree otherwise.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-law-en">
+                        <h2>15. Governing law and disputes</h2>
+                        <p>
+                            These Terms are governed by the laws of the People’s Republic of China, without
+                            depriving a consumer of mandatory protection available in their place of residence.
+                            Please contact us first so we can try to resolve a dispute. You may also use any
+                            competent consumer authority, mediation process, arbitration arrangement validly agreed
+                            after a dispute arises, or court available under applicable law. Mandatory consumer
+                            venue and remedy rights are preserved.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-contact-en">
+                        <h2>16. Contact</h2>
+                        <p>
+                            Operator: 思安奇冰雪科技（张家口）有限公司, trading as SUN<br/>
+                            Customer service email:
+                            <a href="mailto:sun@snowlandholdings.com">sun@snowlandholdings.com</a><br/>
+                            Customer service telephone:
+                            <a href="tel:+864000085355">+86 400-008-5355</a><br/>
+                            You may also use the <a href="/en/contactus">Contact Us</a> page. Please include your
+                            order number, but never send a complete bank-card number, password or verification code.
+                        </p>
+                    </section>
+                </article>
+
+                <article t-else="" class="sun_terms_document mx-auto" t-translation="off">
+                    <header class="sun_terms_header">
+                        <p class="sun_terms_eyebrow">SUN 在线商店</p>
+                        <h1>服务条款</h1>
+                        <p class="sun_terms_date">最后更新：2026 年 9 月 2 日</p>
+                        <p class="sun_terms_intro">
+                            本服务条款适用于由思安奇冰雪科技（张家口）有限公司（以下简称“思安奇”、“SUN”或“我们”）
+                            运营的 SUN 在线商店。在创建账户或提交订单前，请仔细阅读本条款。
+                        </p>
+                    </header>
+
+                    <aside class="sun_terms_notice">
+                        本条款不排除、限制或削减任何依法不得排除或限制的权利，包括消费者所在地的强制性消费者权益。
+                    </aside>
+
+                    <nav class="sun_terms_index" aria-label="条款目录">
+                        <a href="#sun-terms-scope-zh">1. 适用范围</a>
+                        <a href="#sun-terms-account-zh">2. 账户</a>
+                        <a href="#sun-terms-products-zh">3. 商品</a>
+                        <a href="#sun-terms-orders-zh">4. 订单</a>
+                        <a href="#sun-terms-payment-zh">5. 支付</a>
+                        <a href="#sun-terms-delivery-zh">6. 配送</a>
+                        <a href="#sun-terms-returns-zh">7. 退货退款</a>
+                        <a href="#sun-terms-safety-zh">8. 安全使用</a>
+                        <a href="#sun-terms-conduct-zh">9. 合理使用</a>
+                        <a href="#sun-terms-ip-zh">10. 知识产权</a>
+                        <a href="#sun-terms-privacy-zh">11. 隐私</a>
+                        <a href="#sun-terms-liability-zh">12. 责任</a>
+                        <a href="#sun-terms-force-zh">13. 不可控事件</a>
+                        <a href="#sun-terms-changes-zh">14. 条款更新</a>
+                        <a href="#sun-terms-law-zh">15. 争议处理</a>
+                        <a href="#sun-terms-contact-zh">16. 联系我们</a>
+                    </nav>
+
+                    <section id="sun-terms-scope-zh">
+                        <h2>1. 适用范围与接受</h2>
+                        <p>
+                            本条款适用于本网站、客户账户及在线订单。提交订单即表明您已核对订单信息，
+                            并同意本条款和结账页面所链接的相关政策。以企业或其他组织名义购买时，您确认自己有权代表该组织。
+                            未成年人应在适用法律要求的监护人同意和指导下使用本商店。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-account-zh">
+                        <h2>2. 客户账户</h2>
+                        <p>
+                            您应提供真实、准确、完整且有效的信息，并妥善保管登录凭据。除因我们未尽到法定义务所致外，
+                            您对通过本人账户完成的操作负责。如怀疑账户被未授权访问，请立即联系我们。为防止欺诈、滥用或安全事件，
+                            我们可在合理必要的范围内暂停账户，但不影响您就已有订单获得支持和依法维权。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-products-zh">
+                        <h2>3. 商品信息、库存与价格</h2>
+                        <p>
+                            我们尽力准确展示商品描述、颜色、尺码、硬度、图片、价格和库存。屏幕设置和合理的生产公差可能造成轻微差异。
+                            您的选择以购物车和订单记录中显示的配置为准。价格使用网站当前选择的币种，最终结账总额会列明已包含的费用。
+                            进口税、关税或当地费用按结账页面的说明或法律规定承担。
+                        </p>
+                        <p>
+                            支付前，系统会通过 ERP 核实可用库存；仅将商品加入购物车不代表已锁定库存。如存在明显的价格或描述错误，
+                            我们可在履行订单前更正，但对重大变更会征得您同意，或允许取消并全额退款。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-orders-zh">
+                        <h2>4. 订单与库存保留</h2>
+                        <p>
+                            提交前，您可核对并修正商品、规格、数量、收货信息和费用。成功提交后，系统会生成电子订单记录，
+                            并在适用法律规定的范围内成立合同；支付状态另行记录。待支付订单通常按支付页面显示的 15 分钟倒计时保留可用库存。
+                            如倒计时结束前仍未确认支付，库存保留将解除，订单标记为已过期；您可根据当时的价格和库存重新下单。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-payment-zh">
+                        <h2>5. 支付</h2>
+                        <p>
+                            结账页面会显示当前可用的支付方式、币种和支付服务商。仅当支付服务商与 ERP 系统均权威确认成功时，支付才算完成。
+                            待处理、被拒绝、已取消或已超时的操作不构成付款证明。请勿将明确标记为沙箱、测试或开发中的方式用于真实付款。
+                            托管式支付服务商可能在其安全页面收集银行卡或电子钱包凭据，同时适用该服务商的附加条款和隐私说明。
+                        </p>
+                        <p>
+                            如账户显示已扣款但订单仍显示未支付，请勿立即再次支付。请提供订单号联系我们，以便核对支付服务商记录并避免重复付款。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-delivery-zh">
+                        <h2>6. 配送</h2>
+                        <p>
+                            可用的配送方式、费用和目的地会在结账过程中显示。除非明确作出保证，预计时间不视为保证送达时间。
+                            您应提供完整、可送达的地址，并在收货后及时检查包裹。风险转移和交付时点按适用法律确定；通过快递交付时，
+                            通常以您或您授权的收件人签收为交付。如包裹破损、丢失或严重延误，请及时联系我们，以便与承运人核查。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-returns-zh">
+                        <h2>7. 取消、退货与退款</h2>
+                        <p>
+                            您可在“购买记录”和退款申请页面查看退货条件与操作指引。中国大陆消费者可在收到符合条件的网购商品之日起七日内无理由退货。
+                            依法不适用无理由退货的商品，包括定作商品或其他根据性质不宜退货的商品，将在购买前以显著方式说明，并在法律要求时取得您确认。
+                            为检查商品而进行的合理拆封或调试本身不影响退货，但退回商品应保持完整和良好状态。
+                        </p>
+                        <p>
+                            无理由退货的退回运费通常由您承担，除非我们另有说明。因错发、损坏或商品不符合约定而退货的，我们按法律规定承担合理运费。
+                            申请批准后，请按页面指引将商品退回指定库位。收到并核验后，符合条件的款项将在支付服务商支持时原路退回。
+                            对中国大陆消费者的退货，我们将在收到退回商品之日起七日内退还商品价款，适用更短期限或其他合法安排的除外。
+                            支付服务商和银行的处理时间可能影响款项到账时间。其他国家或地区的强制性消费者权利不受影响。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-safety-zh">
+                        <h2>8. 商品使用与安全</h2>
+                        <p>
+                            冰雪运动具有固有风险。请选择正确的尺码和规格，使用前检查装备，遵守商品说明和安全警示，并在需要时寻求专业调校或指导。
+                            本条不减轻我们对商品质量、安全或缺陷依法应承担的责任。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-conduct-zh">
+                        <h2>9. 网站的合理使用</h2>
+                        <p>
+                            您不得滥用网站、探测或绕过安全措施、植入恶意代码、以干扰服务的频率抓取数据、冒充他人、提交欺诈交易或影响其他客户。
+                            为保护客户、支付系统、库存及网站，我们可采取必要且适度的措施。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-ip-zh">
+                        <h2>10. 知识产权</h2>
+                        <p>
+                            网站内容、商品图片、图形、软件、商号和标识归 SUN 所有或已获合法授权。您可为个人使用或企业内部使用查看并保留订单文件。
+                            除经事先书面同意或具有其他合法依据外，不得复制、修改、转售或作其他商业使用。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-privacy-zh">
+                        <h2>11. 隐私与通知</h2>
+                        <p>
+                            我们为提供商店服务、防止欺诈、履行订单和遵守法律义务，处理账户、订单、配送、客户支持和支付状态信息。
+                            详情请阅读<a href="/privacy">隐私政策</a>。支付服务商和承运人会按其自身隐私说明处理完成服务所需的信息。
+                            与账户、订单、安全事件或退款相关的服务通知不属于营销信息。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-liability-zh">
+                        <h2>12. 保证与责任</h2>
+                        <p>
+                            我们按适用法律的要求为商品和网站提供保证。在法律允许的最大范围内，任何一方对非由其违约导致的间接或不可预见损失不承担责任。
+                            任何内容均不排除欺诈、故意不当行为、因过失造成的人身伤亡、缺陷商品责任，也不限制法律不允许限制的任何责任或消费者救济。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-force-zh">
+                        <h2>13. 合理控制范围之外的事件</h2>
+                        <p>
+                            对于严重天气、交通中断、政府行为、自然灾害或大范围网络故障等超出我们合理控制的事件所导致的延误，我们不承担责任。
+                            我们将采取合理措施降低影响、通知受影响的客户，并按法律规定提供取消或退款权利。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-changes-zh">
+                        <h2>14. 条款更新</h2>
+                        <p>
+                            我们可因法律、安全或运营需要更新本条款。页首日期标明当前版本。重大变更原则上仅向后适用，并在法律要求时向您通知。
+                            除法律强制变更或您另行同意外，您下单时显示的条款继续适用于该订单。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-law-zh">
+                        <h2>15. 适用法律与争议处理</h2>
+                        <p>
+                            本条款适用中华人民共和国法律，但不剥夺消费者在其居住地依法享有的强制性保护。如发生争议，建议先联系我们协商解决。
+                            您也可依法向有管辖权的消费者组织或行政部门投诉，使用调解程序，按争议发生后有效达成的仲裁协议申请仲裁，或向有管辖权的人民法院起诉。
+                            消费者依法享有的强制性管辖和救济权利不受影响。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-contact-zh">
+                        <h2>16. 联系我们</h2>
+                        <p>
+                            运营者：思安奇冰雪科技（张家口）有限公司（SUN）<br/>
+                            客服邮箱：<a href="mailto:sun@snowlandholdings.com">sun@snowlandholdings.com</a><br/>
+                            客服电话：<a href="tel:+864000085355">+86 400-008-5355</a><br/>
+                            您也可通过<a href="/contactus">联系我们</a>页面提交信息。联系时请提供订单号，但请勿发送完整银行卡号、账户密码或验证码。
+                        </p>
+                    </section>
+                </article>
+            </div>
+        </xpath>
+    </template>
+</odoo>
