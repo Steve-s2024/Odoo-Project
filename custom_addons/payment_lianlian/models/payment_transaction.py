@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -89,6 +90,105 @@ class PaymentTransaction(models.Model):
             raise ValidationError(_("连连商品数量必须是正整数。"))
         return int(normalized)
 
+    @staticmethod
+    def _lianlian_checkout_language(sale_order, partner):
+        """Return the language explicitly selected by the storefront.
+
+        Shop-created ERP orders persist this value at the mandatory order
+        confirmation boundary.  A partner-language fallback is retained only
+        for legacy or manually-created orders; delivery country must not alter
+        the customer's chosen checkout language.
+        """
+        language = (
+            getattr(sale_order, "x_website_checkout_language", False)
+            if sale_order else False
+        ) or partner.lang or "zh_CN"
+        return "en_US" if str(language).lower().startswith("en") else "zh_CN"
+
+    @staticmethod
+    def _lianlian_without_product_code(value, product):
+        """Remove any legacy SKU accidentally embedded in display text."""
+        text = str(value or "").strip()
+        if not product:
+            return text
+        codes = {
+            str(product.default_code or "").strip(),
+            str(product.product_tmpl_id.default_code or "").strip(),
+        }
+        for code in sorted(codes - {""}, key=len, reverse=True):
+            text = text.replace(f"[{code}]", "").replace(code, "")
+        return " ".join(text.split()).strip(" -:;：；")
+
+    def _lianlian_product_presentation(self, line, language):
+        """Build the localized cart-style name and selected-option subtitle."""
+        self.ensure_one()
+        is_english = language == "en_US"
+        product = line.product_id
+        is_delivery_method = getattr(line, "_shop_api_is_delivery_line", None)
+        is_delivery = (
+            is_delivery_method() if callable(is_delivery_method)
+            else bool(getattr(line, "is_delivery", False))
+        )
+
+        display_method = getattr(line, "_shop_api_display_name", None)
+        if callable(display_method):
+            name = display_method(language=language)
+        elif is_delivery:
+            name = "Standard delivery" if is_english else "标准送货"
+        elif product:
+            template = product.product_tmpl_id
+            website_name_method = getattr(template, "_get_website_display_name", None)
+            if callable(website_name_method):
+                name = website_name_method(is_english=is_english)
+            else:
+                name = template.with_context(lang=language).name
+        else:
+            name = line.with_context(lang=language).name
+        name = self._lianlian_without_product_code(name, product)
+        if not name:
+            name = "Product" if is_english else "商品"
+
+        options = []
+        option_method = getattr(line, "_shop_api_selected_options", None)
+        if callable(option_method) and not is_delivery:
+            options = [dict(option) for option in option_method(language=language)]
+
+        # Cart/purchase helpers intentionally omit colour when the product
+        # image already communicates it.  LianLian has no product picture in
+        # its order summary, so include the selected colour explicitly there.
+        template = product.product_tmpl_id if product else False
+        variant_method = getattr(template, "_get_shop_variant_display_values", None)
+        if callable(variant_method) and not is_delivery:
+            raw_values = variant_method(is_english=False)
+            display_values = variant_method(is_english=is_english)
+            raw_color = str(raw_values.get("color") or "").strip()
+            if raw_color not in {"", "未识别", "默认"} and not any(
+                option.get("key") == "color" for option in options
+            ):
+                color_option = {
+                    "key": "color",
+                    "label": "Color" if is_english else "颜色",
+                    "value": display_values.get("color"),
+                }
+                insert_at = 1 if options and options[0].get("key") == "type" else 0
+                options.insert(insert_at, color_option)
+
+        separator = "; " if is_english else "；"
+        label_separator = ": " if is_english else "："
+        option_text = separator.join(
+            f"{option.get('label')}{label_separator}{option.get('value')}"
+            for option in options
+            if option.get("label") and option.get("value")
+        )
+        description = self._lianlian_without_product_code(option_text, product) or name
+
+        # LianLian requires product_id/SKU-like identifiers.  Use a stable,
+        # opaque per-line token so internal ERP product codes never leave ERP.
+        opaque_id = hashlib.sha256(
+            f"{self.company_id.id}:{line.order_id.id}:{line.id}".encode("utf-8")
+        ).hexdigest()[:24]
+        return name[:128], description[:256], f"ITEM-{opaque_id}"
+
     def _lianlian_callback_url(self):
         self.ensure_one()
         base = self.provider_id.sudo().lianlian_callback_base_url.rstrip("/")
@@ -128,31 +228,43 @@ class PaymentTransaction(models.Model):
         if not email and not phone:
             raise ValidationError(_("连连收银台要求客户至少填写邮箱或手机号。"))
 
+        language = self._lianlian_checkout_language(sale_order, partner)
+        is_english = language == "en_US"
         products = []
         if sale_order:
             for line in sale_order.order_line.filtered(lambda item: not item.display_type):
                 product = line.product_id
+                name, description, opaque_item_id = self._lianlian_product_presentation(
+                    line, language,
+                )
                 products.append({
-                    "product_id": str(product.id),
-                    "name": (line.name or product.display_name or "Product")[:128],
-                    "description": (product.description_sale or "")[:256],
+                    "product_id": opaque_item_id,
+                    "name": name,
+                    "description": description,
                     "price": f"{line.price_unit:.2f}",
                     "quantity": self._lianlian_product_quantity(line.product_uom_qty),
-                    "sku": (product.default_code or str(product.id))[:64],
+                    "sku": opaque_item_id,
                     "url": urljoin(
                         f"{self.provider_id.get_base_url().rstrip('/')}/",
-                        (getattr(product, "website_url", False) or "shop").lstrip("/"),
+                        ("en/shop" if is_english else "shop"),
                     ),
                     "shipping_provider": "other",
                 })
         if not products:
+            opaque_payment_id = hashlib.sha256(
+                f"{self.company_id.id}:{self.id}".encode("utf-8")
+            ).hexdigest()[:24]
             products = [{
-                "product_id": str(self.id),
-                "name": (self.reference or "Odoo order")[:128],
+                "product_id": f"ITEM-{opaque_payment_id}",
+                "name": "Order payment" if is_english else "订单支付",
+                "description": "Order payment" if is_english else "订单支付",
                 "price": f"{self.amount:.2f}",
                 "quantity": 1,
-                "sku": str(self.id),
-                "url": self.provider_id.get_base_url(),
+                "sku": f"ITEM-{opaque_payment_id}",
+                "url": urljoin(
+                    f"{self.provider_id.get_base_url().rstrip('/')}/",
+                    ("en/shop" if is_english else "shop"),
+                ),
                 "shipping_provider": "other",
             }]
 
@@ -185,7 +297,10 @@ class PaymentTransaction(models.Model):
                 "merchant_order_id": merchant_order_id,
                 "merchant_user_no": str(partner.id),
                 "merchant_order_time": self._lianlian_timestamp(),
-                "order_description": (sale_order.name if sale_order else self.reference)[:256],
+                "order_description": (
+                    (f"Order {sale_order.name}" if is_english else f"订单 {sale_order.name}")
+                    if sale_order else ("Order payment" if is_english else "订单支付")
+                )[:256],
                 "order_amount": f"{self.amount:.2f}",
                 "order_currency_code": self.currency_id.name,
                 "products": products,

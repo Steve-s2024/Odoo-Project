@@ -1,6 +1,7 @@
 import json
 from unittest.mock import patch
 
+from odoo import Command
 from odoo.exceptions import ValidationError
 from odoo.tests.common import TransactionCase, tagged
 
@@ -104,6 +105,67 @@ class TestLianLianProvider(TransactionCase):
         )
         self.assertNotIn("payment_data", payload)
         self.assertNotIn("card_number", json.dumps(payload))
+
+    def test_checkout_products_use_order_language_and_never_expose_product_code(self):
+        partner = self.env["res.partner"].create({
+            "name": "Checkout Language Test",
+            "email": "checkout-language@example.invalid",
+            "lang": "en_US",
+        })
+        product = self.env["product.product"].create({
+            "name": "双板滑雪鞋",
+            "default_code": "012307S2-MA100-H001230",
+            "list_price": 12.34,
+        })
+        template = product.product_tmpl_id
+        if "x_website_english_name" in template._fields:
+            template.x_website_english_name = "Ski Boots"
+        pricelist = self.env["product.pricelist"].search([
+                ("currency_id", "=", self.currency.id),
+            ], limit=1) or self.env["product.pricelist"].create({
+                "name": "LianLian localization test USD",
+                "currency_id": self.currency.id,
+            })
+        order_values = {
+            "partner_id": partner.id,
+            "pricelist_id": pricelist.id,
+            "order_line": [Command.create({
+                "product_id": product.id,
+                "product_uom_qty": 1,
+                "price_unit": 12.34,
+            })],
+        }
+        if "x_website_checkout_language" in self.env["sale.order"]._fields:
+            order_values["x_website_checkout_language"] = "en_US"
+        order = self.env["sale.order"].create(order_values)
+        transaction = self._create_transaction(reference="LL-LOCALIZED-PRODUCT")
+        transaction.write({
+            "partner_id": partner.id,
+            "sale_order_ids": [Command.set(order.ids)],
+        })
+
+        english_payload = transaction._lianlian_order_payload()
+        english_product = english_payload["merchant_order"]["products"][0]
+        serialized_english = json.dumps(english_product, ensure_ascii=False)
+        self.assertEqual(english_product["name"], "Ski Boots")
+        self.assertIn("Color: Black", english_product["description"])
+        self.assertIn("Size: 230", english_product["description"])
+        self.assertNotIn(product.default_code, serialized_english)
+        self.assertTrue(english_product["product_id"].startswith("ITEM-"))
+        self.assertEqual(english_product["sku"], english_product["product_id"])
+        self.assertNotIn(product.default_code.lower(), english_product["url"].lower())
+
+        if "x_website_checkout_language" in order._fields:
+            order.x_website_checkout_language = "zh_CN"
+        else:
+            partner.lang = "zh_CN"
+        chinese_payload = transaction._lianlian_order_payload()
+        chinese_product = chinese_payload["merchant_order"]["products"][0]
+        serialized_chinese = json.dumps(chinese_product, ensure_ascii=False)
+        self.assertEqual(chinese_product["name"], "双板滑雪鞋")
+        self.assertIn("颜色：黑", chinese_product["description"])
+        self.assertIn("尺码：230", chinese_product["description"])
+        self.assertNotIn(product.default_code, serialized_chinese)
 
     def test_duplicate_signed_success_is_idempotent(self):
         tx = self._create_transaction(reference="LL-CALLBACK-REPLAY")

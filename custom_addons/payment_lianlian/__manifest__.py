@@ -1,6 +1,6 @@
 {
     "name": "Payment Provider: LianLian Checkout",
-    "version": "19.0.1.0.9",
+    "version": "19.0.1.0.10",
     "category": "Accounting/Payment Providers",
     "summary": "Accept card and local payments through LianLian hosted Checkout.",
     "depends": ["payment", "account_payment", "sale"],
