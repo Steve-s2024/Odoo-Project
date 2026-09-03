@@ -7,7 +7,7 @@ service="odoo-storefront"
 database="odoo_storefront"
 module="storefront_terms_template"
 archive="${CODEX_STOREFRONT_RELEASE:?}/storefront-terms-template.tar.gz"
-expected_hash="9d07dff38e463d53f84883a4372aaed880124defe9f9d096b4398bf3647d6eea"
+expected_hash="f7f9a87aca2c3f68abd0931b7a844d164fb0d9f9e173f7465d2c2ffa8c246920"
 public_host="${CODEX_STOREFRONT_HOST:?}"
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 backup_dir="/var/backups/odoo-storefront/terms-${stamp}"
@@ -49,6 +49,10 @@ test "$(sha256sum "${archive}" | awk '{print $1}')" = "${expected_hash}"
 grep -q 'SUN Storefront Terms of Service' \
     < <(tar -xOzf "${archive}" custom_addons/${module}/__manifest__.py)
 grep -q '服务条款' \
+    < <(tar -xOzf "${archive}" custom_addons/${module}/views/terms_templates.xml)
+grep -q '按地区待填写' \
+    < <(tar -xOzf "${archive}" custom_addons/${module}/views/terms_templates.xml)
+grep -q '恶劣或极端天气可能导致' \
     < <(tar -xOzf "${archive}" custom_addons/${module}/views/terms_templates.xml)
 
 install -d -m 0750 "${backup_dir}"
@@ -118,7 +122,7 @@ chown -R "${service_user}:${service_user}" "${addons_root}/${module}"
 
 sudo -u "${service_user}" -H \
     "${runtime}/venv/bin/python" "${runtime}/odoo-src/odoo-bin" server \
-    -c "${config}" -d "${test_database}" -i "${module}" \
+    -c "${config}" -d "${test_database}" -u "${module}" \
     --test-enable --test-tags "/${module}" --stop-after-init \
     --http-port=18070 --gevent-port=18073 --log-level=test
 
@@ -127,7 +131,7 @@ sudo -u postgres dropdb "${test_database}"
 systemctl stop "${service}"
 sudo -u "${service_user}" -H \
     "${runtime}/venv/bin/python" "${runtime}/odoo-src/odoo-bin" server \
-    -c "${config}" -d "${database}" -i "${module}" \
+    -c "${config}" -d "${database}" -u "${module}" \
     --stop-after-init --no-http
 systemctl start "${service}"
 
@@ -142,11 +146,18 @@ for attempt in $(seq 1 45); do
 done
 
 systemctl is-active --quiet "${service}"
-page="$(curl --fail --silent --show-error --max-time 10 \
+page_cn="$(curl --fail --silent --show-error --max-time 10 \
     -H "Host: ${public_host}" http://127.0.0.1:8070/terms)"
-grep -q 'sun_terms_page' <<<"${page}"
-grep -q '服务条款' <<<"${page}"
-if grep -q 'You should update this document' <<<"${page}"; then
+page_en="$(curl --fail --silent --show-error --max-time 10 \
+    -H "Host: ${public_host}" http://127.0.0.1:8070/en/terms)"
+grep -q 'sun_terms_page' <<<"${page_cn}"
+grep -q '服务条款' <<<"${page_cn}"
+grep -q '按地区待填写' <<<"${page_cn}"
+grep -q '恶劣或极端天气可能导致' <<<"${page_cn}"
+grep -q 'DRAFT TEMPLATE' <<<"${page_en}"
+grep -q 'TO BE COMPLETED BY REGION' <<<"${page_en}"
+grep -q 'Adverse or severe weather may postpone' <<<"${page_en}"
+if grep -q 'You should update this document' <<<"${page_cn}${page_en}"; then
     printf 'The Odoo placeholder terms are still visible.\n' >&2
     exit 1
 fi

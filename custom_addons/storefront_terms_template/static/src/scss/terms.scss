@@ -32,6 +32,14 @@
     font-size: 0.9rem;
 }
 
+.sun_terms_draft {
+    color: #a12820;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin: 0.65rem 0 0;
+}
+
 .sun_terms_intro {
     font-size: 1.05rem;
     margin: 1.35rem 0 0;
@@ -43,6 +51,37 @@
     border-left: 4px solid #171717;
     margin: 0 0 1.75rem;
     padding: 1rem 1.2rem;
+}
+
+.sun_terms_notice_draft {
+    background: #fff4df;
+    border-left-color: #a12820;
+}
+
+.sun_terms_placeholder {
+    background: #fff2a8;
+    border: 1px dashed #9b7414;
+    border-radius: 0.2rem;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    color: #4c3900;
+    display: inline;
+    font-weight: 600;
+    padding: 0.08rem 0.25rem;
+}
+
+.sun_terms_fields {
+    background: #faf9f5;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    margin-bottom: 2rem;
+    padding: 1.25rem 1.4rem 0.8rem !important;
+}
+
+.sun_terms_fields ul {
+    display: grid;
+    gap: 0.55rem;
+    margin-bottom: 0.75rem;
+    padding-left: 1.25rem;
 }
 
 .sun_terms_index {

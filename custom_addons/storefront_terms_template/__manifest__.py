@@ -1,7 +1,7 @@
 {
     "name": "SUN Storefront Terms of Service",
-    "summary": "Bilingual consumer terms for the SUN online shop",
-    "version": "19.0.1.0.0",
+    "summary": "Marked bilingual regional terms template for the SUN online shop",
+    "version": "19.0.1.1.0",
     "category": "Website/Website",
     "author": "SUN",
     "license": "LGPL-3",
