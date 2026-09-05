@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!--
+        The original action is nested below Website / Configuration, whose
+        parent menu is restricted to full system administrators. Storefront
+        editors should be able to upload media without receiving unrestricted
+        ERP administration rights, so expose this one action directly under
+        the Website application and limit it to website designers.
+    -->
+    <record id="stock_subwarehouse_hierarchy.menu_website_video_upload" model="ir.ui.menu">
+        <field name="parent_id" ref="website.menu_website_configuration"/>
+        <field name="sequence">95</field>
+        <field name="group_ids" eval="[(6, 0, [ref('website.group_website_designer')])]"/>
+    </record>
+</odoo>
