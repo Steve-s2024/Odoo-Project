@@ -402,7 +402,7 @@
                     'snowboard-items': 'Snowboard Products' if x_item_title_is_english else '单板商品(SNOWBOARD PRODUCTS)',
                     'other-items': 'Other Products' if x_item_title_is_english else '其他商品(OTHER PRODUCTS)',
                 }.get(x_item_title_slug)"/>
-                <t t-set="title" t-value="x_item_browser_title + ' | ' + website.name"/>
+                <t t-set="title" t-value="(main_object and 'website_meta_title' in main_object and main_object.website_meta_title) or (x_item_browser_title + ' | ' + website.name)"/>
             </t>
         </xpath>
         <xpath expr="//div[@id='wrapwrap']/main/t[@t-out='0']" position="after">
