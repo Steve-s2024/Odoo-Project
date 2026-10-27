@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$root = "C:\Users\Stephen Sun\Documents\Codex\2026-06-24\dow"
+$root = Split-Path -Parent $PSScriptRoot
 $pgBin = "C:\Program Files\PostgreSQL\17\bin"
 $pgData = Join-Path $root "work\pgdata-odoo"
 
