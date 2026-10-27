@@ -1,0 +1,32 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* storefront_api_bridge
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Language: zh_CN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#. module: storefront_api_bridge
+msgid "ERP could not confirm the password reset request. Please try again or contact customer support."
+msgstr "ERP 无法确认密码重置请求，请重试或联系客服。"
+
+#. module: storefront_api_bridge
+msgid "The password reset request expired. Please submit the form again."
+msgstr "密码重置请求已过期，请重新提交表单。"
+
+#. module: storefront_api_bridge
+msgid "The password reset request is invalid. Please submit the form again."
+msgstr "密码重置请求无效，请重新提交表单。"
+
+#. module: storefront_api_bridge
+msgid "ERP could not confirm the password change. Your password was not changed."
+msgstr "ERP 无法确认密码修改，您的密码未被更改。"
+
+#. module: storefront_api_bridge
+msgid "The Shop does not store account passwords. Use the Shop password reset page so ERP can change the authoritative password."
+msgstr "商城不保存账户密码。请使用商城密码重置页面，由 ERP 修改唯一有效的密码。"

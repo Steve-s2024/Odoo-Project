@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template
+        id="products_item_language_detection"
+        inherit_id="stock_subwarehouse_hierarchy.products_item_international_mapping"
+        name="Storefront product card language detection"
+    >
+        <xpath expr="//span[contains(@t-out, '_get_website_display_name')]" position="attributes">
+            <attribute name="t-out">product._get_website_display_name(bool(request.lang and (request.lang.code or '').lower().startswith('en')))</attribute>
+        </xpath>
+        <xpath expr="//span[contains(@t-out, '_get_website_display_price_label')]" position="attributes">
+            <attribute name="t-out">product._get_website_display_price_label(bool(request.lang and (request.lang.code or '').lower().startswith('en')))</attribute>
+        </xpath>
+    </template>
+
+    <template
+        id="product_price_language_detection"
+        inherit_id="stock_subwarehouse_hierarchy.product_price_international_mapping"
+        name="Storefront product price language detection"
+    >
+        <xpath expr="//t[@t-if=&quot;request.lang and request.lang.code == 'en_US'&quot;]" position="attributes">
+            <attribute name="t-if">bool(request.lang and (request.lang.code or '').lower().startswith('en'))</attribute>
+        </xpath>
+    </template>
+
+    <template
+        id="product_selector_language_detection"
+        inherit_id="stock_subwarehouse_hierarchy.product_page_shop_group_siblings"
+        name="Storefront product selector language detection"
+    >
+        <xpath expr="//t[@t-set='is_english']" position="attributes">
+            <attribute name="t-value">bool(request.lang and (request.lang.code or '').lower().startswith('en'))</attribute>
+        </xpath>
+    </template>
+
+    <template
+        id="cart_product_option_subtitle"
+        inherit_id="website_sale.cart_lines"
+        name="Localized cart product option subtitles"
+    >
+        <xpath expr="//t[@t-call='website_sale.cart_line_product_link'][h6]" position="after">
+            <t
+                t-set="x_storefront_selected_options"
+                t-value="line._storefront_selected_options(request.lang.code if request.lang else 'zh_CN')"
+            />
+            <small t-if="x_storefront_selected_options" class="x_cart_product_option_subtitle">
+                <t t-foreach="x_storefront_selected_options" t-as="option">
+                    <t t-if="option_index"> · </t>
+                    <span><t t-out="option.get('label')"/>: <t t-out="option.get('value')"/></span>
+                </t>
+            </small>
+        </xpath>
+        <xpath expr="//t[@t-set='combination_name']" position="attributes">
+            <attribute name="t-value">line._get_combination_name() if not x_storefront_selected_options else False</attribute>
+        </xpath>
+    </template>
+
+    <template
+        id="delivery_method_language_detection"
+        inherit_id="website_sale.delivery_method"
+        name="Localized storefront delivery method names"
+    >
+        <xpath expr="//span[@name='o_delivery_method_name']" position="replace">
+            <span
+                name="o_delivery_method_name"
+                t-out="dm.with_context(lang='en_US' if bool(request.lang and (request.lang.code or '').lower().startswith('en')) else 'zh_CN').name"
+            />
+        </xpath>
+    </template>
+</odoo>

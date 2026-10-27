@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_storefront_cache_entry_admin,storefront.cache.entry admin read,model_storefront_cache_entry,base.group_system,1,0,0,0
+access_storefront_webhook_event_admin,storefront.webhook.event admin read,model_storefront_webhook_event,base.group_system,1,0,0,0

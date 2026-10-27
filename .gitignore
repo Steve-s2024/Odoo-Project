@@ -5,9 +5,18 @@
 
 # Runtime data, databases, logs, downloaded tools, and generated artifacts.
 /work/
+/tmp/
 /.agents/
 /.codex/
 /outputs/*
+/*.log
+
+# Local deployment credentials and host trust material.  Production values
+# stay on the deployment hosts; only documented templates belong in Git.
+/deploy/*-ssh.conf
+/deploy/*-known_hosts
+/deploy/*-known_hosts.old
+/deploy/*-active.conf
 
 # Python and Odoo caches.
 __pycache__/

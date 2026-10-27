@@ -60,6 +60,17 @@ sudo systemctl restart odoo
 sudo nginx -t
 ```
 
+## Permanent production ERP connection
+
+Use the repository-managed, key-based connection for all future ERP updates:
+
+```powershell
+.\deploy\erp-connection.ps1 -Action Health
+```
+
+Connection identity, deployment usage, automatic backups, and Shop API
+separation are documented in [ERP_PERMANENT_CONNECTION.md](ERP_PERMANENT_CONNECTION.md).
+
 ## Outgoing Email
 
 Odoo needs a real SMTP account before it can send quotations, password reset

@@ -17,9 +17,16 @@ ODOO_SRC="${ODOO_SRC:-$ODOO_HOME/odoo-src}"
 PROJECT_DIR="${PROJECT_DIR:-$ODOO_HOME/project}"
 CUSTOM_ADDONS_DIR="${CUSTOM_ADDONS_DIR:-$PROJECT_DIR/custom_addons}"
 ODOO_CONFIG="${ODOO_CONFIG:-/etc/odoo.conf}"
+ODOO_ENV_FILE="${ODOO_ENV_FILE:-}"
 ODOO_DB="${ODOO_DB:-odoo_prod}"
 ODOO_DB_USER="${ODOO_DB_USER:-odoo}"
 ODOO_PORT="${ODOO_PORT:-8069}"
+ODOO_SERVICE="${ODOO_SERVICE:-odoo}"
+NGINX_SITE="${NGINX_SITE:-odoo}"
+INITIAL_MODULES="${INITIAL_MODULES:-stock_subwarehouse_hierarchy}"
+INITIAL_MODULE_CHECK="${INITIAL_MODULES%%,*}"
+ODOO_WORKERS="${ODOO_WORKERS:-0}"
+CLIENT_MAX_BODY_SIZE="${CLIENT_MAX_BODY_SIZE:-1g}"
 DOMAIN="${DOMAIN:-}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-}"
 INSTALL_SSL="${INSTALL_SSL:-0}"
@@ -30,12 +37,19 @@ if [[ "$(id -u)" -ne 0 ]]; then
     exit 1
 fi
 
+export DEBIAN_FRONTEND=noninteractive
+export UCF_FORCE_CONFFOLD=1
+
+# Preserve provider-managed SSH/network configuration during unattended
+# upgrades, and never block provisioning on a dpkg conffile prompt.
+APT_GET=(apt-get -o Dpkg::Options::="--force-confold")
+
 echo "==> Updating Ubuntu packages"
-apt-get update
-apt-get upgrade -y
+"${APT_GET[@]}" update
+"${APT_GET[@]}" upgrade -y
 
 echo "==> Installing system dependencies"
-apt-get install -y \
+"${APT_GET[@]}" install -y \
     build-essential \
     ca-certificates \
     curl \
@@ -75,10 +89,13 @@ if ! command -v wkhtmltopdf >/dev/null 2>&1; then
             exit 1
             ;;
     esac
-    WKHTML_DEB="wkhtmltox_0.12.6.1-3.bookworm_${WKHTML_ARCH}.deb"
+    # This bootstrap targets Ubuntu 22.04 (Jammy). Use the official Jammy
+    # build, matching Odoo's own 19.0 container, rather than the incompatible
+    # Debian Bookworm package (which requires libjpeg62-turbo).
+    WKHTML_DEB="wkhtmltox_0.12.6.1-3.jammy_${WKHTML_ARCH}.deb"
     WKHTML_URL="https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/${WKHTML_DEB}"
     curl --fail --location --retry 4 --output "/tmp/${WKHTML_DEB}" "$WKHTML_URL"
-    apt-get install -y "/tmp/${WKHTML_DEB}"
+    "${APT_GET[@]}" install -y "/tmp/${WKHTML_DEB}"
     rm -f "/tmp/${WKHTML_DEB}"
 fi
 
@@ -93,10 +110,16 @@ mkdir -p "$ODOO_HOME"
 chown -R "$ODOO_USER:$ODOO_USER" "$ODOO_HOME"
 
 echo "==> Creating PostgreSQL role and database"
+if [[ ! "$ODOO_DB" =~ ^[A-Za-z0-9_-]+$ || ! "$ODOO_DB_USER" =~ ^[A-Za-z0-9_-]+$ ]]; then
+    echo "Database and role names may contain only letters, numbers, underscores, and hyphens."
+    exit 1
+fi
 sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$ODOO_DB_USER'" | grep -q 1 || \
     sudo -u postgres createuser --createdb "$ODOO_DB_USER"
 sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$ODOO_DB'" | grep -q 1 || \
     sudo -u postgres createdb --owner="$ODOO_DB_USER" "$ODOO_DB"
+sudo -u postgres psql -d postgres -c \
+    "ALTER DATABASE \"$ODOO_DB\" OWNER TO \"$ODOO_DB_USER\";"
 
 if [[ ! -d "$ODOO_SRC/.git" ]]; then
     echo "==> Cloning Odoo $ODOO_VERSION"
@@ -118,11 +141,26 @@ fi
 
 echo "==> Creating Python virtual environment"
 sudo -u "$ODOO_USER" python3 -m venv "$ODOO_HOME/venv"
-sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/python" -m pip install --upgrade pip wheel setuptools
+sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/python" -m pip install --upgrade \
+    pip wheel "setuptools<70" "Cython<3"
+
+# Odoo's Python 3.10 dependency set pins gevent 21.8.0. Its source build is
+# incompatible with Cython 3 in pip's isolated build environment, so build it
+# once against the compatible Cython already installed in this venv.
+if sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/python" -c \
+    'import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 10) else 1)'; then
+    sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/pip" install \
+        --no-build-isolation "gevent==21.8.0"
+fi
 sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/pip" install -r "$ODOO_SRC/requirements.txt"
 sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/pip" install openpyxl
+if [[ -f "$PROJECT_DIR/deploy/payment-sdk-requirements.txt" ]]; then
+    sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/pip" install \
+        -r "$PROJECT_DIR/deploy/payment-sdk-requirements.txt"
+fi
 
 ADMIN_PASSWD="$(openssl rand -hex 24)"
+ODOO_LOG_DIR="/var/log/$ODOO_SERVICE"
 
 echo "==> Writing Odoo config: $ODOO_CONFIG"
 cat > "$ODOO_CONFIG" <<EOF
@@ -138,29 +176,34 @@ db_name = $ODOO_DB
 http_interface = 127.0.0.1
 http_port = $ODOO_PORT
 proxy_mode = True
-workers = 0
+workers = $ODOO_WORKERS
 limit_memory_soft = 1073741824
 limit_memory_hard = 1610612736
 limit_time_cpu = 600
 limit_time_real = 1200
-logfile = /var/log/odoo/odoo.log
+logfile = $ODOO_LOG_DIR/$ODOO_SERVICE.log
 EOF
 chown "$ODOO_USER:$ODOO_USER" "$ODOO_CONFIG"
 chmod 640 "$ODOO_CONFIG"
 
-mkdir -p "$ODOO_HOME/data" /var/log/odoo
-chown -R "$ODOO_USER:$ODOO_USER" "$ODOO_HOME/data" /var/log/odoo
+mkdir -p "$ODOO_HOME/data" "$ODOO_LOG_DIR"
+chown -R "$ODOO_USER:$ODOO_USER" "$ODOO_HOME/data" "$ODOO_LOG_DIR"
 
 echo "==> Writing systemd service"
-cat > /etc/systemd/system/odoo.service <<EOF
+ENVIRONMENT_FILE_DIRECTIVE=""
+if [[ -n "$ODOO_ENV_FILE" ]]; then
+    ENVIRONMENT_FILE_DIRECTIVE="EnvironmentFile=-$ODOO_ENV_FILE"
+fi
+cat > "/etc/systemd/system/$ODOO_SERVICE.service" <<EOF
 [Unit]
-Description=Odoo ERP
+Description=Odoo $ODOO_SERVICE
 After=network.target postgresql.service
 
 [Service]
 Type=simple
 User=$ODOO_USER
 Group=$ODOO_USER
+$ENVIRONMENT_FILE_DIRECTIVE
 ExecStart=$ODOO_HOME/venv/bin/python $ODOO_SRC/odoo-bin -c $ODOO_CONFIG
 Restart=always
 RestartSec=5
@@ -179,11 +222,11 @@ MODULE_TABLE="$(
 )"
 if [[ -z "$MODULE_TABLE" ]]; then
     ODOO_MODULE_FLAG="-i"
-    ODOO_MODULES="base,stock_subwarehouse_hierarchy"
+    ODOO_MODULES="base,$INITIAL_MODULES"
 else
     MODULE_STATE="$(
         sudo -u postgres psql -d "$ODOO_DB" -tAc \
-            "SELECT state FROM ir_module_module WHERE name='stock_subwarehouse_hierarchy' LIMIT 1" \
+            "SELECT state FROM ir_module_module WHERE name='$INITIAL_MODULE_CHECK' LIMIT 1" \
             2>/dev/null | xargs || true
     )"
     if [[ "$MODULE_STATE" == "installed" ]]; then
@@ -191,7 +234,7 @@ else
     else
         ODOO_MODULE_FLAG="-i"
     fi
-    ODOO_MODULES="stock_subwarehouse_hierarchy"
+    ODOO_MODULES="$INITIAL_MODULES"
 fi
 sudo -u "$ODOO_USER" "$ODOO_HOME/venv/bin/python" "$ODOO_SRC/odoo-bin" \
     -c "$ODOO_CONFIG" \
@@ -206,12 +249,12 @@ if [[ -n "$DOMAIN" ]]; then
 fi
 
 echo "==> Writing Nginx site"
-cat > /etc/nginx/sites-available/odoo <<EOF
+cat > "/etc/nginx/sites-available/$NGINX_SITE" <<EOF
 server {
     listen 80;
     server_name $SERVER_NAME;
 
-    client_max_body_size 200m;
+    client_max_body_size $CLIENT_MAX_BODY_SIZE;
     proxy_read_timeout 720s;
     proxy_connect_timeout 720s;
     proxy_send_timeout 720s;
@@ -227,7 +270,7 @@ server {
     }
 }
 EOF
-ln -sfn /etc/nginx/sites-available/odoo /etc/nginx/sites-enabled/odoo
+ln -sfn "/etc/nginx/sites-available/$NGINX_SITE" "/etc/nginx/sites-enabled/$NGINX_SITE"
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
 
@@ -238,7 +281,7 @@ ufw --force enable
 
 echo "==> Starting Odoo and Nginx"
 systemctl daemon-reload
-systemctl enable --now odoo
+systemctl enable --now "$ODOO_SERVICE"
 systemctl reload nginx
 
 if [[ "$INSTALL_SSL" == "1" ]]; then
@@ -247,7 +290,7 @@ if [[ "$INSTALL_SSL" == "1" ]]; then
         exit 1
     fi
     echo "==> Installing HTTPS certificate for $DOMAIN"
-    apt-get install -y certbot python3-certbot-nginx
+    "${APT_GET[@]}" install -y certbot python3-certbot-nginx
     certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$ADMIN_EMAIL" --redirect
 fi
 
@@ -258,5 +301,5 @@ if [[ "$INSTALL_SSL" == "1" ]]; then
     echo "HTTPS URL: https://$DOMAIN"
 fi
 echo "Master password saved in $ODOO_CONFIG as admin_passwd."
-echo "Check service: sudo systemctl status odoo"
-echo "Logs: sudo journalctl -u odoo -f"
+echo "Check service: sudo systemctl status $ODOO_SERVICE"
+echo "Logs: sudo journalctl -u $ODOO_SERVICE -f"
