@@ -1,4 +1,3 @@
-import json
 import pprint
 
 from odoo import _
@@ -47,30 +46,15 @@ class WeChatPayController(Controller):
     def wechatpay_notify(self, **kwargs):
         body = request.httprequest.get_data(as_text=True)
         headers = request.httprequest.headers
-        serial_no = headers.get("Wechatpay-Serial")
-        timestamp = headers.get("Wechatpay-Timestamp")
-        nonce = headers.get("Wechatpay-Nonce")
-        signature = headers.get("Wechatpay-Signature")
-
         try:
-            notification = json.loads(body)
-            resource = notification["resource"]
             provider = request.env["payment.provider"].sudo().search([
                 ("code", "=", "wechatpay"),
                 ("state", "in", ["enabled", "test"]),
-                ("wechatpay_platform_serial_no", "=", serial_no),
             ], limit=1)
             if not provider:
                 raise ValidationError(_("找不到匹配的微信支付提供商。"))
 
-            provider._wechatpay_verify_notification_signature(
-                timestamp,
-                nonce,
-                body,
-                signature,
-                serial_no,
-            )
-            payment_data = provider._wechatpay_decrypt_notification_resource(resource)
+            payment_data = provider._wechatpay_parse_notification(headers, body)
             tx = request.env["payment.transaction"].sudo().search([
                 ("provider_code", "=", "wechatpay"),
                 ("wechatpay_out_trade_no", "=", payment_data.get("out_trade_no")),
@@ -88,24 +72,14 @@ class WeChatPayController(Controller):
     def wechatpay_refund_notify(self, **kwargs):
         body = request.httprequest.get_data(as_text=True)
         headers = request.httprequest.headers
-        serial_no = headers.get("Wechatpay-Serial")
-        timestamp = headers.get("Wechatpay-Timestamp")
-        nonce = headers.get("Wechatpay-Nonce")
-        signature = headers.get("Wechatpay-Signature")
-
         try:
-            notification = json.loads(body)
             provider = request.env["payment.provider"].sudo().search([
                 ("code", "=", "wechatpay"),
                 ("state", "in", ["enabled", "test"]),
-                ("wechatpay_platform_serial_no", "=", serial_no),
             ], limit=1)
             if not provider:
                 raise ValidationError(_("找不到匹配的微信支付提供商。"))
-            provider._wechatpay_verify_notification_signature(
-                timestamp, nonce, body, signature, serial_no
-            )
-            refund_data = provider._wechatpay_decrypt_notification_resource(notification["resource"])
+            refund_data = provider._wechatpay_parse_notification(headers, body)
             tx = request.env["payment.transaction"].sudo().search([
                 ("provider_code", "=", "wechatpay"),
                 ("operation", "=", "refund"),

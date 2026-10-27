@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="stock_subwarehouse_hierarchy.SearchBarBooleanSelector"
+       t-inherit="web.SearchBar"
+       t-inherit-mode="extension">
+        <xpath expr="//div[contains(@class, 'o_searchview_input_container')]/input" position="before">
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary d-print-none px-2"
+                    t-att-title="erpBooleanState.connector === '&amp;' ? '新增条件将使用“并且”' : '新增条件将使用“或者”'"
+                    t-on-click.stop.prevent="toggleErpQuickSearchConnector">
+                <t t-if="erpBooleanState.connector === '&amp;'">并且</t>
+                <t t-else="">或者</t>
+            </button>
+        </xpath>
+    </t>
+
+    <t t-name="stock_subwarehouse_hierarchy.SearchBarMenuAdvancedFilterLabel"
+       t-inherit="web.SearchBarMenu"
+       t-inherit-mode="extension">
+        <xpath expr="//DropdownItem[@onSelected.bind='onAddCustomFilterClick']" position="replace">
+            <DropdownItem class="'o_menu_item o_add_custom_filter'" onSelected.bind="onAddCustomFilterClick">
+                高级条件（并且/或者/括号）...
+            </DropdownItem>
+        </xpath>
+    </t>
+
+    <t t-name="stock_subwarehouse_hierarchy.SearchBarQuickAdvancedFilterLabel"
+       t-inherit="web.SearchBar.QuickSearchItems"
+       t-inherit-mode="extension">
+        <xpath expr="//t[@t-if='item.isAddCustomFilterButton']/span" position="replace">
+            <span class="text-action">高级条件（并且/或者/括号）...</span>
+        </xpath>
+    </t>
+
+    <t t-name="stock_subwarehouse_hierarchy.TreeEditorChineseConnector"
+       t-inherit="web.TreeEditor.connector.value"
+       t-inherit-mode="extension">
+        <xpath expr="//t[@t-set='title']" position="replace">
+            <t t-set="title">
+                <t t-if="node.value === '|'">或者</t>
+                <t t-else="">并且</t>
+            </t>
+        </xpath>
+    </t>
+
+    <t t-name="stock_subwarehouse_hierarchy.TreeEditorChineseControls"
+       t-inherit="web.TreeEditor.controls"
+       t-inherit-mode="extension">
+        <xpath expr="//button[@data-tooltip='Add nested rule']" position="attributes">
+            <attribute name="data-tooltip">添加括号条件组</attribute>
+            <attribute name="aria-label">添加括号条件组</attribute>
+        </xpath>
+        <xpath expr="//button[@data-tooltip='Add rule']" position="attributes">
+            <attribute name="data-tooltip">添加条件</attribute>
+            <attribute name="aria-label">添加条件</attribute>
+        </xpath>
+        <xpath expr="//button[@data-tooltip='Delete rule']" position="attributes">
+            <attribute name="data-tooltip">删除条件</attribute>
+            <attribute name="aria-label">删除条件</attribute>
+        </xpath>
+    </t>
+
+    <t t-name="stock_subwarehouse_hierarchy.TreeEditorChineseNewRule"
+       t-inherit="web.TreeEditor"
+       t-inherit-mode="extension">
+        <xpath expr="//a[contains(@t-on-click, 'addNewCondition')]" position="replace">
+            <a href="#" role="button" t-on-click="() => this.addNewCondition(node)">添加条件</a>
+        </xpath>
+    </t>
+</templates>

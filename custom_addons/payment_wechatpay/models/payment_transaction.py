@@ -1,5 +1,4 @@
 import base64
-import json
 
 from odoo import _, fields, models
 
@@ -48,23 +47,14 @@ class PaymentTransaction(models.Model):
             return
 
         base_url = self.provider_id.get_base_url().rstrip("/")
-        payload = {
-            "appid": provider.wechatpay_appid,
-            "mchid": provider.wechatpay_mchid,
-            "description": (self.reference or "Odoo Order")[:127],
-            "out_trade_no": out_trade_no,
-            "notify_url": f"{base_url}{const.NOTIFY_ROUTE}",
-            "amount": {
+        response = provider._wechatpay_native_pay(
+            description=(self.reference or "Odoo Order")[:127],
+            out_trade_no=out_trade_no,
+            notify_url=f"{base_url}{const.NOTIFY_ROUTE}",
+            amount={
                 "total": int(round(self.amount * 100)),
                 "currency": "CNY",
             },
-        }
-        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-        response = provider._send_api_request(
-            "POST",
-            const.NATIVE_TRANSACTION_ENDPOINT,
-            data=body,
-            reference=self.reference,
         )
         code_url = response.get("code_url")
         if not code_url:
@@ -166,22 +156,16 @@ class PaymentTransaction(models.Model):
             self._post_process()
             return
 
-        payload = {
-            "transaction_id": source_tx.provider_reference,
-            "out_refund_no": out_refund_no,
-            "reason": f"Odoo refund {source_tx.reference}"[:80],
-            "notify_url": f"{self.provider_id.get_base_url().rstrip('/')}{const.REFUND_NOTIFY_ROUTE}",
-            "amount": {
+        response = self.provider_id._wechatpay_refund(
+            transaction_id=source_tx.provider_reference,
+            out_refund_no=out_refund_no,
+            reason=f"Odoo refund {source_tx.reference}"[:80],
+            notify_url=f"{self.provider_id.get_base_url().rstrip('/')}{const.REFUND_NOTIFY_ROUTE}",
+            amount={
                 "refund": int(round(-self.amount * 100)),
                 "total": int(round(source_tx.amount * 100)),
                 "currency": self.currency_id.name,
             },
-        }
-        response = self.provider_id._send_api_request(
-            "POST",
-            const.REFUND_ENDPOINT,
-            data=json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
-            reference=self.reference,
         )
         self._process("wechatpay", {
             **response,

@@ -125,3 +125,350 @@ msgstr "每家公司内的子仓库编码必须唯一。"
 #. module: stock_subwarehouse_hierarchy
 msgid "Marks this location as a managed subwarehouse node."
 msgstr "将此库位标记为受管理的子仓库节点。"
+
+#. module: stock_subwarehouse_hierarchy
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_partner_form_distributor
+msgid "Distributor"
+msgstr "经销商"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.actions.act_window,name:stock_subwarehouse_hierarchy.action_distributors
+#: model:ir.ui.menu,name:stock_subwarehouse_hierarchy.menu_distributor_partners
+#: model:ir.ui.menu,name:stock_subwarehouse_hierarchy.menu_distributor_root
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_distributor_partner_list
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_distributor_partner_search
+msgid "Distributors"
+msgstr "经销商"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_is_distributor
+msgid "Is a Distributor"
+msgstr "是经销商"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_distributor_code
+msgid "Distributor Code"
+msgstr "经销商编号"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_distributor_status
+msgid "Distributor Status"
+msgstr "经销商状态"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_distributor_level
+msgid "Distributor Level"
+msgstr "经销商等级"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_distributor_territory
+msgid "Sales Territory"
+msgstr "销售区域"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_distributor_exclusive
+msgid "Exclusive Territory"
+msgstr "独家区域"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_distributor_agreement_start
+msgid "Agreement Start"
+msgstr "协议开始日期"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_distributor_agreement_end
+msgid "Agreement Expiry"
+msgstr "协议到期日期"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_distributor_annual_target
+msgid "Annual Purchase Target"
+msgstr "年度采购目标"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_distributor_currency_id
+msgid "Target Currency"
+msgstr "目标币种"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_distributor_default_warehouse_id
+msgid "Default Delivery Warehouse"
+msgstr "默认发货仓库"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_distributor_notes
+msgid "Distributor Notes"
+msgstr "经销商备注"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.actions.act_window,name:stock_subwarehouse_hierarchy.action_distributor_sale_orders
+msgid "Distributor Sales Orders"
+msgstr "经销商销售订单"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.actions.act_window,name:stock_subwarehouse_hierarchy.action_distributor_deliveries
+msgid "Distributor Deliveries"
+msgstr "经销商交货单"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.ui.menu,name:stock_subwarehouse_hierarchy.menu_distributor_sale_orders
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_distributor_sale_order_count
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_partner_form_distributor
+msgid "Sales Orders"
+msgstr "销售订单"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.ui.menu,name:stock_subwarehouse_hierarchy.menu_distributor_deliveries
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_distributor_delivery_count
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_partner_form_distributor
+msgid "Deliveries"
+msgstr "交货单"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Profile"
+msgstr "档案"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Commercial Terms"
+msgstr "商业条款"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Internal Notes"
+msgstr "内部备注"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Under Review"
+msgstr "审核中"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Suspended"
+msgstr "已暂停"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Terminated"
+msgstr "已终止"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Standard"
+msgstr "标准"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Silver"
+msgstr "银级"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Gold"
+msgstr "金级"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Strategic"
+msgstr "战略级"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "The distributor agreement expiry cannot precede its start date."
+msgstr "经销商协议到期日期不能早于开始日期。"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Create your first distributor"
+msgstr "创建第一个经销商"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Store distributor agreements, territories, pricing, targets, sales orders, and deliveries in one place."
+msgstr "在一个位置管理经销商协议、区域、价格、目标、销售订单和交货单。"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Agreement scope, authorized products, compliance notes, and internal observations..."
+msgstr "协议范围、授权产品、合规备注和内部说明……"
+
+#. module: stock_subwarehouse_hierarchy
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_partner_form_supplier_channel
+msgid "Supplier"
+msgstr "供应商"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.actions.act_window,name:stock_subwarehouse_hierarchy.action_suppliers
+#: model:ir.ui.menu,name:stock_subwarehouse_hierarchy.menu_supplier_partners
+#: model:ir.ui.menu,name:stock_subwarehouse_hierarchy.menu_supplier_root
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_supplier_partner_list
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_supplier_partner_search
+msgid "Suppliers"
+msgstr "供应商"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_supplier_code
+msgid "Supplier Code"
+msgstr "供应商编号"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_supplier_status
+msgid "Supplier Status"
+msgstr "供应商状态"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_supplier_channel_type
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_supplier_partner_search
+msgid "Supply Channel"
+msgstr "进货渠道"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_supplier_preferred
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_supplier_partner_search
+msgid "Preferred Supplier"
+msgstr "首选供应商"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_supplier_lead_days
+msgid "Expected Lead Time (Days)"
+msgstr "预计交期（天）"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_supplier_default_warehouse_id
+msgid "Default Receipt Warehouse"
+msgstr "默认收货仓库"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_supplier_notes
+msgid "Supplier Notes"
+msgstr "供应商备注"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_supplier_outstanding_bill_count
+#: model:ir.ui.menu,name:stock_subwarehouse_hierarchy.menu_supplier_outstanding_bills
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_partner_form_supplier_channel
+msgid "Outstanding Bills"
+msgstr "未结清账单"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.actions.act_window,name:stock_subwarehouse_hierarchy.action_supplier_outstanding_bills
+msgid "Outstanding Supplier Bills"
+msgstr "供应商未结清账单"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_supplier_debt_amount
+msgid "Amount Payable"
+msgstr "应付欠款"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_supplier_expected_receipt_count
+#: model:ir.ui.menu,name:stock_subwarehouse_hierarchy.menu_supplier_expected_receipts
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_partner_form_supplier_channel
+msgid "Expected Receipts"
+msgstr "预计到货"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.actions.act_window,name:stock_subwarehouse_hierarchy.action_supplier_expected_receipts
+msgid "Expected Supplier Receipts"
+msgstr "供应商预计到货"
+
+#. module: stock_subwarehouse_hierarchy
+#: model:ir.model.fields,field_description:stock_subwarehouse_hierarchy.field_res_partner__x_supplier_next_receipt_date
+msgid "Next Expected Arrival"
+msgstr "最近预计到货时间"
+
+#. module: stock_subwarehouse_hierarchy
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_partner_form_supplier_channel
+msgid "Supply Profile"
+msgstr "供应档案"
+
+#. module: stock_subwarehouse_hierarchy
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_partner_form_supplier_channel
+msgid "Accounts Payable"
+msgstr "应付账款"
+
+#. module: stock_subwarehouse_hierarchy
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_partner_form_supplier_channel
+msgid "Incoming Goods"
+msgstr "预计到货货物"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Manufacturer"
+msgstr "生产厂家"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Wholesaler"
+msgstr "批发商"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Agent"
+msgstr "代理商"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Importer"
+msgstr "进口商"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Prospective"
+msgstr "潜在供应商"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Approved"
+msgstr "已批准"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Blocked"
+msgstr "已停用采购"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Create your first supplier"
+msgstr "创建第一个供应商"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Manage supply channels, unpaid bills, amounts payable, and expected receipts in one place."
+msgstr "在一个位置管理进货渠道、未结清账单、应付欠款和预计到货。"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Authorized materials, quality requirements, settlement notes, and procurement observations..."
+msgstr "授权物料、质量要求、结算备注和采购说明……"
+
+#. module: stock_subwarehouse_hierarchy
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_distributor_partner_list
+msgid "Import Distributors"
+msgstr "导入经销商"
+
+#. module: stock_subwarehouse_hierarchy
+#: model_terms:ir.ui.view,arch_db:stock_subwarehouse_hierarchy.view_supplier_partner_list
+msgid "Import Suppliers"
+msgstr "导入供应商"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Distributor Import Template"
+msgstr "经销商导入模板"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Supplier Import Template"
+msgstr "供应商导入模板"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Unknown partner import channel."
+msgstr "未知的往来单位导入类型。"
+#. module: stock_subwarehouse_hierarchy
+msgid "Sales import failed"
+msgstr "销售导入失败"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Sales import was not completed. Please review the red error messages and correct the spreadsheet before importing again."
+msgstr "销售导入未完成。请查看红色错误信息，修正表格后重新导入。"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "The following sales rows were skipped; the remaining valid rows can still be imported:"
+msgstr "以下销售资料行已跳过，其余有效资料仍会继续导入："
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Row %(row)s — %(product)s: %(reason)s"
+msgstr "第 %(row)s 行 — %(product)s：%(reason)s"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "No sales rows were imported because every row was skipped."
+msgstr "所有销售资料行均已跳过，没有导入任何资料。"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Product ID is blank."
+msgstr "产品ID为空。"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Product ID does not exist in ERP."
+msgstr "产品ID在ERP中不存在。"
+
+#. module: stock_subwarehouse_hierarchy
+msgid "Required value is missing for %(field)s."
+msgstr "必填字段 %(field)s 缺少值。"

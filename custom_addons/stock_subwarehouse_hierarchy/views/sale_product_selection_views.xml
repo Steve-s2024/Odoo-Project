@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sale_product_selection_line_list" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.sale.product.selection.line.list</field>
+        <field name="model">stock.subwarehouse.sale.product.selection.line</field>
+        <field name="arch" type="xml">
+            <list string="库存列表选品" create="0" delete="0" editable="bottom">
+                <header>
+                    <button
+                        name="action_add_selected_to_order"
+                        type="object"
+                        string="将所选产品加入报价单"
+                        class="btn-primary"
+                    />
+                </header>
+                <field name="batch_id" column_invisible="True"/>
+                <field name="product_default_code"/>
+                <field name="product_id"/>
+                <field name="product_category_id" optional="show"/>
+                <field name="available_quantity" decoration-success="available_quantity &gt; 0"/>
+                <field name="quantity"/>
+                <field name="product_uom_id"/>
+                <field name="inventory_locations" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sale_product_selection_line_search" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.sale.product.selection.line.search</field>
+        <field name="model">stock.subwarehouse.sale.product.selection.line</field>
+        <field name="arch" type="xml">
+            <search string="搜索库存产品">
+                <field name="product_default_code"/>
+                <field name="product_id"/>
+                <field name="product_category_id"/>
+                <group>
+                    <filter
+                        name="group_by_category"
+                        string="产品类别"
+                        context="{'group_by': 'product_category_id'}"
+                    />
+                </group>
+            </search>
+        </field>
+    </record>
+</odoo>

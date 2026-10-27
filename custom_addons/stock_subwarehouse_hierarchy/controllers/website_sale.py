@@ -72,7 +72,6 @@ class WebsiteSaleStockSource(WebsiteCheckoutLanguageMixin, WebsiteSale):
             lambda country: SaleOrder._is_website_checkout_country_allowed(country, is_english)
         )
         values["x_website_checkout_is_english"] = is_english
-        values["x_website_destination_warning"] = SaleOrder._website_checkout_country_message(is_english)
         return values
 
     @route()

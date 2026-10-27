@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="import_template_manufacturing" model="stock.subwarehouse.import.template">
+        <field name="name">制造单导入模板</field>
+        <field name="res_model">mrp.production</field>
+        <field name="column_ids" eval="[
+            (0, 0, {'sequence': 10, 'field_name': 'name', 'title': '制造单号'}),
+            (0, 0, {'sequence': 20, 'field_name': 'product_id', 'title': '产品', 'required': True}),
+            (0, 0, {'sequence': 30, 'field_name': 'product_qty', 'title': '数量', 'required': True}),
+            (0, 0, {'sequence': 40, 'field_name': 'product_uom_id', 'title': '计量单位'}),
+            (0, 0, {'sequence': 50, 'field_name': 'bom_id', 'title': '物料清单'}),
+            (0, 0, {'sequence': 60, 'field_name': 'origin', 'title': '源单据'}),
+            (0, 0, {'sequence': 70, 'field_name': 'date_start', 'title': '计划日期'}),
+            (0, 0, {'sequence': 80, 'field_name': 'location_src_id', 'title': '组件库位'}),
+            (0, 0, {'sequence': 90, 'field_name': 'location_dest_id', 'title': '成品库位'}),
+            (0, 0, {'sequence': 100, 'field_name': 'picking_type_id', 'title': '作业类型'}),
+            (0, 0, {'sequence': 110, 'field_name': 'company_id', 'title': '公司'}),
+            (0, 0, {'sequence': 120, 'field_name': 'never_product_template_attribute_value_ids', 'title': '产品属性值'})
+        ]"/>
+    </record>
+</odoo>

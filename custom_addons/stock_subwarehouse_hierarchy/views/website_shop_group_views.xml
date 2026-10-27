@@ -402,6 +402,50 @@
                             font-size: 1.06rem;
                             line-height: 1.7;
                         }
+                        .x_item_product_title_link {
+                            display: inline-block;
+                            position: relative;
+                            color: inherit;
+                            text-decoration: none;
+                            transition: color 180ms ease, transform 180ms ease;
+                        }
+                        .x_item_product_title_link::after {
+                            content: "";
+                            position: absolute;
+                            right: 0;
+                            bottom: -0.14em;
+                            left: 0;
+                            height: 2px;
+                            background: currentColor;
+                            transform: scaleX(0);
+                            transform-origin: right center;
+                            transition: transform 220ms ease;
+                        }
+                        .x_item_product_title_link:hover,
+                        .x_item_product_title_link:focus-visible {
+                            color: inherit;
+                            text-decoration: none;
+                            transform: translateY(-1px);
+                        }
+                        .x_item_product_title_link:hover::after,
+                        .x_item_product_title_link:focus-visible::after {
+                            transform: scaleX(1);
+                            transform-origin: left center;
+                        }
+                        .x_item_product_title_link:focus-visible {
+                            outline: 2px solid currentColor;
+                            outline-offset: 4px;
+                        }
+                        @media (prefers-reduced-motion: reduce) {
+                            .x_item_product_title_link,
+                            .x_item_product_title_link::after {
+                                transition: none;
+                            }
+                            .x_item_product_title_link:hover,
+                            .x_item_product_title_link:focus-visible {
+                                transform: none;
+                            }
+                        }
                         .x_item_product_tools {
                             display: flex;
                             justify-content: space-between;
@@ -504,8 +548,16 @@
                     </style>
                     <div class="x_item_product_cards_inner">
                         <header class="x_item_product_header">
-                            <p class="x_item_product_eyebrow" t-out="'SUN PRODUCT COLLECTION' if x_item_page_is_english else 'SUN 产品系列'"/>
-                            <h1 t-out="x_item_page_title"/>
+                            <p class="x_item_product_eyebrow">
+                                <a class="x_item_product_title_link x_item_product_eyebrow_link"
+                                   href="/collections"
+                                   t-out="'SUN PRODUCT COLLECTION' if x_item_page_is_english else 'SUN 产品系列'"/>
+                            </p>
+                            <h1>
+                                <a class="x_item_product_title_link x_item_product_heading_link"
+                                   t-att-href="request.httprequest.path"
+                                   t-out="x_item_page_title"/>
+                            </h1>
                             <p t-out="x_item_page_subtitle"/>
                             <div class="x_item_product_tools">
                                 <form class="x_item_product_search" t-att-action="request.httprequest.path" method="get">
@@ -1148,9 +1200,80 @@
             >
                 <span class="x_shop_cart_icon x_shop_cart_icon_unavailable" aria-hidden="true">
                     <i class="fa fa-shopping-cart"/>
-                    <i class="fa fa-times x_shop_cart_cross"/>
                 </span>
+                <span class="x_shop_stock_banner" t-out="'Out of stock' if is_english else '缺货'"/>
             </button>
+        </xpath>
+    </template>
+
+    <template id="product_page_family_title" inherit_id="website_sale.product_title" name="Product family title">
+        <xpath expr="//h1" position="before">
+            <t t-set="x_shop_product_family" t-value="product.sudo()._get_shop_product_family()"/>
+            <t t-set="x_shop_family_is_english" t-value="bool(request.lang and (request.lang.code or '').lower().startswith('en'))"/>
+            <t t-set="x_shop_family_url" t-value="{'ski': '/ski-items', 'snowboard': '/snowboard-items', 'other': '/other-items'}.get(x_shop_product_family, '/other-items')"/>
+            <t t-set="x_shop_family_title" t-value="{
+                'ski': 'Ski Products' if x_shop_family_is_english else '双板商品(SKI PRODUCTS)',
+                'snowboard': 'Snowboard Products' if x_shop_family_is_english else '单板商品(SNOWBOARD PRODUCTS)',
+                'other': 'Other Products' if x_shop_family_is_english else '其他商品(OTHER PRODUCTS)',
+            }.get(x_shop_product_family)"/>
+            <p class="x_shop_product_family_heading">
+                <a
+                    class="x_shop_product_family_title"
+                    t-att-href="x_shop_family_url"
+                    t-out="x_shop_family_title"
+                />
+            </p>
+            <style>
+                .o_wsale_product_page .x_shop_product_family_heading {
+                    margin: 0 0 .55rem;
+                    line-height: 1.4 !important;
+                }
+                .o_wsale_product_page .x_shop_product_family_title {
+                    display: inline-block;
+                    position: relative;
+                    color: #111;
+                    font-size: 16px !important;
+                    line-height: 1.4 !important;
+                    font-weight: 900;
+                    letter-spacing: .03em;
+                    text-decoration: none;
+                    text-transform: uppercase;
+                    transition: color 180ms ease, transform 180ms ease;
+                }
+                .o_wsale_product_page .x_shop_product_family_title::after {
+                    content: "";
+                    position: absolute;
+                    right: 0;
+                    bottom: -.12em;
+                    left: 0;
+                    height: 2px;
+                    background: currentColor;
+                    transform: scaleX(0);
+                    transform-origin: right center;
+                    transition: transform 220ms ease;
+                }
+                .o_wsale_product_page .x_shop_product_family_title:hover,
+                .o_wsale_product_page .x_shop_product_family_title:focus-visible {
+                    color: #111;
+                    text-decoration: none;
+                    transform: translateY(-1px);
+                }
+                .o_wsale_product_page .x_shop_product_family_title:hover::after,
+                .o_wsale_product_page .x_shop_product_family_title:focus-visible::after {
+                    transform: scaleX(1);
+                    transform-origin: left center;
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .o_wsale_product_page .x_shop_product_family_title,
+                    .o_wsale_product_page .x_shop_product_family_title::after {
+                        transition: none;
+                    }
+                    .o_wsale_product_page .x_shop_product_family_title:hover,
+                    .o_wsale_product_page .x_shop_product_family_title:focus-visible {
+                        transform: none;
+                    }
+                }
+            </style>
         </xpath>
     </template>
 
@@ -1186,7 +1309,6 @@
                 .o_wsale_product_page textarea,
                 .o_wsale_product_page th,
                 .o_wsale_product_page td {
-                    font-family: Georgia, "Noto Serif SC", SimSun, serif !important;
                     font-size: 14px !important;
                     line-height: 1.8 !important;
                 }
@@ -1283,6 +1405,10 @@
                 .x_shop_unavailable_button:disabled {
                     opacity: 1;
                 }
+                .x_shop_unavailable_button {
+                    position: relative;
+                    overflow: hidden;
+                }
                 .x_shop_cart_icon {
                     position: relative;
                     display: inline-flex;
@@ -1292,20 +1418,26 @@
                     font-size: 1.45rem;
                     line-height: 1;
                 }
-                .x_shop_cart_cross {
+                .o_wsale_product_page .x_shop_stock_banner {
                     position: absolute;
-                    top: -.45rem;
-                    right: -.45rem;
-                    display: inline-flex;
+                    top: 50%;
+                    right: 0;
+                    left: 0;
+                    display: flex;
                     align-items: center;
                     justify-content: center;
-                    width: 1rem;
-                    height: 1rem;
-                    border-radius: 50%;
-                    background: #fff;
-                    color: #111;
-                    font-size: .72rem;
-                    line-height: 1;
+                    min-height: 1.65rem;
+                    padding: .08rem .6rem;
+                    background: #d60000;
+                    color: #fff;
+                    font-size: .82rem !important;
+                    line-height: 1.2 !important;
+                    font-weight: 900;
+                    letter-spacing: .08em;
+                    text-transform: uppercase;
+                    transform: translateY(-50%);
+                    box-shadow: 0 2px 7px rgba(0, 0, 0, .24);
+                    pointer-events: none;
                 }
                 .o_wsale_product_page,
                 .o_wsale_product_page *,
@@ -1636,7 +1768,6 @@
                 .o_wsale_product_page textarea,
                 .o_wsale_product_page th,
                 .o_wsale_product_page td {
-                    font-family: Georgia, "Noto Serif SC", SimSun, serif !important;
                     font-size: 14px !important;
                     line-height: 1.8 !important;
                 }
@@ -1674,9 +1805,9 @@
                     font-size: 1.45rem !important;
                     line-height: 1 !important;
                 }
-                .o_wsale_product_page .x_shop_cart_cross {
-                    font-size: .72rem !important;
-                    line-height: 1 !important;
+                .o_wsale_product_page .x_shop_stock_banner {
+                    font-size: .82rem !important;
+                    line-height: 1.2 !important;
                 }
                 .o_wsale_product_page .o_shop_size_slider_button,
                 .o_wsale_product_page .o_shop_size_slider_button .fa,
@@ -1718,4 +1849,11 @@
             </t>
         </xpath>
     </template>
+
+    <template id="product_page_bilingual_browser_title" inherit_id="website_sale.product" name="Bilingual product browser title">
+        <xpath expr="//t[@t-set='additional_title'][@t-value='product.name']" position="attributes">
+            <attribute name="t-value">product.sudo()._get_website_display_name(bool(request.lang and (request.lang.code or '').lower().startswith('en')))</attribute>
+        </xpath>
+    </template>
+
 </odoo>

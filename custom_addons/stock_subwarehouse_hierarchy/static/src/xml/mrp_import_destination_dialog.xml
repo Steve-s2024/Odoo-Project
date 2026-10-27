@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="stock_subwarehouse_hierarchy.MrpImportDestinationDialog" t-inherit="web.ConfirmationDialog" t-inherit-mode="primary">
+        <xpath expr="//p[@t-out='props.body']" position="replace">
+            <p>以下成品库位不存在。创建全部后继续导入，或跳过引用这些库位的资料行。</p>
+            <p t-if="props.dryrun" class="text-info">当前为测试导入，创建库位和制造单的结果都会回滚，不会保存。</p>
+            <div class="overflow-auto" style="max-height: 45vh">
+                <table class="table table-sm">
+                    <thead><tr><th>新库位</th><th>上级仓库 / 库位</th><th>公司</th><th>Excel 行号</th></tr></thead>
+                    <tbody>
+                        <tr t-foreach="props.destinations" t-as="destination" t-key="destination.key">
+                            <td t-esc="destination.name"/>
+                            <td t-esc="destination.parent"/>
+                            <td t-esc="destination.company"/>
+                            <td t-esc="destination.rows.join('、')"/>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-muted mb-0">关闭此窗口会取消本次导入，不会创建库位。</p>
+        </xpath>
+    </t>
+</templates>

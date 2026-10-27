@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="payment_provider_form" model="ir.ui.view">
+        <field name="name">LianLian Checkout Provider Form</field>
+        <field name="model">payment.provider</field>
+        <field name="inherit_id" ref="payment.payment_provider_form"/>
+        <field name="arch" type="xml">
+            <page name="credentials" position="inside">
+                <group invisible="code != 'lianlian'">
+                    <group string="连连商户配置">
+                        <field name="lianlian_environment"/>
+                        <field name="lianlian_merchant_id" required="code == 'lianlian' and state != 'disabled'"/>
+                        <field name="lianlian_sub_merchant_id" required="code == 'lianlian' and state != 'disabled'"/>
+                        <field name="lianlian_merchant_country"/>
+                        <field name="lianlian_currency_codes"/>
+                    </group>
+                    <group string="ERP 安全配置">
+                        <field name="lianlian_merchant_private_key_path" required="code == 'lianlian' and state != 'disabled'"/>
+                        <field name="lianlian_public_key_path" required="code == 'lianlian' and state != 'disabled'"/>
+                        <field name="lianlian_callback_base_url" required="code == 'lianlian' and state != 'disabled'"/>
+                        <field name="lianlian_node_binary"/>
+                        <field name="lianlian_sandbox_customer_email" invisible="lianlian_environment != 'sandbox'"/>
+                    </group>
+                </group>
+            </page>
+            <field name="payment_method_ids" position="attributes">
+                <attribute name="invisible" separator="or" add="code == 'lianlian'"/>
+            </field>
+            <a name="action_view_payment_methods" position="attributes">
+                <attribute name="invisible" separator="or" add="code == 'lianlian'"/>
+            </a>
+        </field>
+    </record>
+</odoo>

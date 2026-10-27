@@ -61,7 +61,7 @@
                     <button
                         name="action_transfer_selected_out_of_descendant_inventory"
                         type="object"
-                        string="转移所有已选项·"
+                        string="内部调拨"
                         class="btn-primary"
                         invisible="not context.get('descendant_inventory_root_location_id')"/>
                 </header>

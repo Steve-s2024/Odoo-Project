@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_external_sale_graph" model="ir.ui.view">
+        <field name="name">sale.order.external.graph</field>
+        <field name="model">sale.report</field>
+        <field name="arch" type="xml">
+            <graph string="外部销售分析" type="line">
+                <field name="date" interval="month"/>
+                <field name="x_official_total" type="measure"/>
+                <field name="x_amount_received" type="measure"/>
+                <field name="x_processing_fee" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_external_sale_pivot" model="ir.ui.view">
+        <field name="name">sale.order.external.pivot</field>
+        <field name="model">sale.report</field>
+        <field name="arch" type="xml">
+            <pivot string="外部销售分析">
+                <field name="date" interval="month" type="row"/>
+                <field name="x_official_total" type="measure"/>
+                <field name="x_amount_received" type="measure"/>
+                <field name="x_processing_fee" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_external_sale_list" model="ir.ui.view">
+        <field name="name">sale.order.external.list</field>
+        <field name="model">sale.report</field>
+        <field name="arch" type="xml">
+            <list string="外部销售" decoration-success="state == 'external_done'">
+                <field name="date"/>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="product_id" optional="show"/>
+                <field name="x_official_total" sum="总金额"/>
+                <field name="x_processing_fee" sum="手续费"/>
+                <field name="x_amount_received" sum="实收"/>
+                <field name="state" widget="badge"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="sale.action_order_report_all" model="ir.actions.act_window">
+        <field name="domain">[('state', '!=', 'cancel'), ('x_is_external_order', '=', False)]</field>
+    </record>
+    <record id="sale.action_order_report_salesperson" model="ir.actions.act_window">
+        <field name="domain">[('x_is_external_order', '=', False)]</field>
+    </record>
+    <record id="sale.action_order_report_products" model="ir.actions.act_window">
+        <field name="domain">[('x_is_external_order', '=', False)]</field>
+    </record>
+    <record id="sale.action_order_report_customers" model="ir.actions.act_window">
+        <field name="domain">[('x_is_external_order', '=', False)]</field>
+    </record>
+
+    <record id="view_external_sale_search" model="ir.ui.view">
+        <field name="name">sale.order.external.search</field>
+        <field name="model">sale.report</field>
+        <field name="arch" type="xml">
+            <search string="外部销售分析">
+                <field name="date"/>
+                <field name="partner_id"/>
+                <field name="product_id"/>
+                <filter name="filter_date" string="下单日期" date="date" default_period="year"/>
+                <group>
+                    <filter name="group_month" string="月份" context="{'group_by': 'date:month'}"/>
+                    <filter name="group_product" string="产品" context="{'group_by': 'product_id'}"/>
+                    <filter name="group_customer" string="客户" context="{'group_by': 'partner_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_external_sale_report" model="ir.actions.act_window">
+        <field name="name">外部销售分析</field>
+        <field name="res_model">sale.report</field>
+        <field name="view_mode">graph,pivot,list,form</field>
+        <field name="views" eval="[
+            (ref('view_external_sale_graph'), 'graph'),
+            (ref('view_external_sale_pivot'), 'pivot'),
+            (ref('view_external_sale_list'), 'list'),
+            (False, 'form')
+        ]"/>
+        <field name="search_view_id" ref="view_external_sale_search"/>
+        <field name="domain">[('x_is_external_order', '=', True), ('state', '!=', 'cancel')]</field>
+        <field name="context">{'search_default_filter_date': 1}</field>
+    </record>
+
+    <menuitem
+        id="menu_external_sale_report"
+        name="外部销售"
+        parent="sale.menu_sale_report"
+        action="action_external_sale_report"
+        sequence="50"
+        groups="sales_team.group_sale_manager"
+    />
+</odoo>

@@ -45,15 +45,6 @@
                         <span class="o_stat_text">产品汇总</span>
                     </div>
                 </button>
-                <button name="action_create_internal_transfer"
-                    type="object"
-                    class="oe_stat_button"
-                    icon="fa-random"
-                    string="内部调拨">
-                    <div class="o_stat_info">
-                        <span class="o_stat_text">内部调拨</span>
-                    </div>
-                </button>
                 <button name="action_load_remove_inventory"
                     type="object"
                     class="oe_stat_button"

@@ -1,6 +1,7 @@
 from odoo.tests.common import TransactionCase, tagged
 from odoo.exceptions import ValidationError
 from unittest.mock import patch
+from types import SimpleNamespace
 
 
 @tagged("post_install", "-at_install")
@@ -120,3 +121,29 @@ class TestWeChatPayProvider(TransactionCase):
                 "state": "test",
                 "wechatpay_simulation_mode": False,
             })
+
+    def test_live_native_order_is_delegated_to_sdk(self):
+        provider = self.env.ref("payment_wechatpay.payment_provider_wechatpay")
+        provider.wechatpay_simulation_mode = False
+        sdk = SimpleNamespace(pay=lambda **values: (
+            200, '{"code_url":"weixin://wxpay/bizpayurl?pr=sdk"}'
+        ))
+        with patch.object(type(provider), "_wechatpay_sdk", return_value=sdk):
+            result = provider._wechatpay_native_pay(
+                description="SDK test",
+                out_trade_no="ODOOSDK1",
+                notify_url="https://example.test/notify",
+                amount={"total": 100, "currency": "CNY"},
+            )
+        self.assertEqual(result["code_url"], "weixin://wxpay/bizpayurl?pr=sdk")
+
+    def test_callback_verification_and_decryption_are_delegated_to_sdk(self):
+        provider = self.env.ref("payment_wechatpay.payment_provider_wechatpay")
+        sdk = SimpleNamespace(callback=lambda headers, body: {
+            "resource": {"out_trade_no": "ODOOSDK1", "trade_state": "SUCCESS"},
+        })
+        with patch.object(type(provider), "_wechatpay_sdk", return_value=sdk):
+            result = provider._wechatpay_parse_notification(
+                {"Wechatpay-Signature": "handled-by-sdk"}, b"{}"
+            )
+        self.assertEqual(result["trade_state"], "SUCCESS")

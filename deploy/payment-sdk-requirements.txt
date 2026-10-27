@@ -1,0 +1,13 @@
+# Payment protocol, signing, response verification, certificate rotation, and
+# callback decryption must stay in maintained public SDKs. Keep versions pinned
+# and update only after reviewing upstream release notes and running sandbox tests.
+alipay-sdk-python==3.7.1160
+wechatpayv3==2.0.2
+# Keep Odoo's OpenSSL wrapper aligned with the modern cryptography version
+# required by wechatpayv3.  The server's former pyOpenSSL 21.0.0 is not
+# compatible with current cryptography releases.
+pyOpenSSL==25.3.0
+# Odoo's former urllib3 1.26.5 imports private cryptography internals which no
+# longer exist.  1.26.20 is the compatible final maintenance release in the
+# same urllib3 major line, avoiding a broader urllib3 2.x migration.
+urllib3==1.26.20

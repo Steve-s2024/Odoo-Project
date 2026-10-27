@@ -6,7 +6,8 @@ from odoo.exceptions import ValidationError
 
 class WebsiteRefundRequest(models.Model):
     _name = "stock.subwarehouse.website.refund.request"
-    _description = "Website Refund Request"
+    _inherit = ["mail.thread", "mail.activity.mixin"]
+    _description = "网站退款申请"
     _order = "create_date desc, id desc"
 
     name = fields.Char(related="order_id.name", store=True, readonly=True)
@@ -16,7 +17,7 @@ class WebsiteRefundRequest(models.Model):
         "payment.transaction", string="原支付交易", required=True, ondelete="restrict"
     )
     refund_transaction_id = fields.Many2one(
-        "payment.transaction", string="微信退款交易", readonly=True, ondelete="restrict"
+        "payment.transaction", string="支付退款交易", readonly=True, ondelete="restrict"
     )
     credit_note_id = fields.Many2one(
         "account.move", string="退款贷项通知单", readonly=True, copy=False, ondelete="restrict"
@@ -41,6 +42,27 @@ class WebsiteRefundRequest(models.Model):
     return_picking_count = fields.Integer(
         string="退货单数量", compute="_compute_return_picking_count"
     )
+    x_return_delivery_state = fields.Selection(
+        [
+            ("awaiting_delivery", "等待退货发出"),
+            ("delivering", "退货运输中"),
+            ("delivered", "退货已送达"),
+        ],
+        string="退货配送状态",
+        copy=False,
+        tracking=True,
+        index=True,
+    )
+    x_return_delivery_started_at = fields.Datetime(
+        string="退货发出时间",
+        copy=False,
+        readonly=True,
+    )
+    x_return_delivered_at = fields.Datetime(
+        string="退货送达时间",
+        copy=False,
+        readonly=True,
+    )
     currency_id = fields.Many2one(related="source_transaction_id.currency_id")
     line_ids = fields.One2many(
         "stock.subwarehouse.website.refund.request.line", "request_id", string="退款商品"
@@ -64,6 +86,7 @@ class WebsiteRefundRequest(models.Model):
         [("requested", "待审核"), ("approved", "已通过"), ("rejected", "已拒绝")],
         default="requested",
         required=True,
+        tracking=True,
     )
 
     @api.model_create_multi
@@ -73,7 +96,68 @@ class WebsiteRefundRequest(models.Model):
             original_locations = refund_request._get_original_return_locations()
             if len(original_locations) == 1:
                 refund_request.return_location_id = original_locations
+        refund_requests._notify_refund_reviewers()
         return refund_requests
+
+    def write(self, vals):
+        result = super().write(vals)
+        if "review_state" in vals:
+            self.filtered(lambda request: request.review_state != "requested")._complete_review_activities()
+        return result
+
+    def _refund_reviewer_users(self):
+        sales_managers = self.env.ref(
+            "sales_team.group_sale_manager", raise_if_not_found=False,
+        )
+        users = sales_managers.all_user_ids if sales_managers else self.env["res.users"]
+        users = users.filtered(lambda user: user.active and not user.share)
+        if users:
+            return users
+        administrator = self.env.ref("base.user_admin", raise_if_not_found=False)
+        return administrator if administrator and administrator.active else self.env.user
+
+    def _notify_refund_reviewers(self):
+        activity_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
+        if not activity_type:
+            return
+        summary = _("新退款申请待审核")
+        for refund_request in self.filtered(lambda request: request.review_state == "requested"):
+            reviewers = refund_request._refund_reviewer_users().filtered(
+                lambda user: not user.company_ids or refund_request.order_id.company_id in user.company_ids
+            )
+            for reviewer in reviewers:
+                existing = refund_request.activity_ids.filtered(
+                    lambda activity: activity.activity_type_id == activity_type
+                    and activity.user_id == reviewer
+                    and activity.summary == summary
+                )
+                if not existing:
+                    refund_request.activity_schedule(
+                        act_type_xmlid="mail.mail_activity_data_todo",
+                        user_id=reviewer.id,
+                        summary=summary,
+                        note=_(
+                            "订单 %(order)s 收到一项新退款申请。请按申请时间顺序审核。",
+                            order=refund_request.order_id.name,
+                        ),
+                    )
+            refund_request.order_id.message_post(
+                body=_(
+                    "收到新的退款申请：%(refund)s。该申请已加入待处理退款队列。",
+                    refund=refund_request.display_name,
+                ),
+                message_type="comment",
+                subtype_xmlid="mail.mt_note",
+                partner_ids=reviewers.partner_id.ids,
+            )
+
+    def _complete_review_activities(self):
+        summary = _("新退款申请待审核")
+        activities = self.activity_ids.filtered(
+            lambda activity: activity.summary == summary
+        )
+        if activities:
+            activities.sudo().action_feedback(feedback=_("退款申请已完成审核。"))
 
     @api.depends("return_picking_ids")
     def _compute_return_picking_count(self):
@@ -120,7 +204,7 @@ class WebsiteRefundRequest(models.Model):
     def action_submit_wechat_refund(self):
         return_pickings = self.env["stock.picking"]
         for refund_request in self:
-            if refund_request.state not in ("requested", "return_received"):
+            if refund_request.state not in ("requested", "return_received", "failed"):
                 raise ValidationError(_("该退款申请当前不能提交退款。"))
             refund_request._validate_payment_refund()
 
@@ -138,6 +222,7 @@ class WebsiteRefundRequest(models.Model):
                     return_pickings |= refund_request._create_customer_return_pickings(
                         quantities_by_picking
                     )
+                    refund_request.x_return_delivery_state = "awaiting_delivery"
                     continue
 
             refund_request._submit_payment_refund()
@@ -148,23 +233,28 @@ class WebsiteRefundRequest(models.Model):
 
     def _validate_payment_refund(self):
         self.ensure_one()
-        if self.source_transaction_id.provider_code != "wechatpay":
-            raise ValidationError(_("仅支持从微信支付交易发起退款。"))
-        if self.amount_total <= 0:
-            raise ValidationError(_("退款金额必须大于零。"))
-        available = self.source_transaction_id.amount - sum(
-            -transaction.amount
-            for transaction in self.source_transaction_id.child_transaction_ids
-            if transaction.operation == "refund"
-            and transaction.state in ("draft", "pending", "authorized", "done")
-        )
-        if self.amount_total > available:
-            raise ValidationError(_("退款金额超过当前可退款金额。"))
+        self.source_transaction_id._validate_website_original_refund(self.amount_total)
 
     def _submit_payment_refund(self):
         self.ensure_one()
         if self.refund_transaction_id:
-            return self.refund_transaction_id
+            transaction = self.refund_transaction_id
+            if transaction.state != "error":
+                return transaction
+            if transaction.provider_code != "lianlian":
+                raise ValidationError(_("该退款交易失败，请联系客户支持后重试。"))
+            try:
+                transaction._lianlian_refresh_status(force=True)
+            except ValidationError:
+                # A rejected request might not exist in LianLian yet.  Reuse
+                # the same merchant refund ID exactly as required by the
+                # provider's idempotency contract.
+                pass
+            if transaction.state == "error":
+                transaction._send_refund_request()
+            if transaction.state == "done":
+                self._ensure_credit_note()
+            return transaction
         if self.return_required and self.state != "return_received":
             raise ValidationError(_("必须先完成客户退货入库，才能提交支付退款。"))
         transaction = self.source_transaction_id._refund(self.amount_total)
@@ -288,6 +378,11 @@ class WebsiteRefundRequest(models.Model):
         for quantities_by_move in quantities_by_picking.values():
             for move in quantities_by_move:
                 locations |= move.location_id
+        if not locations:
+            # A refund can be requested before the delivery move is completed or
+            # linked.  The sale line is still authoritative for the exact source
+            # subwarehouse selected during checkout.
+            locations |= self.line_ids.mapped("sale_line_id.x_source_location_id")
         return locations
 
     def _create_customer_return_pickings(self, quantities_by_picking):
@@ -330,9 +425,72 @@ class WebsiteRefundRequest(models.Model):
         quantities_by_picking = self._get_return_quantities_by_picking()
         if not quantities_by_picking:
             raise ValidationError(_("没有可重新创建的已交付退货数量。"))
-        return self._return_pickings_action(
-            self._create_customer_return_pickings(quantities_by_picking)
-        )
+        pickings = self._create_customer_return_pickings(quantities_by_picking)
+        self.write({
+            "x_return_delivery_state": "awaiting_delivery",
+            "x_return_delivery_started_at": False,
+            "x_return_delivered_at": False,
+        })
+        return self._return_pickings_action(pickings)
+
+    def action_start_customer_return_delivery(self):
+        """Start customer return transit without changing ERP inventory."""
+        for refund_request in self:
+            if (
+                not refund_request.return_required
+                or refund_request.x_return_delivery_state != "awaiting_delivery"
+            ):
+                raise ValidationError(_("只有等待退货发出的申请可以开始退货配送。"))
+            if not refund_request.return_picking_ids.filtered(
+                lambda picking: picking.state != "cancel"
+            ):
+                raise ValidationError(_("该退款申请没有有效的客户退货单。"))
+            refund_request.write({
+                "x_return_delivery_state": "delivering",
+                "x_return_delivery_started_at": fields.Datetime.now(),
+            })
+            refund_request.message_post(
+                body=_("客户退货已经发出，当前处于运输途中；ERP库存尚未增加。"),
+                message_type="comment",
+                subtype_xmlid="mail.mt_note",
+            )
+        return {"type": "ir.actions.client", "tag": "reload"}
+
+    def action_mark_customer_return_delivered(self):
+        """Receive the return and restore stock only at confirmed delivery."""
+        for refund_request in self:
+            if refund_request.x_return_delivery_state != "delivering":
+                raise ValidationError(_("只有退货运输中的申请可以确认送达。"))
+            pickings = refund_request.return_picking_ids.filtered(
+                lambda picking: picking.state != "cancel"
+            )
+            if not pickings:
+                raise ValidationError(_("该退款申请没有有效的客户退货单。"))
+            for picking in pickings.filtered(lambda item: item.state != "done"):
+                if picking.state == "draft":
+                    picking.action_confirm()
+                picking.action_assign()
+                for move in picking.move_ids.filtered(
+                    lambda stock_move: stock_move.product_id.tracking == "none"
+                ):
+                    move.quantity = move.product_uom_qty
+                    move.picked = True
+                picking.with_context(
+                    skip_refund_delivery_sync=True,
+                    shop_api_skip_event=True,
+                ).button_validate()
+                if picking.state != "done":
+                    raise ValidationError(_("退货单尚未完成，请先处理退货单中的待确认步骤。"))
+            refund_request.write({
+                "x_return_delivery_state": "delivered",
+                "x_return_delivered_at": fields.Datetime.now(),
+            })
+            refund_request.message_post(
+                body=_("客户退货已送达并完成入库，ERP库存已经恢复。"),
+                message_type="comment",
+                subtype_xmlid="mail.mt_note",
+            )
+        return {"type": "ir.actions.client", "tag": "reload"}
 
     def action_view_return_pickings(self):
         self.ensure_one()

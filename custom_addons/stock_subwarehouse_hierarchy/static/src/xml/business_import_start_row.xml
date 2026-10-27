@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="ImportAction" t-inherit-mode="extension">
+        <xpath expr="//ImportDataSidepanel" position="attributes">
+            <attribute name="resModel">resModel</attribute>
+        </xpath>
+    </t>
+
+    <t t-inherit="ImportDataSidepanel" t-inherit-mode="extension">
+        <xpath expr="//CheckBox[@value='props.options.has_headers']" position="after">
+            <div
+                t-if="['product.template', 'stock.quant', 'sale.order', 'mrp.production'].includes(props.resModel)"
+                class="mt-3"
+            >
+                <label class="form-label mb-1" for="o_business_import_top_rows">
+                    跳过顶部行数
+                </label>
+                <input
+                    id="o_business_import_top_rows"
+                    class="form-control"
+                    type="number"
+                    min="1"
+                    step="1"
+                    t-att-value="getOptionValue('skip')"
+                    t-on-change="onBusinessTopRowsChange"
+                />
+                <div class="form-text">
+                    默认 1：跳过标题行，从 Excel 第 2 行开始读取；例如填写 3，则从第 4 行开始读取。
+                </div>
+            </div>
+        </xpath>
+
+        <xpath expr="//input[@id='o_import_row_start']/.." position="attributes">
+            <attribute name="t-if">!['product.template', 'stock.quant', 'sale.order', 'mrp.production'].includes(props.resModel)</attribute>
+        </xpath>
+    </t>
+</templates>

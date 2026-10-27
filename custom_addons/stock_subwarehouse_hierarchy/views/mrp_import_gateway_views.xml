@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="rule_mrp_import_gateway_owner" model="ir.rule">
+        <field name="name">制造导入：仅自己的文件</field>
+        <field name="model_id" ref="model_stock_subwarehouse_mrp_import_gateway"/>
+        <field name="domain_force">[('create_uid', '=', user.id)]</field>
+    </record>
+    <record id="rule_mrp_import_gateway_line_owner" model="ir.rule">
+        <field name="name">制造导入：仅自己的预览</field>
+        <field name="model_id" ref="model_stock_subwarehouse_mrp_import_gateway_line"/>
+        <field name="domain_force">[('gateway_id.create_uid', '=', user.id)]</field>
+    </record>
+    <record id="view_import_template_form" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.import.template.form</field>
+        <field name="model">stock.subwarehouse.import.template</field>
+        <field name="arch" type="xml">
+            <form string="导入模板配置" create="false" delete="false">
+                <header><button name="action_download" type="object" string="下载当前模板" class="btn-primary"/></header>
+                <sheet>
+                    <group><field name="name"/><field name="res_model" readonly="1"/></group>
+                    <div class="alert alert-info">拖动调整顺序，添加或删除字段，勾选启用/必填。模板第1行为字段标识，第2行固定为中文标题。默认值在导入时作为建议展示，由导入人接受后生效。</div>
+                    <field name="column_ids">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="enabled"/>
+                            <field name="field_name"/>
+                            <field name="title"/>
+                            <field name="required"/>
+                            <field name="default_value"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_import_template_manufacturing" model="ir.actions.act_window">
+        <field name="name">制造单导入模板配置</field>
+        <field name="res_model">stock.subwarehouse.import.template</field>
+        <field name="view_mode">form</field>
+        <field name="res_id" ref="import_template_manufacturing"/>
+    </record>
+    <record id="view_mrp_import_gateway_form" model="ir.ui.view">
+        <field name="name">stock.subwarehouse.mrp.import.gateway.form</field>
+        <field name="model">stock.subwarehouse.mrp.import.gateway</field>
+        <field name="arch" type="xml">
+            <form string="制造单标准导入">
+                <header>
+                    <button name="action_preview" type="object" string="检查数据" class="btn-primary" invisible="state == 'done'"/>
+                    <button name="action_generate_defaults" type="object" string="生成默认值建议" invisible="state != 'review'"/>
+                    <button name="action_accept_import" type="object" string="接受建议并导入勾选行" class="btn-primary" invisible="state != 'review'"/>
+                    <button name="action_accept_import" type="object" string="查看导入结果" invisible="state != 'done'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="d-flex gap-2 mb-3">
+                        <button name="action_download_template" type="object" string="下载当前模板" class="btn-secondary"/>
+                        <button name="action_configure_template" type="object" string="配置模板列" groups="base.group_system" class="btn-secondary"/>
+                    </div>
+                    <div class="alert alert-info">模板第1行为字段标识，第2行为中文标题；默认从第3行读取数据。缺失或无法识别的值可生成默认值建议，请核对后接受。未解决的问题行可以跳过。</div>
+                    <group readonly="state == 'done'">
+                        <group>
+                            <field name="file" filename="filename" options="{'accepted_file_extensions': '.xlsx,.csv'}" readonly="state == 'done'"/>
+                            <field name="filename" invisible="1"/>
+                            <field name="start_row" readonly="state == 'done'"/>
+                            <field name="sheet_number" readonly="state == 'done'"/>
+                            <field name="group_blank_names" readonly="state == 'done'"/>
+                        </group>
+                        <group>
+                            <field name="company_id" readonly="state == 'done'"/>
+                            <field name="picking_type_id" readonly="state == 'done'" options="{'no_create': True}"/>
+                            <field name="location_id" readonly="state == 'done'" options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <div class="text-muted mb-3">未提供制造单号列时每行自动编号。保留该列且勾选“空单号行作为上一单的附加产品”时，空单号行归属上一张制造单；首行空单号使用自动编号。</div>
+                    <group invisible="state == 'draft'">
+                        <field name="summary" nolabel="1"/>
+                        <field name="missing_destinations" invisible="not missing_destinations"/>
+                        <field name="destination_decision" widget="radio" invisible="not missing_destinations" readonly="state == 'done'"/>
+                    </group>
+                    <field name="line_ids" invisible="state == 'draft'" readonly="state == 'done'">
+                        <list editable="bottom" create="false" delete="false" decoration-danger="status == 'invalid'" decoration-warning="status == 'proposed'" limit="80">
+                            <field name="include"/>
+                            <field name="source_row"/>
+                            <field name="group_row" optional="hide"/>
+                            <field name="status"/>
+                            <field name="original"/>
+                            <field name="changes"/>
+                            <field name="error"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_mrp_import_gateway" model="ir.actions.act_window">
+        <field name="name">制造单标准导入</field>
+        <field name="res_model">stock.subwarehouse.mrp.import.gateway</field>
+        <field name="view_mode">form</field>
+    </record>
+    <menuitem id="menu_mrp_import_gateway" name="制造单标准导入" parent="stock.menu_stock_root" action="action_mrp_import_gateway" sequence="55" groups="mrp.group_mrp_user"/>
+    <menuitem id="menu_mrp_import_template" name="制造单导入模板配置" parent="stock.menu_stock_root" action="action_import_template_manufacturing" sequence="56" groups="base.group_system"/>
+</odoo>
