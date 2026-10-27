@@ -1,0 +1,476 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <template id="sun_account_terms_conditions_page"
+              name="SUN bilingual terms of service template"
+              inherit_id="account.account_terms_conditions_page">
+        <xpath expr="//div[@id='o_terms_conditions']" position="replace">
+            <div id="o_terms_conditions" class="sun_terms_page py-5">
+                <t t-set="is_english"
+                   t-value="request.env.lang and request.env.lang.startswith('en')"/>
+
+                <article t-if="is_english" class="sun_terms_document mx-auto" t-translation="off">
+                    <header class="sun_terms_header">
+                        <p class="sun_terms_eyebrow">SUN ONLINE SHOP</p>
+                        <h1>Terms of Service</h1>
+                        <p class="sun_terms_draft">DRAFT TEMPLATE — COMPLETE EVERY MARKED FIELD BEFORE PUBLICATION</p>
+                        <p class="sun_terms_date">
+                            Effective / last updated:
+                            <span class="sun_terms_placeholder">________________ [TO BE COMPLETED: date and version]</span>
+                        </p>
+                        <p class="sun_terms_intro">
+                            These Terms govern purchases from
+                            <span class="sun_terms_placeholder">________________ [TO BE COMPLETED: shop and website name]</span>,
+                            operated by
+                            <span class="sun_terms_placeholder">________________ [TO BE COMPLETED: full legal entity name]</span>,
+                            for
+                            <span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: applicable country/region and storefront]</span>.
+                        </p>
+                    </header>
+
+                    <aside class="sun_terms_notice sun_terms_notice_draft">
+                        <strong>Template status:</strong> this page is not final legal text. Every yellow field must be
+                        completed and reviewed for each country or region before publication. The applicable rules,
+                        delivery options, charges, timing, cancellation rights and remedies may differ by region and
+                        by the exact circumstances of an order. Nothing in these Terms excludes rights that cannot
+                        lawfully be excluded in the customer’s location.
+                    </aside>
+
+                    <section class="sun_terms_fields" id="sun-terms-fields-en">
+                        <h2>Fields that must be completed</h2>
+                        <p>Prepare and approve a separate completed version for every region in which the shop operates.</p>
+                        <ul>
+                            <li><span class="sun_terms_placeholder">________________ [TO BE COMPLETED: operator, trading name and registration details]</span></li>
+                            <li><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: website, sales territory and eligible customers]</span></li>
+                            <li><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: prices, currencies, taxes, duties and fees]</span></li>
+                            <li><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: order acceptance and inventory-reservation period]</span></li>
+                            <li><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: payment methods and providers]</span></li>
+                            <li><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: delivery area, methods, costs and estimates]</span></li>
+                            <li><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: cancellation, return and refund rules]</span></li>
+                            <li><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: warranty period and remedies]</span></li>
+                            <li><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: governing law and dispute forum]</span></li>
+                            <li><span class="sun_terms_placeholder">________________ [TO BE COMPLETED: privacy-policy URL and customer-service contacts]</span></li>
+                        </ul>
+                    </section>
+
+                    <nav class="sun_terms_index" aria-label="Terms contents">
+                        <a href="#sun-terms-scope-en">1. Scope</a>
+                        <a href="#sun-terms-account-en">2. Accounts</a>
+                        <a href="#sun-terms-products-en">3. Products</a>
+                        <a href="#sun-terms-orders-en">4. Orders</a>
+                        <a href="#sun-terms-payment-en">5. Payment</a>
+                        <a href="#sun-terms-delivery-en">6. Delivery</a>
+                        <a href="#sun-terms-returns-en">7. Returns</a>
+                        <a href="#sun-terms-safety-en">8. Product safety</a>
+                        <a href="#sun-terms-conduct-en">9. Acceptable use</a>
+                        <a href="#sun-terms-ip-en">10. Intellectual property</a>
+                        <a href="#sun-terms-privacy-en">11. Privacy</a>
+                        <a href="#sun-terms-liability-en">12. Liability</a>
+                        <a href="#sun-terms-force-en">13. External events</a>
+                        <a href="#sun-terms-changes-en">14. Changes</a>
+                        <a href="#sun-terms-law-en">15. Disputes</a>
+                        <a href="#sun-terms-contact-en">16. Contact</a>
+                    </nav>
+
+                    <section id="sun-terms-scope-en">
+                        <h2>1. Scope, regional application and acceptance</h2>
+                        <p>
+                            These Terms apply to the storefront and region identified above, customer accounts and
+                            online orders. The completed regional version shown when an order is placed, together
+                            with the order summary and policies disclosed at checkout, governs that order. Website
+                            language or IP-based routing alone does not determine the customer’s legal rights.
+                        </p>
+                        <p>
+                            Terms and service performance depend on the exact circumstances and may differ between
+                            countries or regions. Relevant circumstances include the delivery destination, selected
+                            products, stock location, payment method, carrier, customs requirements, local law and
+                            weather. These circumstances do not permit us to remove an accepted right or change an
+                            accepted order except as these Terms and applicable law allow.
+                        </p>
+                        <p>
+                            By submitting an order, you confirm that you reviewed the order information and accept
+                            the applicable completed Terms. Business purchasers confirm authority to bind their
+                            organisation. A minor may use the shop only with the consent and supervision required by
+                            applicable law.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-account-en">
+                        <h2>2. Customer accounts</h2>
+                        <p>
+                            You must provide accurate and current information and keep your credentials secure. You
+                            are responsible for activity through your account unless caused by our breach of duty.
+                            Notify us promptly of suspected unauthorised access. We may take proportionate measures
+                            to prevent fraud, misuse or a security incident while preserving lawful remedies and
+                            support for existing orders.
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: account eligibility, age and suspension rules]</span></p>
+                    </section>
+
+                    <section id="sun-terms-products-en">
+                        <h2>3. Product information, availability and prices</h2>
+                        <p>
+                            We aim to present descriptions, colours, sizes, specifications, images, prices and stock
+                            accurately. Screen settings and manufacturing tolerances may cause minor variations. The
+                            configuration recorded in the cart and accepted order controls the customer’s selection.
+                            Adding an item to the cart alone does not reserve it unless checkout expressly says so.
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: currency, tax, duty, pricing-error and stock-confirmation policy]</span></p>
+                    </section>
+
+                    <section id="sun-terms-orders-en">
+                        <h2>4. Orders and inventory reservation</h2>
+                        <p>
+                            Before submission, customers can review products, options, quantities, delivery details
+                            and charges. The point at which an order is accepted and a contract is formed must be
+                            stated for the applicable region. Payment status is recorded separately.
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: contract-formation event, reservation duration, expiry and cancellation consequences]</span></p>
+                    </section>
+
+                    <section id="sun-terms-payment-en">
+                        <h2>5. Payment</h2>
+                        <p>
+                            The checkout page identifies the methods, currencies, providers and charges offered for
+                            the particular order. Payment is complete only after the authorised provider and the
+                            order system confirm it. Pending, declined, cancelled or timed-out attempts are not proof
+                            of payment. A method labelled sandbox, test or under development must not be used for a
+                            real purchase.
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: accepted payment methods, providers, currencies, authorisation and duplicate-payment process]</span></p>
+                    </section>
+
+                    <section id="sun-terms-delivery-en">
+                        <h2>6. Delivery and regional conditions</h2>
+                        <p>
+                            Delivery availability and timing depend on the exact address and region, inventory
+                            location, selected service, carrier capacity, customs or public-authority action, seasonal
+                            demand, road conditions and weather. Adverse or severe weather may postpone dispatch,
+                            transport or delivery. Unless an express guarantee is stated at checkout, displayed dates
+                            are estimates rather than guaranteed arrival times.
+                        </p>
+                        <p>
+                            Customers must provide a complete deliverable address and inspect the parcel promptly.
+                            Risk transfer, the legal delivery event and remedies for damage, loss or delay depend on
+                            applicable regional law and the completed policy below.
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: destinations, carriers, methods, costs, estimates, risk transfer and delay remedies]</span></p>
+                    </section>
+
+                    <section id="sun-terms-returns-en">
+                        <h2>7. Cancellations, returns and refunds</h2>
+                        <p>
+                            Eligibility, deadlines, exclusions, required product condition, return instructions,
+                            shipping responsibility, inspection and refund timing differ by region and product type.
+                            The completed regional policy must preserve all mandatory consumer rights and identify
+                            any lawful exclusions before purchase.
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: cooling-off period, exclusions, return address, freight responsibility, inspection and refund deadline]</span></p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY PAYMENT METHOD: original-route refund support and alternative lawful refund process]</span></p>
+                    </section>
+
+                    <section id="sun-terms-safety-en">
+                        <h2>8. Product use and safety</h2>
+                        <p>
+                            Snow sports involve inherent risks. Select the correct size and specification, inspect
+                            equipment before use, follow instructions and warnings, and obtain professional fitting
+                            or instruction where appropriate. Nothing in this section reduces legal responsibility
+                            for product quality, safety or defects.
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY PRODUCT/REGION: additional warnings, age limits, standards and fitting requirements]</span></p>
+                    </section>
+
+                    <section id="sun-terms-conduct-en">
+                        <h2>9. Acceptable use</h2>
+                        <p>
+                            Users must not misuse the website, bypass security controls, introduce malicious code,
+                            scrape at a disruptive rate, impersonate another person, submit fraudulent transactions
+                            or interfere with other customers. We may take proportionate protective measures.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-ip-en">
+                        <h2>10. Intellectual property</h2>
+                        <p>
+                            Website content, product photography, graphics, software, trade names and logos belong
+                            to their owners or are used under licence. Customers may retain order documents for
+                            personal or internal business use. Other use requires permission or another lawful basis.
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED: rights owner, licensed marks and permissions contact]</span></p>
+                    </section>
+
+                    <section id="sun-terms-privacy-en">
+                        <h2>11. Privacy and communications</h2>
+                        <p>
+                            Account, order, delivery, support and payment-status information is processed to operate
+                            the shop, prevent fraud, fulfil orders and meet legal duties. Providers and carriers may
+                            process the information necessary for their services under their own notices.
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: privacy-policy URL, controller identity and communication rules]</span></p>
+                    </section>
+
+                    <section id="sun-terms-liability-en">
+                        <h2>12. Warranties and liability</h2>
+                        <p>
+                            Products and the website carry all warranties required by applicable law. No clause
+                            excludes liability or consumer remedies that cannot legally be limited, including any
+                            applicable responsibility for fraud, wilful misconduct, personal injury or defective
+                            products.
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: express warranty, permitted limitations and available remedies]</span></p>
+                    </section>
+
+                    <section id="sun-terms-force-en">
+                        <h2>13. Events outside reasonable control</h2>
+                        <p>
+                            Exact performance may be affected by events outside reasonable control, including severe
+                            weather, transport interruption, customs or governmental action, natural disaster,
+                            infrastructure failure or widespread network disruption. Weather conditions may therefore
+                            postpone delivery. We will take reasonable steps to reduce disruption and provide the
+                            notices, cancellation rights, alternative performance or refunds required by the law and
+                            the completed regional terms.
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: notice method, customer options and consequences of prolonged delay]</span></p>
+                    </section>
+
+                    <section id="sun-terms-changes-en">
+                        <h2>14. Changes to these Terms</h2>
+                        <p>
+                            The approved version and effective date must be shown above. Material changes apply
+                            prospectively and must be communicated where required. The completed Terms accepted when
+                            an order is placed continue to govern that order unless mandatory law changes or the
+                            parties lawfully agree otherwise.
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-law-en">
+                        <h2>15. Governing law and disputes</h2>
+                        <p>
+                            Governing law, courts, consumer-authority routes, mediation and any arbitration process
+                            vary by region. No selection may deprive a consumer of mandatory protection or venue
+                            rights available under applicable law.
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: governing law, complaint process, regulator, court and any valid arbitration provision]</span></p>
+                    </section>
+
+                    <section id="sun-terms-contact-en">
+                        <h2>16. Contact</h2>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED: legal operator and registration number]</span></p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED BY REGION: customer-service email, telephone, postal/return address and operating hours]</span></p>
+                        <p><span class="sun_terms_placeholder">________________ [TO BE COMPLETED: contact-page URL]</span></p>
+                        <p>Include the order number when requesting support, but never send a complete bank-card number, password or verification code.</p>
+                    </section>
+                </article>
+
+                <article t-else="" class="sun_terms_document mx-auto" t-translation="off">
+                    <header class="sun_terms_header">
+                        <p class="sun_terms_eyebrow">SUN 在线商店</p>
+                        <h1>服务条款</h1>
+                        <p class="sun_terms_draft">草案模板——发布前须填写全部标记项</p>
+                        <p class="sun_terms_date">
+                            生效日期／最后更新：
+                            <span class="sun_terms_placeholder">________________【待填写：日期与版本号】</span>
+                        </p>
+                        <p class="sun_terms_intro">
+                            本条款适用于
+                            <span class="sun_terms_placeholder">________________【待填写：商店及网站名称】</span>，
+                            由<span class="sun_terms_placeholder">________________【待填写：运营主体完整法定名称】</span>运营，
+                            适用范围为<span class="sun_terms_placeholder">________________【按地区待填写：国家／地区及对应站点】</span>。
+                        </p>
+                    </header>
+
+                    <aside class="sun_terms_notice sun_terms_notice_draft">
+                        <strong>模板状态：</strong>本页面并非可直接发布的最终法律文本。所有黄色标记项均须按国家或地区填写并审核后方可发布。
+                        适用规则、配送方式、费用、时效、取消权及救济可能因地区和订单的具体情况而不同。本条款不排除任何依法不得排除的消费者权利。
+                    </aside>
+
+                    <section class="sun_terms_fields" id="sun-terms-fields-zh">
+                        <h2>发布前必须填写的项目</h2>
+                        <p>商店经营涉及的每个地区都应分别准备并审批一份填写完整的版本。</p>
+                        <ul>
+                            <li><span class="sun_terms_placeholder">________________【待填写：运营主体、商号及登记信息】</span></li>
+                            <li><span class="sun_terms_placeholder">________________【按地区待填写：网站、销售区域及客户资格】</span></li>
+                            <li><span class="sun_terms_placeholder">________________【按地区待填写：价格、币种、税费、关税及其他费用】</span></li>
+                            <li><span class="sun_terms_placeholder">________________【按地区待填写：订单接受及库存保留期限】</span></li>
+                            <li><span class="sun_terms_placeholder">________________【按地区待填写：支付方式及支付服务商】</span></li>
+                            <li><span class="sun_terms_placeholder">________________【按地区待填写：配送范围、方式、费用及预计时效】</span></li>
+                            <li><span class="sun_terms_placeholder">________________【按地区待填写：取消、退货及退款规则】</span></li>
+                            <li><span class="sun_terms_placeholder">________________【按地区待填写：质保期限及救济方式】</span></li>
+                            <li><span class="sun_terms_placeholder">________________【按地区待填写：适用法律及争议解决地】</span></li>
+                            <li><span class="sun_terms_placeholder">________________【待填写：隐私政策链接及客服联系方式】</span></li>
+                        </ul>
+                    </section>
+
+                    <nav class="sun_terms_index" aria-label="条款目录">
+                        <a href="#sun-terms-scope-zh">1. 适用范围</a>
+                        <a href="#sun-terms-account-zh">2. 账户</a>
+                        <a href="#sun-terms-products-zh">3. 商品</a>
+                        <a href="#sun-terms-orders-zh">4. 订单</a>
+                        <a href="#sun-terms-payment-zh">5. 支付</a>
+                        <a href="#sun-terms-delivery-zh">6. 配送</a>
+                        <a href="#sun-terms-returns-zh">7. 退货退款</a>
+                        <a href="#sun-terms-safety-zh">8. 安全使用</a>
+                        <a href="#sun-terms-conduct-zh">9. 合理使用</a>
+                        <a href="#sun-terms-ip-zh">10. 知识产权</a>
+                        <a href="#sun-terms-privacy-zh">11. 隐私</a>
+                        <a href="#sun-terms-liability-zh">12. 责任</a>
+                        <a href="#sun-terms-force-zh">13. 外部事件</a>
+                        <a href="#sun-terms-changes-zh">14. 条款更新</a>
+                        <a href="#sun-terms-law-zh">15. 争议处理</a>
+                        <a href="#sun-terms-contact-zh">16. 联系方式</a>
+                    </nav>
+
+                    <section id="sun-terms-scope-zh">
+                        <h2>1. 适用范围、地区差异与接受</h2>
+                        <p>
+                            本条款适用于页首标明的站点和地区、客户账户及在线订单。下单时展示并填写完整的地区版本，连同订单摘要及结账时披露的政策，
+                            共同适用于该订单。网站语言或基于 IP 的页面跳转本身并不决定客户依法享有的权利。
+                        </p>
+                        <p>
+                            条款内容及服务履行取决于具体情况，并可能因国家或地区而异。相关情况包括收货地、所选商品、库存库位、支付方式、承运人、
+                            海关要求、当地法律及天气。除本条款及适用法律允许外，我们不得以具体情况为由取消已经接受的权利或擅自变更已接受的订单。
+                        </p>
+                        <p>
+                            提交订单即表明客户已核对订单信息并接受对应地区的完整条款。以企业或组织名义购买时，客户确认有权代表该组织。
+                            未成年人应在适用法律要求的监护人同意和指导下使用本商店。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-account-zh">
+                        <h2>2. 客户账户</h2>
+                        <p>
+                            客户应提供真实、准确且有效的信息，并妥善保管登录凭据。除因我们未尽法定义务所致外，客户对通过本人账户完成的操作负责。
+                            如怀疑账户被未授权访问，请立即联系我们。我们可采取适度措施防止欺诈、滥用或安全事件，但不影响依法享有的救济及已有订单支持。
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________【按地区待填写：账户资格、年龄及暂停账户规则】</span></p>
+                    </section>
+
+                    <section id="sun-terms-products-zh">
+                        <h2>3. 商品信息、库存与价格</h2>
+                        <p>
+                            我们尽力准确展示商品描述、颜色、尺码、规格、图片、价格和库存。屏幕设置和合理生产公差可能造成轻微差异。
+                            客户选择以购物车及已接受订单中记录的配置为准。除结账页面另有明确说明外，仅加入购物车不代表已保留库存。
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________【按地区待填写：币种、税费、关税、价格错误及库存确认政策】</span></p>
+                    </section>
+
+                    <section id="sun-terms-orders-zh">
+                        <h2>4. 订单与库存保留</h2>
+                        <p>
+                            提交前，客户可核对商品、规格、数量、收货信息和费用。订单何时被接受以及合同何时成立，应按适用地区明确说明；支付状态另行记录。
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________【按地区待填写：合同成立节点、库存保留时长、过期及取消后果】</span></p>
+                    </section>
+
+                    <section id="sun-terms-payment-zh">
+                        <h2>5. 支付</h2>
+                        <p>
+                            结账页面会列明该订单可用的支付方式、币种、服务商及费用。仅当获授权的支付服务商与订单系统均确认成功时，付款才算完成。
+                            待处理、被拒绝、已取消或已超时的操作不构成付款证明。明确标记为沙箱、测试或开发中的方式不得用于真实付款。
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________【按地区待填写：支付方式、服务商、币种、授权及重复付款处理流程】</span></p>
+                    </section>
+
+                    <section id="sun-terms-delivery-zh">
+                        <h2>6. 配送及地区条件</h2>
+                        <p>
+                            是否可配送及配送时效取决于具体地址和地区、库存库位、所选服务、承运能力、海关或政府措施、季节性需求、道路状况及天气。
+                            恶劣或极端天气可能导致发货、运输或送达推迟。除结账页面明确保证外，页面日期均为预计时间，不构成保证到达日期。
+                        </p>
+                        <p>
+                            客户应提供完整且可送达的地址，并在收货后及时检查包裹。风险转移、法律意义上的交付节点及破损、丢失或延误的救济，
+                            按适用地区法律和下方填写完整的政策确定。
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________【按地区待填写：目的地、承运人、配送方式、费用、预计时效、风险转移及延误救济】</span></p>
+                    </section>
+
+                    <section id="sun-terms-returns-zh">
+                        <h2>7. 取消、退货与退款</h2>
+                        <p>
+                            退货资格、期限、例外、商品状态要求、退回方式、运费承担、核验及退款时限会因地区和商品类型而不同。
+                            完整的地区政策必须保留所有强制性消费者权利，并在购买前说明任何合法例外。
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________【按地区待填写：冷静期／无理由退货期、例外、退货地址、运费、核验及退款期限】</span></p>
+                        <p><span class="sun_terms_placeholder">________________【按支付方式待填写：原路退款支持情况及合法的替代退款流程】</span></p>
+                    </section>
+
+                    <section id="sun-terms-safety-zh">
+                        <h2>8. 商品使用与安全</h2>
+                        <p>
+                            冰雪运动具有固有风险。请选择正确的尺码和规格，使用前检查装备，遵守说明和警示，并在需要时寻求专业调校或指导。
+                            本条不减轻对商品质量、安全或缺陷依法应承担的责任。
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________【按商品／地区待填写：附加警示、年龄限制、适用标准及调校要求】</span></p>
+                    </section>
+
+                    <section id="sun-terms-conduct-zh">
+                        <h2>9. 网站的合理使用</h2>
+                        <p>
+                            用户不得滥用网站、绕过安全措施、植入恶意代码、以干扰服务的频率抓取数据、冒充他人、提交欺诈交易或影响其他客户。
+                            我们可采取必要且适度的保护措施。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-ip-zh">
+                        <h2>10. 知识产权</h2>
+                        <p>
+                            网站内容、商品图片、图形、软件、商号和标识归相应权利人所有或已获合法授权。客户可为个人使用或企业内部使用保留订单文件；
+                            其他使用须取得许可或具有其他合法依据。
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________【待填写：权利人、获许可标识及授权联系方式】</span></p>
+                    </section>
+
+                    <section id="sun-terms-privacy-zh">
+                        <h2>11. 隐私与通知</h2>
+                        <p>
+                            为运营商店、防止欺诈、履行订单和遵守法律义务，可能处理账户、订单、配送、客户支持和支付状态信息。
+                            支付服务商和承运人可按其自身说明处理完成服务所需的信息。
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________【按地区待填写：隐私政策链接、个人信息处理者身份及通知规则】</span></p>
+                    </section>
+
+                    <section id="sun-terms-liability-zh">
+                        <h2>12. 保证与责任</h2>
+                        <p>
+                            商品和网站应提供适用法律要求的全部保证。任何条款均不排除依法不得限制的责任或消费者救济，
+                            包括适用的欺诈、故意不当行为、人身伤害或缺陷商品责任。
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________【按地区待填写：明示质保、法律允许的责任限制及救济方式】</span></p>
+                    </section>
+
+                    <section id="sun-terms-force-zh">
+                        <h2>13. 合理控制范围之外的事件</h2>
+                        <p>
+                            具体履行可能受到合理控制范围之外的事件影响，包括严重天气、交通中断、海关或政府措施、自然灾害、基础设施故障或大范围网络中断。
+                            因此，天气状况可能导致配送推迟。我们将采取合理措施降低影响，并按法律及填写完整的地区条款提供通知、取消权、替代履行或退款。
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________【按地区待填写：通知方式、客户选择及长期延误的处理结果】</span></p>
+                    </section>
+
+                    <section id="sun-terms-changes-zh">
+                        <h2>14. 条款更新</h2>
+                        <p>
+                            经批准的版本及生效日期须显示在页首。重大变更原则上仅向后适用，并在法律要求时通知。
+                            下单时接受的完整条款继续适用于该订单，除非强制性法律发生变化或双方另行合法约定。
+                        </p>
+                    </section>
+
+                    <section id="sun-terms-law-zh">
+                        <h2>15. 适用法律与争议处理</h2>
+                        <p>
+                            适用法律、管辖法院、消费者主管部门渠道、调解及仲裁安排会因地区而异。任何选择均不得剥夺消费者依法享有的强制性保护或管辖权利。
+                        </p>
+                        <p><span class="sun_terms_placeholder">________________【按地区待填写：适用法律、投诉流程、主管部门、法院及任何有效仲裁条款】</span></p>
+                    </section>
+
+                    <section id="sun-terms-contact-zh">
+                        <h2>16. 联系方式</h2>
+                        <p><span class="sun_terms_placeholder">________________【待填写：法定运营主体及登记编号】</span></p>
+                        <p><span class="sun_terms_placeholder">________________【按地区待填写：客服邮箱、电话、邮寄／退货地址及服务时间】</span></p>
+                        <p><span class="sun_terms_placeholder">________________【待填写：联系页面链接】</span></p>
+                        <p>联系支持时请提供订单号，但请勿发送完整银行卡号、账户密码或验证码。</p>
+                    </section>
+                </article>
+            </div>
+        </xpath>
+    </template>
+</odoo>

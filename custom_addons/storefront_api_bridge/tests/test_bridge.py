@@ -3,6 +3,7 @@ import json
 import hashlib
 import hmac
 import uuid
+import unittest
 from calendar import timegm
 from datetime import timedelta
 from types import SimpleNamespace
@@ -22,6 +23,10 @@ from odoo.addons.storefront_api_bridge.controllers.website_sale import (
     StorefrontWebsiteSale,
 )
 from odoo.addons.storefront_api_bridge.controllers import website_sale as website_sale_module
+from odoo.addons.storefront_api_bridge.controllers.native_login import (
+    StorefrontNativeLogin,
+)
+from odoo.addons.storefront_api_bridge.controllers import native_login as native_login_module
 from odoo.addons.storefront_api_bridge.controllers.signup import StorefrontAuthSignup
 from odoo.addons.storefront_api_bridge.controllers import signup as signup_module
 
@@ -152,7 +157,9 @@ class TestStorefrontApiClient(TransactionCase):
         class Session(dict):
             def __init__(self):
                 super().__init__()
-                self.authenticate = MagicMock()
+                self.uid = None
+                self.context = {"lang": "en_US"}
+                self.finalize = MagicMock()
 
         session = Session()
         attempt_id = str(uuid.uuid4())
@@ -163,7 +170,11 @@ class TestStorefrontApiClient(TransactionCase):
             "storefront.erp.client": client,
             "res.users": user_model,
         }[model]
-        return SimpleNamespace(env=fake_env, session=session), user_model, attempt_id
+        return SimpleNamespace(
+            env=fake_env,
+            session=session,
+            update_env=MagicMock(),
+        ), user_model, attempt_id
 
     def test_signup_waits_for_authoritative_create_and_readback(self):
         client = MagicMock()
@@ -191,7 +202,13 @@ class TestStorefrontApiClient(TransactionCase):
         )
         client.get.assert_called_once_with("/api/v1/customers/erp-customer-id")
         user_model._storefront_provision_portal_user.assert_called_once()
-        fake_request.session.authenticate.assert_called_once()
+        local_user = user_model._storefront_provision_portal_user.return_value
+        fake_request.session.finalize.assert_called_once_with(fake_request.env)
+        fake_request.update_env.assert_called_once_with(
+            user=local_user.id,
+            context=fake_request.session.context,
+        )
+        local_user._update_last_login.assert_called_once_with()
         self.assertNotIn("storefront_signup_attempt_id", fake_request.session)
 
     def test_signup_fails_closed_when_erp_times_out(self):
@@ -1881,6 +1898,8 @@ class TestStorefrontApiClient(TransactionCase):
             "storefront_api_bridge.payment_status"
         ).arch_db
         self.assertIn("provider.get('available', True)", arch)
+        self.assertIn("Checkout is under development", arch)
+        self.assertIn("结账功能仍在开发中", arch)
         self.assertIn("data-storefront-payment-status", status_arch)
         self.assertIn("/purchase-document/#{completed_order_id}/receipt.pdf", status_arch)
         self.assertIn("Payment successful", status_arch)
@@ -1895,16 +1914,19 @@ class TestStorefrontApiClient(TransactionCase):
         self.assertIn("/purchase-detail/#{order['id']}/pay", purchase_arch)
         self.assertIn("支付订单", purchase_arch)
 
-    def test_auth_placeholders_and_portal_navigation_are_language_aware(self):
-        login_arch = self.env.ref(
-            "storefront_api_bridge.storefront_localized_login_fields"
-        ).arch_db
-        signup_arch = self.env.ref(
+    def test_signup_and_portal_navigation_are_language_aware(self):
+        signup_view = self.env.ref(
             "storefront_api_bridge.storefront_erp_confirmed_signup"
-        ).arch_db
-        password_arch = self.env.ref(
+        )
+        password_view = self.env.ref(
             "storefront_api_bridge.storefront_localized_signup_password_fields"
-        ).arch_db
+        )
+        reset_view = self.env.ref(
+            "storefront_api_bridge.storefront_erp_confirmed_password_reset"
+        )
+        signup_arch = signup_view.arch_db
+        password_arch = password_view.arch_db
+        reset_arch = reset_view.arch_db
         portal_style_arch = self.env.ref(
             "storefront_api_bridge.remote_portal_style"
         ).arch_db
@@ -1918,12 +1940,15 @@ class TestStorefrontApiClient(TransactionCase):
             "storefront_api_bridge.remote_refund_item_page"
         ).arch_db
 
-        self.assertIn("请输入电子邮箱", login_arch)
-        self.assertIn("请输入密码", login_arch)
-        self.assertIn("request.env.lang == 'zh_CN'", login_arch)
+        self.assertTrue(signup_view.active)
+        self.assertTrue(password_view.active)
+        self.assertTrue(reset_view.active)
+        self.assertIn("signup_attempt_id", signup_arch)
+        self.assertIn("data-storefront-erp-signup", signup_arch)
         self.assertIn("请输入姓名", signup_arch)
         self.assertIn("请输入电子邮箱", signup_arch)
         self.assertIn("请再次输入密码", password_arch)
+        self.assertIn("password_reset_attempt_id", reset_arch)
         self.assertIn("x_portal_title_motion::after", portal_style_arch)
         self.assertIn("prefers-reduced-motion", portal_style_arch)
         self.assertIn(
@@ -1949,9 +1974,19 @@ class TestStorefrontApiClient(TransactionCase):
                 "state": "pending",
             },
         }
+        fake_session = {
+            "sale_order_id": 42,
+            "website_sale_cart_quantity": 2,
+        }
+        fake_website = MagicMock()
+        fake_website.sale_reset.side_effect = lambda: (
+            fake_session.pop("sale_order_id", None),
+            fake_session.pop("website_sale_cart_quantity", None),
+        )
         fake_request = SimpleNamespace(
             cart=order,
-            session={},
+            session=fake_session,
+            website=fake_website,
             redirect=MagicMock(return_value=redirected),
         )
         with patch.object(website_sale_module, "request", fake_request):
@@ -1972,6 +2007,181 @@ class TestStorefrontApiClient(TransactionCase):
             fake_request.session["x_storefront_pending_payment_id"],
             "payment-id",
         )
+        self.assertNotIn("sale_order_id", fake_request.session)
+        self.assertNotIn("website_sale_cart_quantity", fake_request.session)
+        fake_website.sale_reset.assert_called_once_with()
+
+    def test_lianlian_payment_start_hands_off_to_authoritative_checkout_url(self):
+        redirected = object()
+        checkout_url = (
+            "https://gacashier.lianlianpay-inc.com/"
+            "?key=sandbox&paymentData=signed"
+        )
+        order = MagicMock(
+            id=43,
+            x_storefront_remote_order_id="remote-lianlian-order-id",
+        )
+        order.sudo.return_value._storefront_create_payment.return_value = {
+            "authoritative": True,
+            "payment": {
+                "id": "lianlian-payment-id",
+                "provider": "lianlian",
+                "state": "pending",
+                "checkout_url": checkout_url,
+            },
+            "processing": {},
+        }
+        fake_session = {
+            "sale_order_id": 43,
+            "website_sale_cart_quantity": 1,
+        }
+        fake_website = MagicMock()
+        fake_website.sale_reset.side_effect = lambda: (
+            fake_session.pop("sale_order_id", None),
+            fake_session.pop("website_sale_cart_quantity", None),
+        )
+        fake_request = SimpleNamespace(
+            cart=order,
+            session=fake_session,
+            website=fake_website,
+            render=MagicMock(),
+            redirect=MagicMock(return_value=redirected),
+            lang=SimpleNamespace(code="en_US"),
+        )
+
+        with patch.object(website_sale_module, "request", fake_request):
+            result = StorefrontWebsiteSale.storefront_payment_start.__wrapped__(
+                StorefrontWebsiteSale(), "lianlian"
+            )
+
+        self.assertIs(result, redirected)
+        fake_request.redirect.assert_called_once_with(
+            checkout_url, code=303, local=False,
+        )
+        fake_request.render.assert_not_called()
+        self.assertEqual(
+            fake_session["x_storefront_pending_payment_id"],
+            "lianlian-payment-id",
+        )
+        self.assertNotIn("sale_order_id", fake_session)
+        fake_website.sale_reset.assert_called_once_with()
+
+    def test_pending_lianlian_status_has_resume_checkout_action(self):
+        status_arch = self.env.ref(
+            "storefront_api_bridge.payment_status"
+        ).arch_db
+
+        self.assertIn('/shop/erp-payment/start/lianlian', status_arch)
+        self.assertIn("payment.get('provider') == 'lianlian'", status_arch)
+        self.assertIn("Complete payment", status_arch)
+        self.assertIn("完成支付", status_arch)
+        self.assertIn('name="csrf_token"', status_arch)
+
+    def test_lianlian_payment_start_rejects_untrusted_checkout_url(self):
+        rendered = object()
+        order = MagicMock(
+            id=44,
+            x_storefront_remote_order_id="remote-lianlian-order-id",
+        )
+        order.sudo.return_value._storefront_create_payment.return_value = {
+            "authoritative": True,
+            "payment": {
+                "id": "lianlian-payment-id",
+                "provider": "lianlian",
+                "state": "pending",
+                "checkout_url": "https://payments.example.test/collect?token=bad",
+            },
+            "processing": {},
+        }
+        fake_session = {"sale_order_id": 44, "website_sale_cart_quantity": 1}
+        fake_website = MagicMock()
+        fake_website.sale_reset.side_effect = lambda: (
+            fake_session.pop("sale_order_id", None),
+            fake_session.pop("website_sale_cart_quantity", None),
+        )
+        fake_request = SimpleNamespace(
+            cart=order,
+            session=fake_session,
+            website=fake_website,
+            render=MagicMock(return_value=rendered),
+            redirect=MagicMock(),
+            lang=SimpleNamespace(code="en_US"),
+        )
+
+        with patch.object(website_sale_module, "request", fake_request):
+            result = StorefrontWebsiteSale.storefront_payment_start.__wrapped__(
+                StorefrontWebsiteSale(), "lianlian"
+            )
+
+        self.assertIs(result, rendered)
+        fake_request.redirect.assert_not_called()
+        template, values = fake_request.render.call_args.args
+        self.assertEqual(template, "storefront_api_bridge.payment_error")
+        self.assertIn("invalid checkout address", values["message"])
+
+    def test_payment_start_prefers_pending_usd_order_over_new_cny_cart(self):
+        redirected = object()
+        pending_usd_order = MagicMock(
+            id=43,
+            x_storefront_remote_order_id="remote-usd-order-id",
+        )
+        pending_usd_order.sudo.return_value._storefront_create_payment.return_value = {
+            "authoritative": True,
+            "payment": {
+                "id": "usd-payment-id",
+                "provider": "lianlian",
+                "state": "pending",
+                "checkout_url": "https://celer-gateway.lianlianpay-inc.com/publish/usd",
+            },
+            "processing": {},
+        }
+        new_cny_cart = MagicMock(id=99)
+        fake_session = {
+            "sale_order_id": 99,
+            "website_sale_cart_quantity": 2,
+            "x_storefront_pending_local_order_id": 43,
+            "x_storefront_pending_order_id": "remote-usd-order-id",
+        }
+        fake_website = MagicMock()
+        fake_request = SimpleNamespace(
+            cart=new_cny_cart,
+            session=fake_session,
+            website=fake_website,
+            render=MagicMock(),
+            redirect=MagicMock(return_value=redirected),
+            lang=SimpleNamespace(code="en_US"),
+        )
+
+        with (
+            patch.object(website_sale_module, "request", fake_request),
+            patch.object(
+                StorefrontWebsiteSale,
+                "_pending_order_from_session",
+                return_value=pending_usd_order,
+            ) as pending_resolver,
+        ):
+            result = StorefrontWebsiteSale.storefront_payment_start.__wrapped__(
+                StorefrontWebsiteSale(), "lianlian"
+            )
+
+        self.assertIs(result, redirected)
+        fake_request.redirect.assert_called_once_with(
+            "https://celer-gateway.lianlianpay-inc.com/publish/usd",
+            code=303,
+            local=False,
+        )
+        fake_request.render.assert_not_called()
+        pending_resolver.assert_called_once_with()
+        pending_usd_order.sudo.return_value._storefront_create_payment.assert_called_once_with(
+            "lianlian"
+        )
+        new_cny_cart.sudo.assert_not_called()
+        self.assertEqual(fake_session["sale_order_id"], 99)
+        self.assertEqual(fake_session["website_sale_cart_quantity"], 2)
+        self.assertEqual(
+            fake_session["x_storefront_pending_payment_id"], "usd-payment-id"
+        )
+        fake_website.sale_reset.assert_not_called()
 
     def test_pending_remote_order_is_labeled_awaiting_payment(self):
         order = {"state": "sent", "payment_state": "pending"}
@@ -2082,7 +2292,8 @@ class TestStorefrontApiClient(TransactionCase):
 
         self.assertIs(result, redirect_result)
         fake_request.redirect.assert_called_once_with("/shop/payment/status")
-        self.assertEqual(fake_request.session["sale_order_id"], local_order.id)
+        self.assertNotIn("sale_order_id", fake_request.session)
+        self.assertNotIn("website_sale_cart_quantity", fake_request.session)
         self.assertEqual(
             fake_request.session["x_storefront_pending_order_id"], order_id
         )
@@ -2178,6 +2389,68 @@ class TestStorefrontApiClient(TransactionCase):
             fake_session["x_storefront_completed_payment_state"], "done",
         )
 
+    def test_completed_pending_payment_preserves_a_new_active_cart(self):
+        completed_order = self._checkout_order()
+        new_cart = self.env["sale.order"].create({
+            "partner_id": completed_order.partner_id.id,
+            "website_id": completed_order.website_id.id,
+        })
+        payment = self._completed_payment(completed_order)
+        completed_order.write({
+            "x_storefront_remote_order_id": "completed-remote-order",
+            "x_storefront_remote_payment_id": payment["id"],
+            "x_storefront_payment_provider": payment["provider"],
+        })
+        fake_session = {
+            "sale_order_id": new_cart.id,
+            "website_sale_cart_quantity": 2,
+            "x_storefront_pending_local_order_id": completed_order.id,
+        }
+        fake_website = MagicMock()
+        fake_request = SimpleNamespace(session=fake_session, website=fake_website)
+
+        with patch.object(website_sale_module, "request", fake_request):
+            StorefrontWebsiteSale._store_completed_payment_session(
+                completed_order, payment,
+            )
+
+        self.assertEqual(fake_session["sale_order_id"], new_cart.id)
+        self.assertEqual(fake_session["website_sale_cart_quantity"], 2)
+        fake_website.sale_reset.assert_not_called()
+        self.assertNotIn("x_storefront_pending_local_order_id", fake_session)
+
+    def test_detaching_pending_payment_keeps_history_pointer_not_active_cart(self):
+        order = self._checkout_order()
+        original_attempt = order.x_storefront_attempt_id
+        fake_session = {
+            "sale_order_id": order.id,
+            "website_sale_cart_quantity": 3,
+            "x_storefront_pending_local_order_id": order.id,
+            "x_storefront_pending_order_id": "pending-order-id",
+            "x_storefront_pending_payment_id": "pending-payment-id",
+        }
+        fake_website = MagicMock()
+        fake_website.sale_reset.side_effect = lambda: (
+            fake_session.pop("sale_order_id", None),
+            fake_session.pop("website_sale_cart_quantity", None),
+        )
+        fake_request = SimpleNamespace(session=fake_session, website=fake_website)
+
+        with patch.object(website_sale_module, "request", fake_request):
+            StorefrontWebsiteSale._detach_pending_payment_cart(order)
+
+        self.assertNotIn("sale_order_id", fake_session)
+        self.assertNotIn("website_sale_cart_quantity", fake_session)
+        self.assertEqual(fake_session["x_storefront_pending_local_order_id"], order.id)
+        self.assertEqual(order.x_storefront_attempt_id, original_attempt)
+
+        next_cart = self.env["sale.order"].create({
+            "partner_id": order.partner_id.id,
+            "website_id": order.website_id.id,
+        })
+        self.assertTrue(next_cart.x_storefront_attempt_id)
+        self.assertNotEqual(next_cart.x_storefront_attempt_id, original_attempt)
+
     def test_forgetting_expired_payment_session_preserves_cart(self):
         fake_session = {
             "sale_order_id": 42,
@@ -2199,6 +2472,7 @@ class TestStorefrontApiClient(TransactionCase):
 
     def test_payment_return_url_uses_erp_shop_configuration(self):
         order = self._checkout_order()
+        order.x_website_checkout_language = "zh_CN"
         with patch(
             "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
             return_value={"shop_base_url": "https://shop.example.test/"},
@@ -2206,6 +2480,18 @@ class TestStorefrontApiClient(TransactionCase):
             self.assertEqual(
                 order._storefront_payment_return_url(),
                 "https://shop.example.test/shop/payment/status",
+            )
+
+    def test_english_payment_return_url_keeps_language_prefix(self):
+        order = self._checkout_order()
+        order.x_website_checkout_language = "en_US"
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.get",
+            return_value={"shop_base_url": "https://shop.example.test/"},
+        ):
+            self.assertEqual(
+                order._storefront_payment_return_url(),
+                "https://shop.example.test/en/shop/payment/status",
             )
 
     def test_product_grouping_uses_name_not_flex_or_style_code(self):
@@ -2235,6 +2521,7 @@ class TestStorefrontApiClient(TransactionCase):
             len((first | second | different_name)._get_shop_grouped_products()), 2,
         )
 
+    @unittest.skip("retired res.users.authenticate bridge removed in native login v2")
     def test_existing_internal_editor_can_use_erp_verified_password(self):
         editor_uuid = "erp-editor-id"
         editor_partner = self.env["res.partner"].create({
@@ -2268,6 +2555,7 @@ class TestStorefrontApiClient(TransactionCase):
         self.assertEqual(auth_info["uid"], editor.id)
         self.assertTrue(editor._is_internal())
 
+    @unittest.skip("retired res.users.authenticate bridge removed in native login v2")
     def test_existing_portal_is_promoted_only_after_erp_editor_authorization(self):
         partner = self.env["res.partner"].create({
             "name": "Future Website Editor",
@@ -2304,6 +2592,7 @@ class TestStorefrontApiClient(TransactionCase):
         self.assertEqual(editor.partner_id.shop_api_uuid, "erp-editor-id")
         self.assertEqual(editor.x_storefront_remote_customer_id, "erp-editor-id")
 
+    @unittest.skip("retired res.users.authenticate bridge removed in native login v2")
     def test_uuid_mapped_editor_takes_priority_over_existing_login_portal(self):
         remote_id = "mapped-erp-editor-id"
         editor_partner = self.env["res.partner"].create({
@@ -2347,6 +2636,7 @@ class TestStorefrontApiClient(TransactionCase):
         self.assertTrue(mapped_editor._is_internal())
         self.assertFalse(portal._is_internal())
 
+    @unittest.skip("retired res.users.authenticate bridge removed in native login v2")
     def test_erp_customer_login_provisions_portal_without_copying_password(self):
         profile = {
             "id": "erp-customer-id",
@@ -2385,6 +2675,7 @@ class TestStorefrontApiClient(TransactionCase):
         self.assertEqual(user.partner_id.child_ids.shop_api_uuid, "erp-address-id")
         self.assertEqual(mocked.call_args.args[0], "/api/v1/customers/authenticate")
 
+    @unittest.skip("retired res.users.authenticate bridge removed in native login v2")
     def test_local_internal_password_is_not_an_erp_outage_fallback(self):
         partner = self.env["res.partner"].create({"name": "Local-only editor"})
         self.env["res.users"].with_context(no_reset_password=True).create({
@@ -2407,6 +2698,7 @@ class TestStorefrontApiClient(TransactionCase):
                 "password": "local-password",
             }, {"interactive": True})
 
+    @unittest.skip("retired Shop password proxy removed in native login v2")
     def test_shop_password_change_updates_erp_without_writing_local_hash(self):
         self.env.cr.execute(
             "SELECT password FROM res_users WHERE id = %s",
@@ -2445,6 +2737,7 @@ class TestStorefrontApiClient(TransactionCase):
             )
         )
 
+    @unittest.skip("retired Shop password proxy removed in native login v2")
     def test_shop_password_change_fails_closed_when_erp_is_unavailable(self):
         with (
             patch(
@@ -2458,6 +2751,7 @@ class TestStorefrontApiClient(TransactionCase):
                 "new-erp-password",
             )
 
+    @unittest.skip("retired Shop password proxy removed in native login v2")
     def test_shop_local_password_wizard_cannot_create_a_second_hash(self):
         self.env.cr.execute(
             "SELECT password FROM res_users WHERE id = %s",
@@ -2471,6 +2765,244 @@ class TestStorefrontApiClient(TransactionCase):
             [self.env.user.id],
         )
         self.assertEqual(self.env.cr.fetchone()[0], before)
+
+    def test_native_profile_provisions_portal_without_local_password(self):
+        user = self.env["res.users"]._storefront_provision_native_user({
+            "id": "native-customer-id",
+            "authoritative": True,
+            "authentication_backend": "odoo_native",
+            "authentication_version": 2,
+            "login": "native-customer@example.test",
+            "name": "Native Customer",
+            "email": "native-customer@example.test",
+            "language": "en_US",
+            "is_internal": False,
+            "website_editor": False,
+        })
+        self.assertTrue(user.share)
+        self.assertEqual(
+            user.x_storefront_remote_customer_id, "native-customer-id"
+        )
+        self.env.cr.execute(
+            "SELECT password FROM res_users WHERE id = %s", [user.id]
+        )
+        self.assertFalse(self.env.cr.fetchone()[0])
+
+    def test_native_profile_promotes_only_explicit_erp_editor(self):
+        partner = self.env["res.partner"].create({
+            "name": "Native Editor",
+            "email": "native-editor@example.test",
+        })
+        user = self.env["res.users"].with_context(no_reset_password=True).create({
+            "login": "native-editor@example.test",
+            "partner_id": partner.id,
+            "group_ids": [Command.set([self.env.ref("base.group_portal").id])],
+        })
+        mapped = self.env["res.users"]._storefront_provision_native_user({
+            "id": "native-editor-id",
+            "authoritative": True,
+            "authentication_backend": "odoo_native",
+            "authentication_version": 2,
+            "login": user.login,
+            "name": "Native Editor",
+            "email": user.login,
+            "is_internal": True,
+            "website_editor": True,
+        })
+        self.assertEqual(mapped, user)
+        self.assertTrue(mapped._is_internal())
+        self.assertTrue(mapped.has_group("website.group_website_designer"))
+
+    def test_native_profile_rejects_non_authoritative_response(self):
+        with self.assertRaises(AccessDenied):
+            self.env["res.users"]._storefront_provision_native_user({
+                "id": "untrusted-id",
+                "login": "untrusted@example.test",
+                "authoritative": False,
+                "authentication_backend": "odoo_native",
+                "authentication_version": 2,
+            })
+
+    def test_core_res_users_authenticate_no_longer_calls_erp_client(self):
+        with patch(
+            "odoo.addons.storefront_api_bridge.models.api_client.StorefrontErpClient.post"
+        ) as mocked, self.assertRaises(AccessDenied):
+            self.env["res.users"].authenticate({
+                "type": "password",
+                "login": "does-not-exist@example.test",
+                "password": "irrelevant",
+            }, {"interactive": True})
+        mocked.assert_not_called()
+
+    def test_correct_local_password_cannot_bypass_native_erp_login(self):
+        partner = self.env["res.partner"].create({
+            "name": "Retired Local Credential",
+        })
+        self.env["res.users"].with_context(no_reset_password=True).create({
+            "login": "retired-local@example.test",
+            "password": "local-password-must-not-work",
+            "partner_id": partner.id,
+            "group_ids": [Command.set([self.env.ref("base.group_portal").id])],
+        })
+        with self.assertRaises(AccessDenied):
+            self.env["res.users"].authenticate({
+                "type": "password",
+                "login": "retired-local@example.test",
+                "password": "local-password-must-not-work",
+            }, {"interactive": True})
+
+    def test_native_login_timeout_fails_closed_without_local_session(self):
+        controller = StorefrontNativeLogin()
+        user_model = MagicMock()
+        user_model._should_captcha_login.return_value = False
+        client = MagicMock()
+        client.post.side_effect = StorefrontApiError(
+            "ERP unavailable", code="erp_unavailable", status=503
+        )
+        fake_env = MagicMock()
+        fake_env.uid = self.env.uid
+        fake_env.__getitem__.side_effect = lambda name: {
+            "res.users": user_model,
+            "storefront.erp.client": client,
+        }[name]
+        rendered = SimpleNamespace(headers={})
+        fake_request = SimpleNamespace(
+            env=fake_env,
+            params={"login": "admin", "password": "admin"},
+            httprequest=SimpleNamespace(method="POST"),
+            session=MagicMock(),
+            render=MagicMock(return_value=rendered),
+        )
+        with (
+            patch.object(native_login_module, "request", fake_request),
+            patch.object(native_login_module, "ensure_db"),
+            patch.object(native_login_module, "_", side_effect=lambda text: text),
+            patch.object(native_login_module._logger, "warning") as warning,
+            patch.object(controller, "_prepare_public_environment"),
+            patch.object(controller, "_finalize_local_session") as finalize,
+        ):
+            response = controller.web_login.__wrapped__(controller)
+        self.assertIs(response, rendered)
+        finalize.assert_not_called()
+        self.assertIn(
+            "temporarily unavailable",
+            fake_request.render.call_args.args[1]["error"],
+        )
+        warning.assert_not_called()
+
+    def test_failed_admin_login_emits_only_verified_public_shop_ip(self):
+        controller = StorefrontNativeLogin()
+        fake_request = SimpleNamespace(
+            httprequest=SimpleNamespace(remote_addr="8.8.8.8"),
+        )
+        with (
+            patch.object(native_login_module, "request", fake_request),
+            patch.object(native_login_module._logger, "warning") as warning,
+        ):
+            self.assertTrue(controller._record_failed_admin_login("admin"))
+        warning.assert_called_once_with(
+            "STORE_SECURITY_ADMIN_LOGIN_REJECTED source_ip=%s", "8.8.8.8"
+        )
+
+        for unsafe_address in ("127.0.0.1", "10.0.0.8", "::1", "not-an-ip", ""):
+            fake_request.httprequest.remote_addr = unsafe_address
+            with (
+                patch.object(native_login_module, "request", fake_request),
+                patch.object(native_login_module._logger, "warning") as warning,
+            ):
+                self.assertFalse(controller._record_failed_admin_login("admin"))
+            warning.assert_not_called()
+
+        fake_request.httprequest.remote_addr = "8.8.8.8"
+        with (
+            patch.object(native_login_module, "request", fake_request),
+            patch.object(native_login_module._logger, "warning") as warning,
+        ):
+            self.assertFalse(
+                controller._record_failed_admin_login("customer@example.test")
+            )
+        warning.assert_not_called()
+
+    def test_erp_rejected_admin_login_emits_blacklist_event(self):
+        controller = StorefrontNativeLogin()
+        user_model = MagicMock()
+        user_model._should_captcha_login.return_value = False
+        client = MagicMock()
+        client.post.side_effect = StorefrontApiError(
+            "Wrong login/password", code="invalid_credentials", status=401
+        )
+        fake_env = MagicMock()
+        fake_env.uid = self.env.uid
+        fake_env.__getitem__.side_effect = lambda name: {
+            "res.users": user_model,
+            "storefront.erp.client": client,
+        }[name]
+        rendered = SimpleNamespace(headers={})
+        fake_request = SimpleNamespace(
+            env=fake_env,
+            params={"login": "admin", "password": "incorrect"},
+            httprequest=SimpleNamespace(method="POST", remote_addr="8.8.4.4"),
+            session=MagicMock(),
+            render=MagicMock(return_value=rendered),
+        )
+        with (
+            patch.object(native_login_module, "request", fake_request),
+            patch.object(native_login_module, "ensure_db"),
+            patch.object(native_login_module, "_", side_effect=lambda text: text),
+            patch.object(native_login_module._logger, "warning") as warning,
+            patch.object(controller, "_prepare_public_environment"),
+        ):
+            response = controller.web_login.__wrapped__(controller)
+        self.assertIs(response, rendered)
+        warning.assert_called_once_with(
+            "STORE_SECURITY_ADMIN_LOGIN_REJECTED source_ip=%s", "8.8.4.4"
+        )
+
+    def test_native_login_success_finalizes_only_confirmed_identity(self):
+        controller = StorefrontNativeLogin()
+        profile = {
+            "id": "confirmed-admin-id",
+            "authoritative": True,
+            "authentication_backend": "odoo_native",
+            "authentication_version": 2,
+            "login": "admin",
+        }
+        local_user = MagicMock(id=42)
+        user_model = MagicMock()
+        user_model._should_captcha_login.return_value = False
+        user_model._storefront_provision_native_user.return_value = local_user
+        client = MagicMock()
+        client.post.return_value = profile
+        fake_env = MagicMock()
+        fake_env.uid = self.env.uid
+        fake_env.__getitem__.side_effect = lambda name: {
+            "res.users": user_model,
+            "storefront.erp.client": client,
+        }[name]
+        redirected = object()
+        fake_request = SimpleNamespace(
+            env=fake_env,
+            params={"login": "admin", "password": "admin"},
+            httprequest=SimpleNamespace(method="POST"),
+            session=MagicMock(),
+            redirect=MagicMock(return_value=redirected),
+        )
+        with (
+            patch.object(native_login_module, "request", fake_request),
+            patch.object(native_login_module, "ensure_db"),
+            patch.object(controller, "_prepare_public_environment"),
+            patch.object(controller, "_finalize_local_session") as finalize,
+            patch.object(controller, "_login_redirect", return_value="/odoo"),
+        ):
+            response = controller.web_login.__wrapped__(controller)
+        self.assertIs(response, redirected)
+        client.post.assert_called_once_with(
+            "/api/v2/native-auth/login",
+            {"login": "admin", "password": "admin"},
+            timeout_seconds=15,
+        )
+        finalize.assert_called_once_with(local_user, "admin")
+        self.assertTrue(fake_request.params["login_success"])
 
     def test_authenticated_customer_order_reuses_erp_customer_and_address(self):
         order = self._checkout_order()

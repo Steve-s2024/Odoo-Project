@@ -1,5 +1,5 @@
 from datetime import datetime
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from odoo import fields
 from odoo.addons.stock_subwarehouse_hierarchy.controllers.website_sale import (
@@ -135,9 +135,26 @@ class StorefrontCart(WebsiteCartStockSource):
 
 
 class StorefrontWebsiteSale(WebsiteSaleStockSource):
+    @staticmethod
+    def _trusted_lianlian_checkout_url(url):
+        """Accept only provider-hosted HTTPS checkout URLs confirmed by ERP."""
+        parsed = urlparse(url or "")
+        host = (parsed.hostname or "").lower()
+        return bool(
+            parsed.scheme == "https"
+            and host
+            and parsed.username is None
+            and parsed.password is None
+            and any(
+                host == suffix or host.endswith(f".{suffix}")
+                for suffix in ("lianlianpay-inc.com", "lianlianpay.com")
+            )
+        )
+
     _PAYMENT_PRESENTATION = {
         "wechatpay": {"zh_CN": "微信支付", "en_US": "WeChat Pay", "icon": "fa-weixin"},
         "alipay": {"zh_CN": "支付宝", "en_US": "Alipay", "icon": "fa-credit-card"},
+        "lianlian": {"zh_CN": "连连收银台", "en_US": "Card / LianLian Checkout", "icon": "fa-credit-card"},
         "bank_card": {"zh_CN": "银行卡支付（即将开放）", "en_US": "Bank card (coming soon)", "icon": "fa-credit-card"},
     }
 
@@ -162,11 +179,13 @@ class StorefrontWebsiteSale(WebsiteSaleStockSource):
         request.session["x_storefront_completed_provider"] = payment.get("provider")
         request.session["x_storefront_completed_payment_state"] = "done"
         request.session["sale_last_order_id"] = order.id
-        request.website.sale_reset()
-        # `sale_reset()` removes Odoo's cart cache keys. Keep the intent
-        # explicit so future website changes cannot revive the completed cart.
-        request.session.pop("sale_order_id", None)
-        request.session.pop("website_sale_cart_quantity", None)
+        # The pending order is normally detached on entry to /shop/payment.
+        # If it is still the active cart (legacy/bfcache session), clear it;
+        # otherwise preserve any genuinely new cart the customer has started.
+        if request.session.get("sale_order_id") == order.id:
+            request.website.sale_reset()
+            request.session.pop("sale_order_id", None)
+            request.session.pop("website_sale_cart_quantity", None)
         request.session.pop("x_storefront_pending_local_order_id", None)
         request.session.pop("x_storefront_pending_order_id", None)
         request.session.pop("x_storefront_pending_payment_id", None)
@@ -179,6 +198,21 @@ class StorefrontWebsiteSale(WebsiteSaleStockSource):
         request.session["x_storefront_pending_payment_id"] = payment.get("id")
 
     @staticmethod
+    def _detach_pending_payment_cart(order):
+        """Make the pending checkout history-only and leave the next cart fresh.
+
+        The ERP-confirmed payment keeps its original order attempt/idempotency
+        key so status reads, callbacks, and retries remain idempotent. Removing
+        the local order from Odoo's active cart session means the next add-to-
+        cart creates a new sale order, whose model ``create`` assigns a new
+        ``x_storefront_attempt_id``.
+        """
+        if request.session.get("sale_order_id") == order.id:
+            request.website.sale_reset()
+            request.session.pop("sale_order_id", None)
+            request.session.pop("website_sale_cart_quantity", None)
+
+    @staticmethod
     def _forget_pending_payment_session():
         """Forget only the expired payment pointers; keep the active cart."""
         request.session.pop("x_storefront_pending_local_order_id", None)
@@ -186,36 +220,47 @@ class StorefrontWebsiteSale(WebsiteSaleStockSource):
         request.session.pop("x_storefront_pending_payment_id", None)
 
     @staticmethod
-    def _payment_order_from_session(payment_id=None):
-        order_id = (
-            request.session.get("sale_order_id")
-            or request.session.get("x_storefront_pending_local_order_id")
-        )
-        if not order_id:
-            return request.env["sale.order"]
-        try:
-            order_id = int(order_id)
-        except (TypeError, ValueError):
-            return request.env["sale.order"]
-        order = request.env["sale.order"].sudo().browse(order_id).exists()
-        if (
-            not order
-            or order.website_id != request.website
-            or not order.x_storefront_remote_order_id
-            or not order.x_storefront_remote_payment_id
-            or (
-                payment_id
-                and order.x_storefront_remote_payment_id != str(payment_id)
-            )
-        ):
-            return request.env["sale.order"]
-        if not request.env.user._is_public() and not request.env.user._is_internal():
+    def _pending_order_from_session(payment_id=None, require_payment=False):
+        """Resolve the pending checkout before any unrelated new active cart."""
+        candidate_ids = [
+            request.session.get("x_storefront_pending_local_order_id"),
+            request.session.get("sale_order_id"),
+        ]
+        seen = set()
+        for raw_order_id in candidate_ids:
+            try:
+                order_id = int(raw_order_id)
+            except (TypeError, ValueError):
+                continue
+            if order_id in seen:
+                continue
+            seen.add(order_id)
+            order = request.env["sale.order"].sudo().browse(order_id).exists()
             if (
-                order.partner_id.commercial_partner_id
-                != request.env.user.partner_id.commercial_partner_id
+                not order
+                or order.website_id != request.website
+                or not order.x_storefront_remote_order_id
+                or (require_payment and not order.x_storefront_remote_payment_id)
+                or (
+                    payment_id
+                    and order.x_storefront_remote_payment_id != str(payment_id)
+                )
             ):
-                return request.env["sale.order"]
-        return order
+                continue
+            if not request.env.user._is_public() and not request.env.user._is_internal():
+                if (
+                    order.partner_id.commercial_partner_id
+                    != request.env.user.partner_id.commercial_partner_id
+                ):
+                    continue
+            return order
+        return request.env["sale.order"]
+
+    @staticmethod
+    def _payment_order_from_session(payment_id=None):
+        return StorefrontWebsiteSale._pending_order_from_session(
+            payment_id=payment_id, require_payment=True,
+        )
 
     @staticmethod
     def _completed_payment_context():
@@ -304,6 +349,17 @@ class StorefrontWebsiteSale(WebsiteSaleStockSource):
         if getattr(response, "qcontext", None) is not None:
             response.qcontext["x_storefront_payment_methods"] = remote_methods
             response.qcontext["x_storefront_payment_error"] = remote_error
+            if (
+                order
+                and not remote_error
+                and order.x_storefront_remote_order_id
+                and order.x_storefront_reservation_id
+            ):
+                # The countdown/payment page is now a stable history view.
+                # Preserve its pointer, then release the active-cart slot so
+                # the next add-to-cart obtains a new order and attempt key.
+                self._remember_pending_payment(order, {})
+                self._detach_pending_payment_cart(order)
         return response
 
     @route(
@@ -311,7 +367,16 @@ class StorefrontWebsiteSale(WebsiteSaleStockSource):
         type="http", auth="public", methods=["POST"], website=True, sitemap=False,
     )
     def storefront_payment_start(self, provider_code, **post):
-        order = request.cart
+        # The payment page deliberately detaches its ERP-confirmed order from
+        # Odoo's active cart slot.  Prefer that session-owned pending order so
+        # a subsequently-created cart (possibly in another currency) cannot
+        # replace the order the customer actually submitted for payment.
+        pending_order = (
+            self._pending_order_from_session()
+            if request.session.get("x_storefront_pending_local_order_id")
+            else False
+        )
+        order = pending_order or request.cart
         if not order:
             return request.redirect("/shop/cart")
         if provider_code == "bank_card":
@@ -325,45 +390,66 @@ class StorefrontWebsiteSale(WebsiteSaleStockSource):
             return request.render("storefront_api_bridge.payment_error", {"message": str(exc)})
         payment = result.get("payment") or {}
         self._remember_pending_payment(order, payment)
+        # The payment command has been authoritatively accepted. From this
+        # commit boundary onward the order is purchase history, not the active
+        # cart. Pending-session pointers keep the countdown/status page and
+        # simulation callback resumable without reusing the old checkout key.
+        self._detach_pending_payment_cart(order)
         if payment.get("provider") in {"wechatpay", "alipay"}:
             # Never render a reloadable POST response.  A refresh on that page
             # repeats payment initiation and, after completion, can create a
             # second checkout attempt.  The stable GET page only reads status.
             return request.redirect("/shop/payment/status")
         processing = result.get("processing") or {}
-        action = processing.get("api_url") or processing.get("action_url") or processing.get("url")
+        action = (
+            processing.get("api_url") or processing.get("action_url")
+            or processing.get("url") or payment.get("checkout_url")
+        )
         values = processing.get("form_values") or processing.get("data") or {
             key: value for key, value in processing.items()
-            if key not in ("api_url", "action_url", "url")
+            if key not in ("api_url", "action_url", "url", "http_method")
         }
         if not action:
             return request.redirect("/shop/payment/status")
         if action.startswith("/"):
             base_url, _key, _timeout = request.env["storefront.erp.client"]._settings()
             action = urljoin(f"{base_url}/", action.lstrip("/"))
+        if payment.get("provider") == "lianlian":
+            # LianLian's authoritative checkout URL carries signed ``key`` and
+            # ``paymentData`` query parameters. Submitting that URL as the
+            # action of a GET form makes browsers rebuild (and therefore drop)
+            # its query string, which LianLian reports as an invalid/expired
+            # order. A server-side 303 preserves the URL byte-for-byte and
+            # keeps refreshes from replaying our payment-initiation POST.
+            if not self._trusted_lianlian_checkout_url(action):
+                return request.render("storefront_api_bridge.payment_error", {
+                    "message": (
+                        "The payment provider returned an invalid checkout address."
+                        if request.lang.code == "en_US"
+                        else "支付服务返回了无效的收银台地址。"
+                    ),
+                })
+            # ``Request.redirect`` defaults to ``local=True`` and strips the
+            # scheme/host from absolute URLs.  That turns LianLian's signed
+            # checkout URL into a Shop URL such as ``/en?key=...``.  The
+            # provider allowlist immediately above is the security boundary;
+            # only after it succeeds may Odoo preserve the external origin.
+            return request.redirect(action, code=303, local=False)
         return request.render("storefront_api_bridge.payment_handoff", {
             "action": action,
             "form_values": values,
+            "http_method": (
+                processing.get("http_method") or ("get" if payment.get("provider") == "lianlian" else "post")
+            ),
         })
 
     @route("/shop/payment/status", type="http", auth="public", website=True, sitemap=False)
     def storefront_payment_status(self, **post):
-        # A provider webhook can complete and retire the local presentation
-        # order before the browser returns. Capture the signed-session cart id
-        # before `request.cart` clears it, then recover only that exact order.
-        session_cart_id = request.session.get("sale_order_id")
-        order = request.cart
-        if not order and session_cart_id:
-            candidate = request.env["sale.order"].sudo().browse(
-                int(session_cart_id)
-            ).exists()
-            if (
-                candidate
-                and candidate.website_id == request.website
-                and candidate.x_storefront_remote_order_id
-                and candidate.x_storefront_remote_payment_id
-            ):
-                order = candidate
+        # Pending payments are deliberately detached from the active cart.
+        # Resolve only the signed, session-owned pending pointer; never ask
+        # ``request.cart`` here because a newly created cart belongs to the
+        # customer's next checkout attempt.
+        order = self._payment_order_from_session()
         payment = self._completed_payment_context()
         completed_order_id = request.session.get("x_storefront_completed_order_id")
         remote_order = {}
@@ -474,9 +560,9 @@ class StorefrontWebsiteSale(WebsiteSaleStockSource):
         type="http", auth="public", methods=["POST"], website=True, sitemap=False,
     )
     def storefront_payment_simulate_success(self, **post):
-        order = request.cart
+        order = self._payment_order_from_session()
         if not order:
-            return request.redirect("/shop/cart")
+            return request.redirect("/purchase-history")
         try:
             order.sudo()._storefront_simulate_payment_success()
         except StorefrontApiError as exc:

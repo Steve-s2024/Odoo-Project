@@ -34,6 +34,7 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
         labels = {
             "wechatpay": ("WeChat Pay", "微信支付"),
             "alipay": ("Alipay", "支付宝"),
+            "lianlian": ("Card / LianLian Checkout", "连连收银台"),
             "stripe": ("Stripe", "Stripe"),
             "demo": ("Demo payment", "模拟支付"),
         }
@@ -346,12 +347,18 @@ class StorefrontCustomerPortal(WebsitePurchaseHistory):
                 "x_storefront_payment_amount": payment.get("amount") or 0.0,
             })
 
-        request.session["sale_order_id"] = local_order.id
-        request.session["website_sale_cart_quantity"] = int(local_order.cart_quantity)
         request.session["x_storefront_pending_local_order_id"] = local_order.id
         request.session["x_storefront_pending_order_id"] = order_uuid
         request.session["x_storefront_pending_payment_id"] = payment.get("id") or False
         request.session.pop("x_storefront_completed_payment_state", None)
+        if payment:
+            # A resumed pending payment is purchase history, not an active
+            # cart. Its stable attempt key must not leak into the next order.
+            request.session.pop("sale_order_id", None)
+            request.session.pop("website_sale_cart_quantity", None)
+        else:
+            request.session["sale_order_id"] = local_order.id
+            request.session["website_sale_cart_quantity"] = int(local_order.cart_quantity)
         return request.redirect(
             "/shop/payment/status" if payment else "/shop/payment"
         )

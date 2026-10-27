@@ -1,7 +1,12 @@
+import logging
+
 from odoo import models
 from odoo.http import request
 
 from .api_client import StorefrontApiError
+
+
+_logger = logging.getLogger(__name__)
 
 
 class ProductTemplate(models.Model):
@@ -40,8 +45,16 @@ class ProductTemplate(models.Model):
             return cache
         try:
             cache = self.env["storefront.erp.client"].inventory_snapshot()
-        except StorefrontApiError:
-            cache = {}
+        except StorefrontApiError as exc:
+            # Availability shown on catalogue pages may use the last persisted
+            # ERP snapshot during a short transport interruption.  This cache
+            # is display-only: checkout still performs a synchronous,
+            # fail-closed ERP reservation before the order can proceed.
+            cache = self.env["storefront.cache.entry"].inventory_map()
+            _logger.warning(
+                "ERP inventory snapshot unavailable; using persisted display cache (code=%s)",
+                exc.code,
+            )
         request._storefront_erp_inventory_snapshot = cache
         return cache
 

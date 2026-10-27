@@ -40,6 +40,15 @@ class StorefrontAuthSignup(SunErpAuthSignupHome):
         qcontext["signup_attempt_id"] = attempt_id
 
     @staticmethod
+    def _finalize_local_session(user, canonical_login):
+        """Open a Shop session without copying the ERP password hash locally."""
+        request.session.uid = None
+        request.session["pre_login"] = canonical_login
+        request.session["pre_uid"] = user.id
+        request.session.finalize(request.env)
+        request.update_env(user=user.id, context=request.session.context)
+
+    @staticmethod
     def _new_password_reset_attempt(qcontext=None):
         attempt_id = str(uuid.uuid4())
         request.session["storefront_password_reset_attempt_id"] = attempt_id
@@ -252,12 +261,11 @@ class StorefrontAuthSignup(SunErpAuthSignupHome):
             "login": created["login"],
             "language": values.get("lang") or confirmed.get("language") or "zh_CN",
         }
-        request.env["res.users"]._storefront_provision_portal_user(profile)
+        local_user = request.env["res.users"]._storefront_provision_portal_user(
+            profile
+        )
         if do_login:
-            request.session.authenticate(request.env, {
-                "login": values["login"],
-                "password": values["password"],
-                "type": "password",
-            })
+            self._finalize_local_session(local_user, created["login"])
+            local_user._update_last_login()
         request.session.pop("storefront_signup_attempt_id", None)
         request.env.cr.commit()

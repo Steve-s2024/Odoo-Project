@@ -3,6 +3,9 @@
     <template id="remote_payment_methods" inherit_id="website_sale.payment" name="ERP API payment methods">
         <xpath expr="//div[@id='payment_method']" position="replace">
             <div id="payment_method" class="o_not_editable mb-3">
+                <div class="alert alert-warning" role="alert">
+                    <t t-out="'Checkout is under development and is not in production. If you are a customer, please do not proceed with payment!' if request.lang.code == 'en_US' else '结账功能仍在开发中，尚未投入正式使用。如果您是顾客，请勿继续付款！'"/>
+                </div>
                 <div t-if="x_storefront_payment_error" class="alert alert-danger" role="alert">
                     <t t-out="x_storefront_payment_error"/>
                 </div>
@@ -44,7 +47,7 @@
         <t t-call="website.layout">
             <main class="container py-5 text-center">
                 <h1 t-out="'Opening payment...' if request.lang.code == 'en_US' else '正在打开支付...'"/>
-                <form id="x_storefront_payment_handoff" t-att-action="action" method="post">
+                <form id="x_storefront_payment_handoff" t-att-action="action" t-att-method="http_method or 'post'">
                     <input t-foreach="form_values.items()" t-as="item" type="hidden"
                            t-att-name="item[0]" t-att-value="item[1]"/>
                     <button class="btn btn-primary mt-3" type="submit">
@@ -106,11 +109,18 @@
                 <p t-if="payment and payment.get('state') == 'pending' and not remote_order.get('payment_expired')" class="text-muted">
                     <t t-out="'You may leave this page and resume payment from Purchase History before the timer expires.' if is_english else '您可以离开此页面，并在倒计时结束前从购买记录继续支付。'"/>
                 </p>
+                <form t-if="payment and payment.get('state') == 'pending' and not remote_order.get('payment_expired') and payment.get('provider') == 'lianlian'"
+                      action="/shop/erp-payment/start/lianlian" method="post"
+                      class="d-inline-block me-2 mb-2">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <button class="btn btn-primary" type="submit"
+                            t-out="'Complete payment' if is_english else '完成支付'"/>
+                </form>
                 <a t-if="payment and payment.get('state') == 'pending' and not remote_order.get('payment_expired')"
-                   class="btn btn-outline-secondary me-2" href="/shop/payment/status">
+                   class="btn btn-outline-secondary me-2 mb-2" href="/shop/payment/status">
                     <t t-out="'Refresh status' if is_english else '刷新支付状态'"/>
                 </a>
-                <a class="btn btn-primary" href="/purchase-history">
+                <a class="btn btn-primary mb-2" href="/purchase-history">
                     <t t-out="'Purchase history' if is_english else '购买记录'"/>
                 </a>
                 <a t-if="payment and payment.get('state') == 'done' and completed_order_id and receipt_available"

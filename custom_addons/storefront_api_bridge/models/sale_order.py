@@ -440,7 +440,10 @@ class SaleOrder(models.Model):
         client = self.env["storefront.erp.client"]
         configuration = client.get("/api/v1/shop/configuration") or {}
         shop_base_url = (configuration.get("shop_base_url") or client.public_url()).rstrip("/")
-        return f"{shop_base_url}/shop/payment/status"
+        language_prefix = (
+            "/en" if (self.x_website_checkout_language or "zh_CN").startswith("en") else ""
+        )
+        return f"{shop_base_url}{language_prefix}/shop/payment/status"
 
     def _storefront_create_payment(self, provider_code):
         self.ensure_one()

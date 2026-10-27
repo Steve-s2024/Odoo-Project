@@ -6,8 +6,45 @@
             <main id="wrap" class="x_stores_page">
                 <style>
                     .x_stores_page {
+                        position: relative;
+                        min-height: 70vh;
+                        overflow: hidden;
                         background: #fff;
                         color: #111;
+                    }
+                    .x_stores_preview {
+                        filter: blur(10px);
+                        opacity: .68;
+                        pointer-events: none;
+                        user-select: none;
+                    }
+                    .x_stores_coming_soon {
+                        position: absolute;
+                        inset: 0;
+                        z-index: 20;
+                        background: rgba(255, 255, 255, .2);
+                        cursor: default;
+                    }
+                    .x_stores_coming_soon_message {
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        width: max-content;
+                        max-width: calc(100vw - 40px);
+                        transform: translate(-50%, -50%);
+                        padding: 18px 34px;
+                        border: 1px solid rgba(255, 255, 255, .28);
+                        border-radius: 3px;
+                        background: rgba(17, 17, 17, .94);
+                        box-shadow: 0 20px 60px rgba(0, 0, 0, .24);
+                        color: #fff;
+                        font-family: Arial, Helvetica, sans-serif;
+                        font-size: clamp(1.5rem, 4vw, 2.4rem);
+                        font-weight: 700;
+                        letter-spacing: .08em;
+                        line-height: 1.1;
+                        text-align: center;
+                        text-transform: uppercase;
                     }
                     .x_stores_inner {
                         width: min(1180px, calc(100% - 32px));
@@ -135,6 +172,7 @@
                         }
                     }
                 </style>
+                <div class="x_stores_preview" aria-hidden="true" inert="inert">
                 <section class="x_stores_hero">
                     <div class="x_stores_inner">
                         <p class="x_stores_eyebrow" t-out="'SUN STORE NETWORK' if is_english else 'SUN 门店网络'"/>
@@ -201,6 +239,10 @@
                 <section class="x_stores_inner">
                     <div id="oe_structure_stores_bottom" class="oe_structure oe_empty"/>
                 </section>
+                </div>
+                <div class="x_stores_coming_soon" aria-label="Coming Soon">
+                    <div class="x_stores_coming_soon_message">Coming Soon</div>
+                </div>
             </main>
         </t>
     </template>

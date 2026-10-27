@@ -14,8 +14,8 @@ function enableErpConfirmedSignupFeedback() {
         button.setAttribute("aria-busy", "true");
         const isEnglish = document.documentElement.lang.toLowerCase().startsWith("en");
         button.textContent = isEnglish
-            ? "Waiting for ERP confirmation…"
-            : "正在等待 ERP 确认…";
+            ? "Please be patient…"
+            : "请耐心等候…";
     });
 }
 
