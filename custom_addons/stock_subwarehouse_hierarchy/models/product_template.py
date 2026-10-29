@@ -701,7 +701,12 @@ class ProductTemplate(models.Model):
         code_parts = (self.default_code or "").strip().split("-")
         first_block = code_parts[0].strip().upper() if code_parts else ""
         last_block = code_parts[-1].strip().upper() if code_parts else ""
-        type_code = first_block[-2:] if len(first_block) >= 2 else first_block
+        # The type code follows the 6-digit maker/date prefix and may be 1-3
+        # characters (E, SE, SE&); the last two characters cut those short.
+        if re.match(r"\d{6}.", first_block):
+            type_code = first_block[6:]
+        else:
+            type_code = first_block[-2:] if len(first_block) >= 2 else first_block
         color_code = last_block[:4]
         type_label = type_code or ("Unknown type" if is_english else "未知类型")
         color_label = values["color"]
