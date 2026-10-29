@@ -336,7 +336,8 @@ class ProductTemplate(models.Model):
         representative_ids = []
         for key in ordered_keys:
             products = grouped_products[key]
-            selected_cover = products.filtered(
+            # bin_size: only check that a cover image exists; loading every image runs out of memory.
+            selected_cover = products.with_context(bin_size=True).filtered(
                 lambda product: product.x_shop_group_cover and product.image_1920
             )[:1]
             representative_ids.append((selected_cover or products[:1]).id)
@@ -397,7 +398,7 @@ class ProductTemplate(models.Model):
         if any(term in name for term in ("双板鞋", "双板", "雪杖", "滑雪杖", "ski boot", "ski pole")):
             return "ski"
 
-        if product_code in {"S1", "SE"} or product_code.startswith(("D", "DC", "DZ")):
+        if product_code in {"S1", "SE", "E"} or product_code.startswith(("D", "DC", "DZ")):
             return "snowboard"
         if product_code in {"S", "S2"} or product_code.startswith(("X", "Z")):
             return "ski"
@@ -461,7 +462,7 @@ class ProductTemplate(models.Model):
 
     def _get_shop_variant_option_sort_key(self, key, value):
         normalized_value = " ".join((value or "").strip().split())
-        if key == "size":
+        if key in ("size", "flex"):
             number_match = re.search(r"\d+(?:\.\d+)?", normalized_value.replace(",", "."))
             if number_match:
                 return (0, float(number_match.group()), normalized_value.casefold())
@@ -505,8 +506,8 @@ class ProductTemplate(models.Model):
                     if (
                         key == "type_color"
                         and current_image_product
-                        and not current_image_product.image_1920
-                        and row["product"].image_1920
+                        and not current_image_product.with_context(bin_size=True).image_1920
+                        and row["product"].with_context(bin_size=True).image_1920
                     ):
                         image_products[value] = row["product"]
                     continue
@@ -604,6 +605,10 @@ class ProductTemplate(models.Model):
     def _decode_shop_color_code(self, color_code):
         color_names = {
             "CY": "青",
+            "Q": "玫红",
+            "U": "紫",
+            "X": "彩",
+            "LP": "浅粉",
             "B": "蓝",
             "H": "黑",
             "W": "白",
@@ -645,11 +650,11 @@ class ProductTemplate(models.Model):
                 "\u9ed1": "Black", "\u767d": "White", "\u7ea2": "Red", "\u84dd": "Blue",
                 "\u7eff": "Green", "\u7070": "Gray", "\u7d2b": "Purple", "\u7c89": "Pink",
                 "\u9ec4": "Yellow", "\u6a59": "Orange", "\u68d5": "Brown", "\u91d1": "Gold",
-                "\u94f6": "Silver",
+                "\u94f6": "Silver", "\u73ab\u7ea2": "Magenta", "\u9752": "Cyan", "\u5f69": "Multicolor", "\u6d45\u7c89": "Light Pink",
             }
             if value in {"\u672a\u8bc6\u522b", "\u9ed8\u8ba4"}:
                 return "Not specified"
-            translated = [color_names.get(character, character) for character in value]
+            translated = [color_names.get(token, token) for token in re.findall("\u6d45.|\u73ab\u7ea2|.", value)]
             return " / ".join(translated)
         if key == "size":
             if value in {"\u901a\u7801", "One size"}:
