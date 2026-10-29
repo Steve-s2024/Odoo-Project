@@ -141,13 +141,13 @@ class ShopApiProductSyncPending(models.Model):
             # The durable outbox owns retries from this point onward, so clearing
             # the set cannot lose an update even if the storefront is unavailable.
             pending.unlink()
-            if commit:
-                self.env.cr.commit()
+            # Dispatch before committing: once committed, the webhook cron could
+            # pick up the same events and race this loop for their deliveries.
             if dispatch:
                 for event in events:
                     event._dispatch()
-                if commit:
-                    self.env.cr.commit()
+            if commit:
+                self.env.cr.commit()
             event_ids += events.ids
             self.env.flush_all()
             self.env.invalidate_all()
