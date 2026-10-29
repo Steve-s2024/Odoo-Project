@@ -1,5 +1,6 @@
 from odoo import api, models
 from odoo.fields import Domain
+from odoo.http import request
 from odoo.tools import float_compare
 
 
@@ -49,6 +50,30 @@ class ProductProduct(models.Model):
         company = self.env["res.company"].browse(company_id).exists() if company_id else self.env.company
         product_ids = self._internal_transfer_stocked_product_ids(source_location, company)
         return [("id", "in", product_ids)] if product_ids else [("id", "=", 0)]
+
+    def _to_markup_data(self, website):
+        """Describe the product to search engines exactly as the page shows it.
+
+        Visible prices follow the page language (English pages show the USD
+        price, Chinese pages CNY), and the name is the language's website
+        name.  Odoo's default always uses the website currency and the ERP
+        (Chinese) name, which makes English pages disagree with their markup.
+        """
+        markup_data = super()._to_markup_data(website)
+        lang_code = (request and request.lang and request.lang.code) or ""
+        is_english = lang_code.lower().startswith("en")
+        template = self.product_tmpl_id
+        markup_data["name"] = template._get_website_display_name(is_english=is_english)
+        if is_english:
+            if template.x_website_usd_price:
+                markup_data["offers"].update({
+                    "price": template.x_website_usd_price,
+                    "priceCurrency": "USD",
+                })
+            else:
+                # The page says "Price on request"; a CNY offer would contradict it.
+                markup_data.pop("offers", None)
+        return markup_data
 
     @api.model
     def _context_record_id(self, key):
