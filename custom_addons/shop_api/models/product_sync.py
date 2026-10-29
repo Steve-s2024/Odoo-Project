@@ -192,7 +192,10 @@ class ShopApiProductSyncPending(models.Model):
 
     @api.model
     def _cron_flush_pending_products(self):
-        return self._flush_pending_products(dispatch=True, commit=True)
+        # Only write the outbox; the webhook cron sends it.  Sending here keeps
+        # each batch's transaction open across HTTP calls that update the same
+        # webhook rows as that cron, and the commit then fails to serialize.
+        return self._flush_pending_products(commit=True)
 
 
 class ProductTemplate(models.Model):
