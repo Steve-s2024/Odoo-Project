@@ -691,7 +691,7 @@ class TestShopApiBackend(ShopApiTestMixin, TransactionCase):
         expected_options = [
             {"key": "type", "label": "Type", "value": "S1"},
             {"key": "size", "label": "Size", "value": "255"},
-            {"key": "flex", "label": "Flex", "value": "7 flex"},
+            {"key": "flex", "label": "Flex", "value": "7"},
         ]
         self.assertEqual(order._shop_api_payload()["items"][0]["selected_options"], expected_options)
         self.assertEqual(payload["items"][0]["selected_options"], expected_options)

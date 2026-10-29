@@ -609,7 +609,6 @@ class ProductTemplate(models.Model):
             "Q": "玫红",
             "U": "紫",
             "X": "彩",
-            "LP": "浅粉",
             "B": "蓝",
             "H": "黑",
             "W": "白",
@@ -651,11 +650,11 @@ class ProductTemplate(models.Model):
                 "\u9ed1": "Black", "\u767d": "White", "\u7ea2": "Red", "\u84dd": "Blue",
                 "\u7eff": "Green", "\u7070": "Gray", "\u7d2b": "Purple", "\u7c89": "Pink",
                 "\u9ec4": "Yellow", "\u6a59": "Orange", "\u68d5": "Brown", "\u91d1": "Gold",
-                "\u94f6": "Silver", "\u73ab\u7ea2": "Magenta", "\u9752": "Cyan", "\u5f69": "Multicolor", "\u6d45\u7c89": "Light Pink",
+                "\u94f6": "Silver", "\u73ab\u7ea2": "Quartz", "\u9752": "Cyan", "\u5f69": "Multicolor",
             }
             if value in {"\u672a\u8bc6\u522b", "\u9ed8\u8ba4"}:
                 return "Not specified"
-            translated = [color_names.get(token, token) for token in re.findall("\u6d45.|\u73ab\u7ea2|.", value)]
+            translated = [color_names.get(token, token) for token in re.findall("\u73ab\u7ea2|.", value)]
             return " / ".join(translated)
         if key == "size":
             if value in {"\u901a\u7801", "One size"}:
@@ -669,7 +668,8 @@ class ProductTemplate(models.Model):
                 return "No flex"
             if normalized in {"\u672a\u8bc6\u522b", "\u9ed8\u8ba4"}:
                 return "Not specified"
-            return f"{normalized} flex"
+            # The option group is already headed "Flex", so the value is the bare number.
+            return normalized
         if key == "audience":
             return {
                 "\u6210\u4eba": "Adult",

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="contact_order_box" name="Contact to order box">
+        <t t-set="x_contact_is_english" t-value="bool(request.lang and (request.lang.code or '').lower().startswith('en'))"/>
+        <div class="x_contact_order_box w-100">
+            <style>
+                .x_contact_order_box {
+                    padding: 1.1rem 1.2rem;
+                    border: 2px solid #111;
+                    color: #111;
+                }
+                .x_contact_order_box .x_contact_order_title {
+                    margin: 0 0 .35rem;
+                    font-size: 1.05rem !important;
+                    font-weight: 900;
+                    letter-spacing: .03em;
+                    text-transform: uppercase;
+                }
+                .x_contact_order_box .x_contact_order_text {
+                    margin: 0 0 .9rem;
+                    font-size: .9rem !important;
+                    line-height: 1.55 !important;
+                }
+                .x_contact_order_box .x_contact_order_channels {
+                    display: flex;
+                    flex-direction: column;
+                    gap: .5rem;
+                }
+                .x_contact_order_box .x_contact_order_channel {
+                    display: flex;
+                    align-items: center;
+                    gap: .7rem;
+                    min-height: 3.2rem;
+                    padding: .5rem 1rem;
+                    border: 1px solid #111;
+                    border-radius: 0;
+                    background: #fff;
+                    color: #111 !important;
+                    font-weight: 700;
+                    text-decoration: none;
+                    word-break: break-all;
+                }
+                .x_contact_order_box a.x_contact_order_channel:hover {
+                    background: #111;
+                    color: #fff !important;
+                }
+                .x_contact_order_box .x_contact_order_channel_primary {
+                    background: #111;
+                    color: #fff !important;
+                }
+                .x_contact_order_box a.x_contact_order_channel_primary:hover {
+                    background: #333;
+                }
+                .x_contact_order_box .x_contact_order_channel .fa {
+                    width: 1.3rem;
+                    font-size: 1.2rem;
+                    text-align: center;
+                }
+                .x_contact_order_box .x_contact_order_label {
+                    min-width: 3.2rem;
+                    font-weight: 400;
+                    opacity: .8;
+                }
+                .x_contact_order_box .x_contact_order_code {
+                    margin: .8rem 0 0;
+                    font-size: .82rem !important;
+                    opacity: .75;
+                }
+            </style>
+            <p class="x_contact_order_title" t-out="'Contact us to order' if x_contact_is_english else '下单请直接联系我们'"/>
+            <p class="x_contact_order_text" t-out="'Online checkout is not open yet. Call, email or message us with the product, colour, size and flex you want, and we will arrange your order.' if x_contact_is_english else '网站暂未开放在线下单。请通过电话、邮箱或微信联系我们，告诉我们想要的产品、颜色、尺码和硬度，我们会尽快为您安排。'"/>
+            <div class="x_contact_order_channels">
+                <a t-if="website.x_contact_order_phone"
+                   class="x_contact_order_channel x_contact_order_channel_primary"
+                   t-att-href="website._contact_order_phone_href()">
+                    <i class="fa fa-phone" aria-hidden="true"/>
+                    <span class="x_contact_order_label" t-out="'Phone' if x_contact_is_english else '电话'"/>
+                    <span class="o_force_ltr" t-out="website.x_contact_order_phone"/>
+                </a>
+                <a t-if="website.x_contact_order_email"
+                   class="x_contact_order_channel"
+                   t-att-href="website._contact_order_mail_href(product, x_contact_is_english)">
+                    <i class="fa fa-envelope" aria-hidden="true"/>
+                    <span class="x_contact_order_label" t-out="'Email' if x_contact_is_english else '邮箱'"/>
+                    <span t-out="website.x_contact_order_email"/>
+                </a>
+                <div t-if="website.x_contact_order_wechat" class="x_contact_order_channel">
+                    <i class="fa fa-weixin" aria-hidden="true"/>
+                    <span class="x_contact_order_label" t-out="'WeChat' if x_contact_is_english else '微信'"/>
+                    <span t-out="website.x_contact_order_wechat"/>
+                </div>
+            </div>
+            <p t-if="product and product.default_code" class="x_contact_order_code">
+                <t t-out="'Product code: ' if x_contact_is_english else '产品编码：'"/><span t-out="product.default_code"/>
+            </p>
+        </div>
+    </template>
+
+    <!-- Product page: contact details in place of the cart button. -->
+    <template id="cta_wrapper_contact_order" inherit_id="website_sale.cta_wrapper" name="Contact to order on product page">
+        <xpath expr="//div[@id='add_to_cart_wrap']" position="attributes">
+            <attribute name="t-if">not website.x_contact_to_order</attribute>
+        </xpath>
+        <xpath expr="//div[@id='add_to_cart_wrap']" position="before">
+            <t t-if="website.x_contact_to_order" t-call="storefront_contact_order.contact_order_box"/>
+        </xpath>
+    </template>
+
+    <!-- Header: no cart icon while the cart is closed. -->
+    <template id="header_cart_link_contact_order" inherit_id="website_sale.header_cart_link" name="Hide cart while contact to order">
+        <xpath expr="//t[@t-set='show_cart']" position="after">
+            <t t-set="show_cart" t-value="show_cart and not website.x_contact_to_order"/>
+        </xpath>
+    </template>
+
+    <!-- Cart page (old carts, bookmarks): how to order instead of checkout. -->
+    <template id="cart_contact_order" inherit_id="website_sale.cart" name="Contact to order on cart page">
+        <xpath expr="//div[@id='shop_cart']/*[1]" position="before">
+            <div t-if="website.x_contact_to_order" class="mb-4">
+                <t t-call="storefront_contact_order.contact_order_box">
+                    <t t-set="product" t-value="False"/>
+                </t>
+            </div>
+        </xpath>
+    </template>
+
+    <template id="navigation_buttons_contact_order" inherit_id="website_sale.navigation_buttons" name="No checkout while contact to order">
+        <xpath expr="//a[@name='website_sale_main_button']" position="attributes">
+            <attribute name="t-if">not website.x_contact_to_order</attribute>
+        </xpath>
+    </template>
+</odoo>

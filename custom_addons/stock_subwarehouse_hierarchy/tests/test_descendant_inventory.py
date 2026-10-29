@@ -2837,7 +2837,7 @@ class TestDescendantInventoryTotals(TransactionCase):
         ))
         self.assertEqual(product._get_english_shop_variant_value("color", "\u9ed1\u767d"), "Black / White")
         self.assertEqual(product._get_english_shop_variant_value("size", "\u901a\u7801"), "One size")
-        self.assertEqual(product._get_english_shop_variant_value("flex", "\u786c\u5ea6100"), "100 flex")
+        self.assertEqual(product._get_english_shop_variant_value("flex", "\u786c\u5ea6100"), "100")
         self.assertEqual(action["params"]["type"], "success")
 
         unsafe_product = self.env["product.template"].create({
