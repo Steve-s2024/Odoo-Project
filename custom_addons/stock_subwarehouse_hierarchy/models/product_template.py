@@ -456,6 +456,7 @@ class ProductTemplate(models.Model):
             "双板鞋",
             "单板鞋",
             "滑雪鞋",
+            "快穿套装",  # boots + bindings set: chosen by the same boot sizes
             "ski boot",
             "snowboard boot",
         ))
