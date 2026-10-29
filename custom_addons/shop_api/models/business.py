@@ -221,7 +221,9 @@ class ProductTemplate(models.Model):
         self.ensure_one()
         self._shop_api_ensure_uuid()
         images = []
-        if self.image_1920:
+        # bin_size: only test that a cover exists; reading the binary would also
+        # prefetch the full images of every product in the batch.
+        if self.with_context(bin_size=True).image_1920:
             images.append({
                 "id": self.shop_api_uuid,
                 "kind": "cover",
