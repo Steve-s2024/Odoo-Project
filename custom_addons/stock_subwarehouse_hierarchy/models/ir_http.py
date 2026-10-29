@@ -19,8 +19,9 @@ class IrHttp(models.AbstractModel):
     @classmethod
     def _sun_format_website_title(cls, title):
         is_english = bool((request.lang and request.lang.code or "").lower().startswith("en"))
+        brand = "SUN Winter Sports" if is_english else "SUN思安奇冰雪运动"
         if not title:
-            return "Home | SUN" if is_english else "主页 | 思安奇"
+            return "Home | %s" % brand if is_english else "主页 | %s" % brand
 
         page_title, separator, _brand = title.partition(" | ")
         page_title = (page_title or "").strip()
@@ -80,6 +81,4 @@ class IrHttp(models.AbstractModel):
                 "contact": "联系我们",
             }
             formatted_page_title = title_map.get(page_title.casefold(), page_title)
-        if separator:
-            return f"{formatted_page_title} | {'SUN' if is_english else '思安奇'}"
-        return f"{formatted_page_title} | {'SUN' if is_english else '思安奇'}"
+        return f"{formatted_page_title} | {brand}"

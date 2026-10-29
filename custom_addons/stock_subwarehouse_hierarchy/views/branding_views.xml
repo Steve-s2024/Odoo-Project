@@ -5,7 +5,7 @@
             <title t-esc="title or 'SUN ERP'"/>
         </xpath>
         <xpath expr="//link[@rel='shortcut icon']" position="replace">
-            <link type="image/png" rel="shortcut icon" href="/stock_subwarehouse_hierarchy/static/img/logo.png"/>
+            <link type="image/png" rel="shortcut icon" sizes="512x512" href="/stock_subwarehouse_hierarchy/static/img/favicon.png"/>
         </xpath>
     </template>
 
@@ -27,7 +27,7 @@
     </template>
 
     <template id="sun_website_page_transitions" inherit_id="website.layout" name="SUN Website Page Transitions">
-        <xpath expr="//meta[@name='generator']" position="before">
+        <xpath expr="//t[@t-set='x_icon']" position="after">
             <t t-set="x_seo_object" t-value="seo_object or main_object"/>
             <t t-set="title" t-value="(x_seo_object and 'website_meta_title' in x_seo_object and x_seo_object.website_meta_title) or request.env['ir.http']._sun_format_website_title(title)"/>
             <t t-set="default_title" t-value="request.env['ir.http']._sun_format_website_title(default_title)"/>

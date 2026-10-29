@@ -19,15 +19,15 @@ class TestWebsiteBranding(TransactionCase):
     def test_custom_page_titles_follow_requested_language(self):
         self.assertEqual(
             self._format_title("Details | SUN", "en_US"),
-            "Discover | SUN",
+            "Discover | SUN Winter Sports",
         )
         self.assertEqual(
             self._format_title("Purchase | SUN", "en_US"),
-            "Stores | SUN",
+            "Stores | SUN Winter Sports",
         )
         self.assertEqual(
             self._format_title("Purchase | 思安奇", "zh_CN"),
-            "门店 | 思安奇",
+            "门店 | SUN思安奇冰雪运动",
         )
 
     def test_language_selector_uses_supplied_flag_assets(self):
