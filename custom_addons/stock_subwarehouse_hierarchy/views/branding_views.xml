@@ -41,6 +41,38 @@
                     vertical-align: -0.075em;
                     box-shadow: none;
                 }
+                header#top .nav-link,
+                header#top .btn {
+                    font-family: Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+                    font-size: 15px !important;
+                }
+                header#top #top_menu .nav-link {
+                    font-weight: 500;
+                }
+                .s_cover:has(.x_scroll_hint) {
+                    position: relative;
+                }
+                .x_scroll_hint {
+                    position: absolute;
+                    left: 50%;
+                    bottom: 28px;
+                    z-index: 2;
+                    padding: 10px;
+                    margin-left: -32px;
+                    color: #fff;
+                    opacity: 0.8;
+                    line-height: 0;
+                    animation: x_scroll_hint_bob 2.4s ease-in-out infinite;
+                }
+                .x_scroll_hint:hover,
+                .x_scroll_hint:focus-visible {
+                    color: #fff;
+                    opacity: 1;
+                }
+                @keyframes x_scroll_hint_bob {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(6px); }
+                }
                 html.x_page_transition_ready body {
                     opacity: 1;
                     transition: opacity 320ms ease, transform 320ms ease;
@@ -60,6 +92,9 @@
                         opacity: 1;
                         transform: none;
                         transition: none;
+                    }
+                    .x_scroll_hint {
+                        animation: none;
                     }
                 }
             </style>
