@@ -34,5 +34,5 @@ class TestWebsiteBranding(TransactionCase):
         view = self.env.ref(
             "stock_subwarehouse_hierarchy.sun_language_selector_flags"
         )
-        self.assertIn("static/img/flags/en_US.png", view.arch_db)
-        self.assertIn("static/img/flags/zh_CN.png", view.arch_db)
+        self.assertIn("static/img/flags/en_US.svg", view.arch_db)
+        self.assertIn("static/img/flags/zh_CN.svg", view.arch_db)
