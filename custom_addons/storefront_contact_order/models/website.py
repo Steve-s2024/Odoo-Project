@@ -19,6 +19,10 @@ class Website(models.Model):
         string="Order WeChat ID",
         help="Shown on product pages only when filled in.",
     )
+    x_contact_order_wechat_english = fields.Boolean(
+        string="Show WeChat on English pages",
+        default=True,
+    )
 
     def _contact_order_phone_href(self):
         self.ensure_one()

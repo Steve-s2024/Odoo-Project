@@ -4,7 +4,7 @@
     # customers order by contacting us.  Turn the switch off under
     # Website > Configuration > Websites > Contact to order to restore the cart.
     "summary": "Replace the online cart with phone, email and WeChat ordering",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "category": "Website/Website",
     "author": "SUN",
     "license": "LGPL-3",

@@ -84,7 +84,7 @@
                     <span class="x_contact_order_label" t-out="'Email' if x_contact_is_english else '邮箱'"/>
                     <span t-out="website.x_contact_order_email"/>
                 </a>
-                <div t-if="website.x_contact_order_wechat" class="x_contact_order_channel">
+                <div t-if="website.x_contact_order_wechat and (website.x_contact_order_wechat_english or not x_contact_is_english)" class="x_contact_order_channel">
                     <i class="fa fa-weixin" aria-hidden="true"/>
                     <span class="x_contact_order_label" t-out="'WeChat' if x_contact_is_english else '微信'"/>
                     <span t-out="website.x_contact_order_wechat"/>

@@ -12,6 +12,7 @@
                         <field name="x_contact_order_phone"/>
                         <field name="x_contact_order_email"/>
                         <field name="x_contact_order_wechat"/>
+                        <field name="x_contact_order_wechat_english"/>
                     </group>
                 </page>
             </xpath>
