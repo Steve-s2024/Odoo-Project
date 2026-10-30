@@ -75,6 +75,46 @@ class ProductTemplateCustomAttributeValue(models.Model):
     )
 
 
+# Readable names for the product-type code in a SKU, shown on the shop's
+# type/colour choices instead of the bare code.
+SHOP_TYPE_LABELS = {
+    "S1": ("单板鞋", "Snowboard boots"),
+    "S2": ("3+3双板鞋", "Ski boots 3+3"),
+    "S": ("4+2双板鞋", "Ski boots 4+2"),
+    "SE": ("快穿单板鞋", "Ezion boots"),
+    "SE&": ("快穿套装", "Ezion boots + bindings"),
+    "E": ("快穿固定器", "Ezion bindings"),
+    "N": ("无背板固定器", "NoBack bindings"),
+    "L": ("加厚内靴", "Thick liner"),
+    "D": ("全能板", "All-mountain snowboard"),
+    "DZ": ("追逐板", "Cross snowboard"),
+    "DC": ("刻滑板", "Carving snowboard"),
+    "X": ("双板", "Skis"),
+    "B1": ("单板包", "Snowboard bag"),
+    "B": ("双板包", "Ski bag"),
+    "Y": ("纯色上衣", "Solid jacket"),
+    "YX": ("混色上衣", "Mixed-colour jacket"),
+    "YB1": ("单板裤", "Snowboard pants"),
+    "YB": ("双板裤", "Ski pants"),
+    "Z": ("雪杖", "Ski poles"),
+    "G": ("无框雪镜", "Frameless goggles"),
+    "G1": ("翻盖雪镜", "Flip-up goggles"),
+    "PA": ("全脸护脸", "Full face"),
+    "PB": ("半脸护脸", "Half face"),
+    "T5": ("五指手套", "Gloves"),
+    "T1": ("焖子手套", "Mittens"),
+    "H": ("头盔", "Helmet"),
+    "K1": ("HD护臀", "HD hip pads"),
+    "K2": ("PU护臀", "PU hip pads"),
+    "KK1": ("护膝1", "Knee pads 1"),
+    "KK2": ("护膝2", "Knee pads 2"),
+    "W": ("雪袜", "Ski socks"),
+    "Q": ("鞋垫", "Insoles"),
+    "F1": ("小防冻贴", "Small anti-freeze patch"),
+    "F2": ("大防冻贴", "Large anti-freeze patch"),
+}
+
+
 class ProductTemplate(models.Model):
     _inherit = "product.template"
 
@@ -709,7 +749,9 @@ class ProductTemplate(models.Model):
         else:
             type_code = first_block[-2:] if len(first_block) >= 2 else first_block
         color_code = last_block[:4]
-        type_label = type_code or ("Unknown type" if is_english else "未知类型")
+        type_names = SHOP_TYPE_LABELS.get(type_code)
+        type_label = type_names[1 if is_english else 0] if type_names else type_code
+        type_label = type_label or ("Unknown type" if is_english else "未知类型")
         color_label = values["color"]
         values.update({
             "type_code": type_code,

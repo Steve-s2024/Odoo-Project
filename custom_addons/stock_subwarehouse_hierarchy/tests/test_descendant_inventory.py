@@ -992,15 +992,15 @@ class TestDescendantInventoryTotals(TransactionCase):
             for group in option_groups
         }
 
-        self.assertEqual(options_by_key["type_color"], ["YB · 白", "YB · 黑"])
+        self.assertEqual(options_by_key["type_color"], ["双板裤 · 白", "双板裤 · 黑"])
         self.assertEqual(options_by_key["size"], ["150", "155"])
         self.assertEqual(options_by_key["flex"], ["100", "无硬度"])
         self.assertEqual(
-            groups_by_key["type_color"]["image_products"]["YB · 黑"],
+            groups_by_key["type_color"]["image_products"]["双板裤 · 黑"],
             product_1,
         )
         self.assertEqual(
-            groups_by_key["type_color"]["image_products"]["YB · 白"],
+            groups_by_key["type_color"]["image_products"]["双板裤 · 白"],
             product_2,
         )
         self.assertFalse(groups_by_key["size"]["image_products"])
@@ -1025,7 +1025,7 @@ class TestDescendantInventoryTotals(TransactionCase):
             for group in t1_glove._get_shop_group_variant_option_groups()
         }
 
-        self.assertEqual(values["type_color"], ["T1 · 黑", "T5 · 黑"])
+        self.assertEqual(values["type_color"], ["五指手套 · 黑", "焖子手套 · 黑"])
         self.assertEqual(t1_glove._get_shop_variant_display_values()["color_code"], "H001")
         self.assertEqual(t5_glove._get_shop_variant_display_values()["type_code"], "T5")
 
