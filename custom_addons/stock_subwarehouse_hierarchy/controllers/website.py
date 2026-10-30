@@ -25,7 +25,7 @@ class StockSubwarehouseWebsite(http.Controller):
             },
         )
 
-    @route("/stores", type="http", auth="public", website=True, sitemap=True)
+    @route("/stores", type="http", auth="public", website=True, sitemap=False)
     def stores(self, **kwargs):
         stores = [
             {
