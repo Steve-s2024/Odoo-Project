@@ -35,6 +35,11 @@ class StorefrontCacheEntry(models.Model):
             "payload": payload if payload else {"_empty": True},
             "synchronized_at": fields.Datetime.now(),
         }
+        if cache and cache.version == values["version"] and cache.payload == values["payload"]:
+            # Product events repeat the shared watermark and every group
+            # sibling's stock; rewriting identical rows only makes concurrent
+            # events collide on them.
+            return cache
         if cache:
             cache.write(values)
         else:

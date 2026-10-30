@@ -671,6 +671,17 @@ class TestStorefrontApiClient(TransactionCase):
         self.assertEqual(first, second)
         self.assertEqual(first.state, "pending")
 
+    def test_cache_upsert_skips_unchanged_rows(self):
+        cache = self.env["storefront.cache.entry"]
+        entry = cache.upsert("inventory", "unchanged-id", {"available_quantity": 2.0}, version="v1")
+        entry.write({"synchronized_at": "2026-01-01 00:00:00"})
+        cache.upsert("inventory", "unchanged-id", {"available_quantity": 2.0}, version="v1")
+        self.assertEqual(fields.Datetime.to_string(entry.synchronized_at), "2026-01-01 00:00:00")
+        cache.upsert("inventory", "unchanged-id", {"available_quantity": 3.0}, version="v1")
+        self.assertEqual(entry.payload, {"available_quantity": 3.0})
+        cache.upsert("inventory", "unchanged-id", {"available_quantity": 3.0}, version="v2")
+        self.assertEqual(entry.version, "v2")
+
     def test_authoritative_product_webhook_updates_inventory_before_queue(self):
         cache = self.env["storefront.cache.entry"]
         cache.search([
