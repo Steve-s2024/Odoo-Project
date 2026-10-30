@@ -39,6 +39,7 @@
                     height: 1em;
                     border-radius: 2px;
                     vertical-align: -0.075em;
+                    box-shadow: none;
                 }
                 html.x_page_transition_ready body {
                     opacity: 1;
