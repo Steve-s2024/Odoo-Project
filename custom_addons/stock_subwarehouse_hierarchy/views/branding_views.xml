@@ -52,6 +52,7 @@
                 header#top .js_language_selector .dropdown-toggle,
                 header#top .o_no_autohide_item &gt; a,
                 header#top a.btn-outline-primary {
+                    font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
                     font-size: 14px !important;
                 }
                 .s_cover:has(.x_scroll_hint) {
