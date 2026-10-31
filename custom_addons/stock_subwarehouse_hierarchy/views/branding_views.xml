@@ -60,14 +60,16 @@
                     padding: 10px;
                     margin-left: -32px;
                     color: #fff;
-                    opacity: 0.8;
                     line-height: 0;
+                    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
                     animation: x_scroll_hint_bob 2.4s ease-in-out infinite;
                 }
-                .x_scroll_hint:hover,
-                .x_scroll_hint:focus-visible {
-                    color: #fff;
-                    opacity: 1;
+                .s_text_image:has(.x_scroll_target) {
+                    position: relative;
+                }
+                .x_scroll_target {
+                    position: absolute;
+                    top: 100px;
                 }
                 @keyframes x_scroll_hint_bob {
                     0%, 100% { transform: translateY(0); }
