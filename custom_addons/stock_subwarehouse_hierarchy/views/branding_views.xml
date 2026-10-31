@@ -77,6 +77,18 @@
                     position: absolute;
                     top: 100px;
                 }
+                .x_feature .o_grid_item:not(.o_grid_item_image) {
+                    align-self: center;
+                }
+                .x_feature h2 {
+                    margin-bottom: 16px;
+                }
+                .x_feature p {
+                    line-height: 1.6;
+                }
+                .x_feature p:has(.btn) {
+                    margin: 8px 0 0;
+                }
                 @keyframes x_scroll_hint_bob {
                     0%, 100% { transform: translateY(0); }
                     50% { transform: translateY(6px); }
