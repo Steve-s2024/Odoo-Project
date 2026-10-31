@@ -151,28 +151,24 @@
                     0%, 100% { transform: translateY(0); }
                     50% { transform: translateY(6px); }
                 }
-                html.x_page_transition_ready body {
-                    opacity: 1;
-                    transition: opacity 320ms ease, transform 320ms ease;
+                #wrapwrap > main {
+                    animation: x_page_in 600ms ease-out backwards;
+                    transition: opacity 250ms ease;
                 }
-                html.x_page_transition_entering body {
-                    opacity: 0;
-                    transform: translateY(6px);
+                html.x_page_leaving #wrapwrap > main {
+                    opacity: 0.35;
                 }
-                html.x_page_transition_leaving body {
-                    opacity: 0;
-                    transform: translateY(-4px);
+                @keyframes x_page_in {
+                    from {
+                        opacity: 0;
+                        transform: translateY(12px);
+                    }
                 }
                 @media (prefers-reduced-motion: reduce) {
-                    html.x_page_transition_ready body,
-                    html.x_page_transition_entering body,
-                    html.x_page_transition_leaving body {
-                        opacity: 1;
-                        transform: none;
-                        transition: none;
-                    }
+                    #wrapwrap > main,
                     .x_scroll_hint {
                         animation: none;
+                        transition: none;
                     }
                 }
             </style>
@@ -180,42 +176,29 @@
         <xpath expr="//body" position="inside">
             <script>
                 (function () {
+                    // Dim the page while the next one loads; never leave it hidden.
                     const root = document.documentElement;
-                    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-                        return;
-                    }
-                    root.classList.add("x_page_transition_entering");
-                    const enter = () => {
-                        root.classList.add("x_page_transition_ready");
-                        requestAnimationFrame(() => root.classList.remove("x_page_transition_entering"));
-                    };
-                    if (document.readyState === "loading") {
-                        document.addEventListener("DOMContentLoaded", enter, { once: true });
-                    } else {
-                        enter();
-                    }
+                    const reset = () => root.classList.remove("x_page_leaving");
+                    window.addEventListener("pageshow", reset);
                     document.addEventListener("click", (event) => {
                         const link = event.target.closest("a[href]");
-                        if (!link || event.defaultPrevented || event.button !== 0) {
+                        if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
                             return;
                         }
-                        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-                            return;
-                        }
-                        if (link.target &amp;&amp; link.target !== "_self") {
+                        const href = link.getAttribute("href");
+                        if (href.startsWith("#") || link.hasAttribute("download") || link.dataset.bsToggle || (link.target &amp;&amp; link.target !== "_self")) {
                             return;
                         }
                         const url = new URL(link.href, window.location.href);
-                        if (url.origin !== window.location.origin) {
+                        if (url.origin !== window.location.origin || (url.pathname === window.location.pathname &amp;&amp; url.search === window.location.search)) {
                             return;
                         }
-                        if (url.hash &amp;&amp; url.pathname === window.location.pathname) {
-                            return;
-                        }
-                        root.classList.add("x_page_transition_leaving");
-                    });
-                    window.addEventListener("pageshow", () => {
-                        root.classList.remove("x_page_transition_leaving");
+                        setTimeout(() => {
+                            if (!event.defaultPrevented) {
+                                root.classList.add("x_page_leaving");
+                                setTimeout(reset, 2500);
+                            }
+                        });
                     });
                 })();
             </script>
