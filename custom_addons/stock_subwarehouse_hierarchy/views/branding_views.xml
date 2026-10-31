@@ -97,6 +97,16 @@
                         padding-right: 10px !important;
                         padding-left: 40px !important;
                     }
+                    #one-touch-lock::before {
+                        content: "";
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        height: 1730px;
+                        background: url("/stock_subwarehouse_hierarchy/static/img/feature_lines.svg") no-repeat 0 0 / 100% 100%;
+                        pointer-events: none;
+                    }
                 }
                 @keyframes x_scroll_hint_bob {
                     0%, 100% { transform: translateY(0); }
