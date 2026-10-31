@@ -89,6 +89,15 @@
                 .x_feature p:has(.btn) {
                     margin: 8px 0 0;
                 }
+                @media (min-width: 992px) {
+                    .x_feature .o_grid_item:not(.o_grid_item_image) {
+                        padding-right: 40px !important;
+                    }
+                    .x_feature .o_grid_item[style*="grid-area: 1 / 6 / 13 / 12"] {
+                        padding-right: 10px !important;
+                        padding-left: 40px !important;
+                    }
+                }
                 @keyframes x_scroll_hint_bob {
                     0%, 100% { transform: translateY(0); }
                     50% { transform: translateY(6px); }
