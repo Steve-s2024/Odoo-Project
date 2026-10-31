@@ -96,9 +96,11 @@ class StockSubwarehouseImportTemplateController(Controller):
         auth="user",
     )
     def open_separated_storefront(self, **kwargs):
-        host = request.httprequest.host.split(":", 1)[0]
-        scheme = request.httprequest.scheme
-        return redirect(f"{scheme}://{host}:8070/", code=302)
+        # The shops edit their own site; the ERP opens the .cn shop's editor.
+        preview = "/odoo/action-website.website_preview"
+        if request.db == "odoo_storefront":
+            return redirect(preview, code=302)
+        return redirect(f"https://sunwintersports.cn{preview}", code=302)
 
     def _parse_ids(self, ids):
         return [

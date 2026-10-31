@@ -89,6 +89,45 @@
                 .x_feature p:has(.btn) {
                     margin: 8px 0 0;
                 }
+                .x_card {
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                }
+                .x_card h2 {
+                    margin-bottom: 16px;
+                }
+                .x_card p {
+                    font-size: 17px;
+                    line-height: 1.6;
+                }
+                .x_card .x_card_eyebrow {
+                    margin-bottom: 4px;
+                    font-size: 20px;
+                }
+                .x_card .x_card_link {
+                    margin: 8px 0 0;
+                    font-size: 20px;
+                }
+                @media (min-width: 992px) {
+                    .row.o_grid_mode:has(&gt; .x_card) {
+                        grid-auto-rows: minmax(50px, auto);
+                    }
+                    .row.o_grid_mode:has(&gt; .x_card) &gt; .o_grid_item_image {
+                        position: relative;
+                    }
+                    .row.o_grid_mode:has(&gt; .x_card) &gt; .o_grid_item_image img {
+                        position: absolute;
+                        inset: 0;
+                        width: 100%;
+                        height: 100%;
+                    }
+                }
+                @media (max-width: 991.98px) {
+                    .x_card {
+                        padding: 32px 24px !important;
+                    }
+                }
                 @media (min-width: 992px) {
                     .x_feature .o_grid_item:not(.o_grid_item_image) {
                         padding-right: 40px !important;
