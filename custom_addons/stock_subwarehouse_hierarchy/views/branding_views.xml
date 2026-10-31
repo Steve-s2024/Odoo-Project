@@ -49,6 +49,11 @@
                 header#top #top_menu .nav-link {
                     font-weight: 500;
                 }
+                header#top .js_language_selector .dropdown-toggle,
+                header#top .o_no_autohide_item &gt; a,
+                header#top a.btn-outline-primary {
+                    font-size: 14px !important;
+                }
                 .s_cover:has(.x_scroll_hint) {
                     position: relative;
                 }
@@ -59,7 +64,7 @@
                     z-index: 2;
                     padding: 10px;
                     margin-left: -32px;
-                    color: #fff;
+                    color: #fff !important;
                     line-height: 0;
                     filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
                     animation: x_scroll_hint_bob 2.4s ease-in-out infinite;
