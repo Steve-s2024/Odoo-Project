@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="website_search_branding" inherit_id="website.layout" name="SUN Winter Sports search branding" priority="90">
+        <xpath expr="//link[@rel='shortcut icon']" position="replace">
+            <link rel="icon" type="image/png" sizes="192x192" href="/storefront_api_bridge/static/src/img/sun-favicon-192.png"/>
+            <link rel="icon" type="image/svg+xml" sizes="any" href="/storefront_api_bridge/static/src/img/sun-favicon.svg"/>
+            <link rel="shortcut icon" type="image/x-icon" href="/storefront_api_bridge/static/src/img/sun-favicon.ico"/>
+        </xpath>
+        <xpath expr="//head" position="inside">
+            <!-- og:site_name is set in models/website_seo.py; same per-domain name here. -->
+            <meta name="application-name" t-att-content="'思安奇 SUN' if request.httprequest.host.endswith('.cn') else 'SUN Winter Sports'"/>
+        </xpath>
+    </template>
+</odoo>
