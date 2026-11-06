@@ -41,133 +41,24 @@
                     vertical-align: -0.075em;
                     box-shadow: none;
                 }
-                header#top .nav-link,
-                header#top .btn {
-                    font-family: Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-                    font-size: 15px !important;
+                html.x_page_transition_ready body {
+                    opacity: 1;
+                    transition: opacity 320ms ease, transform 320ms ease;
                 }
-                header#top #top_menu .nav-link {
-                    font-weight: 500;
+                html.x_page_transition_entering body {
+                    opacity: 0;
+                    transform: translateY(6px);
                 }
-                header#top .js_language_selector .dropdown-toggle,
-                header#top .o_no_autohide_item &gt; a,
-                header#top a.btn-outline-primary {
-                    font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
-                    font-size: 14px !important;
-                }
-                .s_cover:has(.x_scroll_hint) {
-                    position: relative;
-                }
-                .x_scroll_hint {
-                    position: absolute;
-                    left: 50%;
-                    bottom: 28px;
-                    z-index: 2;
-                    padding: 10px;
-                    margin-left: -32px;
-                    color: #fff !important;
-                    line-height: 0;
-                    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
-                    animation: x_scroll_hint_bob 2.4s ease-in-out infinite;
-                }
-                .s_text_image:has(.x_scroll_target) {
-                    position: relative;
-                }
-                .x_scroll_target {
-                    position: absolute;
-                    top: 100px;
-                }
-                .x_feature .o_grid_item:not(.o_grid_item_image) {
-                    align-self: center;
-                }
-                .x_feature h2 {
-                    margin-bottom: 16px;
-                }
-                .x_feature p {
-                    line-height: 1.6;
-                }
-                .x_feature p:has(.btn) {
-                    margin: 8px 0 0;
-                }
-                .x_card {
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: center;
-                }
-                .x_card h2 {
-                    margin-bottom: 16px;
-                }
-                .x_card p {
-                    font-size: 17px;
-                    line-height: 1.6;
-                }
-                .x_card .x_card_eyebrow {
-                    margin-bottom: 4px;
-                    font-size: 20px;
-                }
-                .x_card .x_card_link {
-                    margin: 8px 0 0;
-                    font-size: 20px;
-                }
-                @media (min-width: 992px) {
-                    .row.o_grid_mode:has(&gt; .x_card) {
-                        grid-auto-rows: minmax(50px, auto);
-                    }
-                    .row.o_grid_mode:has(&gt; .x_card) &gt; .o_grid_item_image {
-                        position: relative;
-                    }
-                    .row.o_grid_mode:has(&gt; .x_card) &gt; .o_grid_item_image img {
-                        position: absolute;
-                        inset: 0;
-                        width: 100%;
-                        height: 100%;
-                    }
-                }
-                @media (max-width: 991.98px) {
-                    .x_card {
-                        padding: 32px 24px !important;
-                    }
-                }
-                @media (min-width: 992px) {
-                    .x_feature .o_grid_item:not(.o_grid_item_image) {
-                        padding-right: 40px !important;
-                    }
-                    .x_feature .o_grid_item[style*="grid-area: 1 / 6 / 13 / 12"] {
-                        padding-right: 10px !important;
-                        padding-left: 40px !important;
-                    }
-                    #one-touch-lock::before {
-                        content: "";
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        height: 1730px;
-                        background: url("/stock_subwarehouse_hierarchy/static/img/feature_lines.svg") no-repeat 0 0 / 100% 100%;
-                        pointer-events: none;
-                    }
-                }
-                @keyframes x_scroll_hint_bob {
-                    0%, 100% { transform: translateY(0); }
-                    50% { transform: translateY(6px); }
-                }
-                #wrapwrap > main {
-                    animation: x_page_in 600ms ease-out backwards;
-                    transition: opacity 250ms ease;
-                }
-                html.x_page_leaving #wrapwrap > main {
-                    opacity: 0.35;
-                }
-                @keyframes x_page_in {
-                    from {
-                        opacity: 0;
-                        transform: translateY(12px);
-                    }
+                html.x_page_transition_leaving body {
+                    opacity: 0;
+                    transform: translateY(-4px);
                 }
                 @media (prefers-reduced-motion: reduce) {
-                    #wrapwrap > main,
-                    .x_scroll_hint {
-                        animation: none;
+                    html.x_page_transition_ready body,
+                    html.x_page_transition_entering body,
+                    html.x_page_transition_leaving body {
+                        opacity: 1;
+                        transform: none;
                         transition: none;
                     }
                 }
@@ -176,29 +67,42 @@
         <xpath expr="//body" position="inside">
             <script>
                 (function () {
-                    // Dim the page while the next one loads; never leave it hidden.
                     const root = document.documentElement;
-                    const reset = () => root.classList.remove("x_page_leaving");
-                    window.addEventListener("pageshow", reset);
+                    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+                        return;
+                    }
+                    root.classList.add("x_page_transition_entering");
+                    const enter = () => {
+                        root.classList.add("x_page_transition_ready");
+                        requestAnimationFrame(() => root.classList.remove("x_page_transition_entering"));
+                    };
+                    if (document.readyState === "loading") {
+                        document.addEventListener("DOMContentLoaded", enter, { once: true });
+                    } else {
+                        enter();
+                    }
                     document.addEventListener("click", (event) => {
                         const link = event.target.closest("a[href]");
-                        if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                        if (!link || event.defaultPrevented || event.button !== 0) {
                             return;
                         }
-                        const href = link.getAttribute("href");
-                        if (href.startsWith("#") || link.hasAttribute("download") || link.dataset.bsToggle || (link.target &amp;&amp; link.target !== "_self")) {
+                        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                            return;
+                        }
+                        if (link.target &amp;&amp; link.target !== "_self") {
                             return;
                         }
                         const url = new URL(link.href, window.location.href);
-                        if (url.origin !== window.location.origin || (url.pathname === window.location.pathname &amp;&amp; url.search === window.location.search)) {
+                        if (url.origin !== window.location.origin) {
                             return;
                         }
-                        setTimeout(() => {
-                            if (!event.defaultPrevented) {
-                                root.classList.add("x_page_leaving");
-                                setTimeout(reset, 2500);
-                            }
-                        });
+                        if (url.hash &amp;&amp; url.pathname === window.location.pathname) {
+                            return;
+                        }
+                        root.classList.add("x_page_transition_leaving");
+                    });
+                    window.addEventListener("pageshow", () => {
+                        root.classList.remove("x_page_transition_leaving");
                     });
                 })();
             </script>

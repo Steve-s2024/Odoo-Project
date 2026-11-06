@@ -3,8 +3,6 @@ from . import base_import
 from . import business_import_result
 from . import mrp_bom
 from . import mrp_production
-from . import mrp_import_destination
-from . import import_template
 from . import payment_transaction
 from . import ir_http
 from . import ir_ui_view
@@ -22,7 +20,6 @@ from . import res_users
 from . import res_currency
 from . import sale_order
 from . import sale_order_line
-from . import sale_product_selection
 from . import sale_report
 from . import spreadsheet_dashboard
 from . import stock_location
@@ -36,4 +33,3 @@ from . import stock_subwarehouse_inventory_total
 from . import website_page
 from . import website_payment_refund_wizard
 from . import website_refund_request
-from . import mrp_import_gateway

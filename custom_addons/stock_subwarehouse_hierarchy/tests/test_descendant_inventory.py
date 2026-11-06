@@ -237,7 +237,7 @@ class TestDescendantInventoryTotals(TransactionCase):
 
         self.assertEqual(len(name_fields), 1)
         self.assertEqual(name_fields[0]["string"], "制造单号")
-        self.assertFalse(name_fields[0]["required"])
+        self.assertTrue(name_fields[0]["required"])
         for header in ("name", "制造单号"):
             suggestion = import_job._get_mapping_suggestion(
                 header, fields_tree, ["char"], {},
@@ -251,8 +251,17 @@ class TestDescendantInventoryTotals(TransactionCase):
         unavailable_button_arch = self.env.ref(
             "stock_subwarehouse_hierarchy.product_page_replace_add_to_cart_button"
         ).arch_db
+        product_style_arch = self.env.ref(
+            "stock_subwarehouse_hierarchy.product_page_hide_standard_product_attributes"
+        ).arch_db
+        sibling_selector_arch = self.env.ref(
+            "stock_subwarehouse_hierarchy.product_page_shop_group_siblings"
+        ).arch_db
 
-        self.assertIn("双板商品(SKI PRODUCTS)", family_title_arch)
+        self.assertIn("'ski': 'Ski Products' if x_shop_family_is_english else '双板商品'", family_title_arch)
+        self.assertNotIn("(SKI PRODUCTS)", family_title_arch)
+        self.assertNotIn("(SNOWBOARD PRODUCTS)", family_title_arch)
+        self.assertNotIn("(OTHER PRODUCTS)", family_title_arch)
         self.assertIn("font-size: 16px", family_title_arch)
         self.assertIn("x_shop_product_family_title", family_title_arch)
         self.assertIn('disabled="disabled"', unavailable_button_arch)
@@ -260,6 +269,12 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertIn("Out of stock", unavailable_button_arch)
         self.assertIn("缺货", unavailable_button_arch)
         self.assertNotIn("fa-times", unavailable_button_arch)
+        self.assertIn("background-color: #111 !important", product_style_arch)
+        self.assertIn("data-current-product-code", sibling_selector_arch)
+        self.assertIn("data-product-code", sibling_selector_arch)
+        self.assertIn("currentPageVariant", sibling_selector_arch)
+        self.assertIn("refreshCurrentPageAvailability", sibling_selector_arch)
+        self.assertIn("event.isTrusted", sibling_selector_arch)
 
     def test_item_search_and_product_cards_reuse_title_hover_motion(self):
         item_page_arch = self.env.ref(
@@ -268,6 +283,13 @@ class TestDescendantInventoryTotals(TransactionCase):
         family_page_arch = self.env.ref(
             "stock_subwarehouse_hierarchy.custom_product_family_page"
         ).arch_db
+
+        for title in ("双板商品", "单板商品", "其他商品"):
+            self.assertIn(title, item_page_arch)
+        for removed_suffix in (
+            "(SKI PRODUCTS)", "(SNOWBOARD PRODUCTS)", "(OTHER PRODUCTS)",
+        ):
+            self.assertNotIn(removed_suffix, item_page_arch)
 
         for arch, search_class, card_class in (
             (item_page_arch, "x_item_product_search", "x_item_product_card"),
@@ -500,6 +522,27 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertEqual(
             action["context"]["default_picking_type_id"],
             self.warehouse.int_type_id.id,
+        )
+
+    def test_internal_transfer_button_only_exists_on_descendant_inventory(self):
+        location_view = self.env.ref(
+            "stock_subwarehouse_hierarchy.view_location_form_subwarehouse_actions"
+        )
+        quant_view = self.env.ref(
+            "stock_subwarehouse_hierarchy.view_stock_quant_tree_descendant_transfer_button"
+        )
+        total_view = self.env.ref(
+            "stock_subwarehouse_hierarchy.view_descendant_inventory_total_list"
+        )
+
+        self.assertNotIn('name="action_create_internal_transfer"', location_view.arch_db)
+        self.assertIn(
+            'name="action_transfer_selected_out_of_descendant_inventory"',
+            quant_view.arch_db,
+        )
+        self.assertIn(
+            'name="action_transfer_selected_out_of_current_warehouse"',
+            total_view.arch_db,
         )
 
     def test_location_load_remove_inventory_action_filters_current_location(self):
@@ -992,15 +1035,15 @@ class TestDescendantInventoryTotals(TransactionCase):
             for group in option_groups
         }
 
-        self.assertEqual(options_by_key["type_color"], ["双板裤 · 白", "双板裤 · 黑"])
+        self.assertEqual(options_by_key["type_color"], ["YB · 白", "YB · 黑"])
         self.assertEqual(options_by_key["size"], ["150", "155"])
         self.assertEqual(options_by_key["flex"], ["100", "无硬度"])
         self.assertEqual(
-            groups_by_key["type_color"]["image_products"]["双板裤 · 黑"],
+            groups_by_key["type_color"]["image_products"]["YB · 黑"],
             product_1,
         )
         self.assertEqual(
-            groups_by_key["type_color"]["image_products"]["双板裤 · 白"],
+            groups_by_key["type_color"]["image_products"]["YB · 白"],
             product_2,
         )
         self.assertFalse(groups_by_key["size"]["image_products"])
@@ -1025,7 +1068,7 @@ class TestDescendantInventoryTotals(TransactionCase):
             for group in t1_glove._get_shop_group_variant_option_groups()
         }
 
-        self.assertEqual(values["type_color"], ["五指手套 · 黑", "焖子手套 · 黑"])
+        self.assertEqual(values["type_color"], ["T1 · 黑", "T5 · 黑"])
         self.assertEqual(t1_glove._get_shop_variant_display_values()["color_code"], "H001")
         self.assertEqual(t5_glove._get_shop_variant_display_values()["type_code"], "T5")
 
@@ -1200,15 +1243,26 @@ class TestDescendantInventoryTotals(TransactionCase):
         quantity = self.StockQuant._get_available_quantity(self.product_a, self.bin_a)
         self.assertEqual(quantity, 2.0)
 
-    def test_location_import_manufacturing_sheet_action_uses_gateway(self):
+    def test_location_import_manufacturing_sheet_action_uses_builtin_import(self):
         action = self.subwarehouse.action_import_manufacturing_sheet()
 
-        self.assertEqual(action["type"], "ir.actions.act_window")
-        self.assertEqual(action["res_model"], "stock.subwarehouse.mrp.import.gateway")
+        self.assertEqual(action["type"], "ir.actions.client")
+        self.assertEqual(action["tag"], "import")
         self.assertEqual(action["target"], "current")
-        self.assertIn(action["context"]["subwarehouse_manufacturing_location_id"], (self.bin_a | self.bin_b).ids)
-        self.assertEqual(action["context"]["default_location_src_id"], action["context"]["subwarehouse_manufacturing_location_id"])
-        self.assertEqual(action["context"]["default_location_dest_id"], action["context"]["subwarehouse_manufacturing_location_id"])
+        self.assertEqual(action["params"]["model"], "mrp.production")
+        self.assertEqual(action["params"]["active_model"], "mrp.production")
+        self.assertIn(
+            action["params"]["context"]["subwarehouse_manufacturing_location_id"],
+            (self.bin_a | self.bin_b).ids,
+        )
+        self.assertEqual(
+            action["params"]["context"]["default_location_src_id"],
+            action["params"]["context"]["subwarehouse_manufacturing_location_id"],
+        )
+        self.assertEqual(
+            action["params"]["context"]["default_location_dest_id"],
+            action["params"]["context"]["subwarehouse_manufacturing_location_id"],
+        )
 
     def test_location_manufacturing_history_action_filters_current_inventory(self):
         action = self.subwarehouse.action_view_manufacturing_history()
@@ -2059,9 +2113,9 @@ class TestDescendantInventoryTotals(TransactionCase):
         self.assertIn("product_qty", import_headers)
         self.assertIn("never_product_template_attribute_value_ids", import_headers)
         import_rows = list(workbook["制造单导入"].iter_rows(values_only=True))
-        self.assertEqual(import_rows[1][import_headers.index("name")], "制造单号")
-        self.assertEqual(import_rows[1][import_headers.index("product_id")], "产品")
-        self.assertEqual(len(import_rows), 2)
+        self.assertEqual(import_rows[1][import_headers.index("name")], "MO-IMPORT-001")
+        self.assertIsNone(import_rows[2][import_headers.index("name")])
+        self.assertTrue(import_rows[2][import_headers.index("product_id")])
 
         attribute_rows = list(workbook["产品属性"].iter_rows(values_only=True))
         self.assertIn(
@@ -2837,7 +2891,7 @@ class TestDescendantInventoryTotals(TransactionCase):
         ))
         self.assertEqual(product._get_english_shop_variant_value("color", "\u9ed1\u767d"), "Black / White")
         self.assertEqual(product._get_english_shop_variant_value("size", "\u901a\u7801"), "One size")
-        self.assertEqual(product._get_english_shop_variant_value("flex", "\u786c\u5ea6100"), "100")
+        self.assertEqual(product._get_english_shop_variant_value("flex", "\u786c\u5ea6100"), "100 flex")
         self.assertEqual(action["params"]["type"], "success")
 
         unsafe_product = self.env["product.template"].create({

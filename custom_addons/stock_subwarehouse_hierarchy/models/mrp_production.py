@@ -20,11 +20,6 @@ class MrpProduction(models.Model):
         )
         result["x_business_import_failures"] = filtered["failures"]
         if filtered["applied"]:
-            for message in result.get("messages", []):
-                rows = message.get("rows") or {}
-                for bound in ("from", "to"):
-                    if isinstance(rows.get(bound), int) and 0 <= rows[bound] < len(filtered["kept_source_indexes"]):
-                        rows[bound] = filtered["kept_source_indexes"][rows[bound]]
             result["nextrow"] = (
                 filtered["source_window_size"]
                 if filtered["has_more_source_rows"]
@@ -50,11 +45,6 @@ class MrpProduction(models.Model):
 
         import_limit = self.env.context.get("_import_limit")
         window_size = min(len(import_data), import_limit) if import_limit else len(import_data)
-        name_index = import_fields.index("name") if "name" in import_fields else None
-        # Never split the additional-product rows of an MO across batches.
-        if name_index is not None:
-            while window_size < len(import_data) and self._is_empty_mrp_import_value(import_data[window_size][name_index]):
-                window_size += 1
         source_data = import_data[:window_size]
         result.update({
             "data": source_data,
@@ -65,6 +55,20 @@ class MrpProduction(models.Model):
         })
         source_offset = self.env.context.get("business_import_source_offset", 0)
         header_offset = 2 if self.env.context.get("business_import_has_headers") else 1
+        if "name" not in import_fields:
+            result["data"] = []
+            result["kept_source_indexes"] = []
+            result["failures"] = [
+                {
+                    "source_row": source_offset + index + header_offset,
+                    "identifier": "",
+                    "reason": "必须映射制造单号（name）字段。",
+                }
+                for index, _row in enumerate(source_data)
+            ]
+            return result
+
+        name_index = import_fields.index("name")
         self.env.cr.execute(
             "SELECT pg_advisory_xact_lock(hashtext(%s))",
             ["stock_subwarehouse_hierarchy.mrp_name_import"],
@@ -77,18 +81,13 @@ class MrpProduction(models.Model):
         """)
         existing = {row[0] for row in self.env.cr.fetchall()}
         accepted = set()
-        prepared_fields, continuation_field_map = (
-            self._prepare_grouped_mrp_import_fields(import_fields)
-            if name_index is not None else (list(import_fields), {})
+        prepared_fields, continuation_field_map = self._prepare_grouped_mrp_import_fields(
+            import_fields
         )
-        destination_plan = self._inspect_mrp_import_destinations(import_fields, source_data)
-        destination_index = destination_plan["field_index"]
-        if destination_index is not None:
-            prepared_fields[destination_index] = "location_dest_id/.id"
         groups = []
         current_group = []
         for source_index, row in enumerate(source_data):
-            starts_new_order = name_index is None or not self._is_empty_mrp_import_value(row[name_index])
+            starts_new_order = not self._is_empty_mrp_import_value(row[name_index])
             if current_group and starts_new_order:
                 groups.append(current_group)
                 current_group = []
@@ -102,36 +101,18 @@ class MrpProduction(models.Model):
         failures = []
         for group in groups:
             first_source_index, first_row = group[0]
-            display_name = str(first_row[name_index] or "").strip() if name_index is not None else ""
+            display_name = str(first_row[name_index] or "").strip()
             normalized_name = display_name.casefold()
-            if first_source_index in destination_plan["invalid"]:
-                for source_index, _row in group:
-                    failures.append({
-                        "source_row": source_offset + source_index + header_offset,
-                        "identifier": display_name,
-                        "reason": destination_plan["invalid"][first_source_index] if source_index == first_source_index
-                        else "所属制造单的成品库位无效，该产品行随制造单跳过。",
-                    })
-                continue
-            if name_index is not None and not normalized_name:
+            if not normalized_name:
                 reason = "制造单号不能为空。"
-            elif normalized_name and normalized_name in existing:
+            elif normalized_name in existing:
                 reason = "制造单号已存在于 ERP。"
-            elif normalized_name and normalized_name in accepted:
+            elif normalized_name in accepted:
                 reason = "制造单号在本次导入文件中重复。"
             else:
                 accepted.add(normalized_name)
                 for group_index, (source_index, row) in enumerate(group):
-                    if source_index in destination_plan["invalid"]:
-                        failures.append({
-                            "source_row": source_offset + source_index + header_offset,
-                            "identifier": display_name,
-                            "reason": destination_plan["invalid"][source_index],
-                        })
-                        continue
                     prepared_row = list(row) + [""] * (len(prepared_fields) - len(row))
-                    if source_index in destination_plan["resolved"]:
-                        prepared_row[destination_index] = str(destination_plan["resolved"][source_index])
                     if group_index:
                         for source_field_index, target_field_index in continuation_field_map.items():
                             if self._is_empty_mrp_import_value(prepared_row[target_field_index]):
@@ -216,7 +197,7 @@ class MrpProduction(models.Model):
                 "batch_id": batch_id,
                 "source_row": source_offset + accepted["source_index"] + header_offset,
                 "status": "success",
-                "identifier": accepted["identifier"] or self.browse(record_id).name,
+                "identifier": accepted["identifier"],
                 "record_ref": f"mrp.production,{record_id}",
                 "reason": "导入成功。",
             })
@@ -378,7 +359,6 @@ class MrpProduction(models.Model):
         field_columns = self._get_dynamic_import_template_columns()
         headers = [field_name for field_name, _label in field_columns]
         import_sheet.append(headers)
-        import_sheet.append([label for _field_name, label in field_columns])
         import_sheet.append([
             "MO-IMPORT-001",
             "产品显示名称或外部 ID",
@@ -442,14 +422,10 @@ class MrpProduction(models.Model):
             ])
 
         for sheet in workbook.worksheets:
-            sheet.freeze_panes = "A3" if sheet == import_sheet else "A2"
+            sheet.freeze_panes = "A2"
             for cell in sheet[1]:
                 cell.font = Font(bold=True)
                 cell.fill = PatternFill("solid", fgColor="D9EAF7")
-            if sheet == import_sheet and sheet.max_row >= 2:
-                for cell in sheet[2]:
-                    cell.font = Font(italic=True)
-                    cell.fill = PatternFill("solid", fgColor="E2F0D9")
             for column_cells in sheet.columns:
                 max_length = max(len(str(cell.value or "")) for cell in column_cells)
                 sheet.column_dimensions[get_column_letter(column_cells[0].column)].width = min(max(max_length + 2, 12), 45)

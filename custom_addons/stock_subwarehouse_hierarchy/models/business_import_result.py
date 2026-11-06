@@ -48,7 +48,6 @@ class BusinessImportResultBatch(models.TransientModel):
         self.search([
             ("create_date", "<", fields.Datetime.subtract(fields.Datetime.now(), days=30)),
         ]).unlink()
-
     def action_open_lines(self):
         self.ensure_one()
         model_label = dict(BUSINESS_IMPORT_MODELS).get(self.res_model, "业务")
@@ -108,4 +107,3 @@ class BusinessImportResultLine(models.TransientModel):
         self.search([
             ("create_date", "<", fields.Datetime.subtract(fields.Datetime.now(), days=30)),
         ]).unlink()
-

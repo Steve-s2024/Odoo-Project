@@ -398,11 +398,11 @@
             <t t-if="x_item_title_slug in ('ski-items', 'snowboard-items', 'other-items')">
                 <t t-set="x_item_title_is_english" t-value="bool(request.lang and (request.lang.code or '').lower().startswith('en'))"/>
                 <t t-set="x_item_browser_title" t-value="{
-                    'ski-items': 'Ski Products' if x_item_title_is_english else '双板商品(SKI PRODUCTS)',
-                    'snowboard-items': 'Snowboard Products' if x_item_title_is_english else '单板商品(SNOWBOARD PRODUCTS)',
-                    'other-items': 'Other Products' if x_item_title_is_english else '其他商品(OTHER PRODUCTS)',
+                    'ski-items': 'Ski Products' if x_item_title_is_english else '双板商品',
+                    'snowboard-items': 'Snowboard Products' if x_item_title_is_english else '单板商品',
+                    'other-items': 'Other Products' if x_item_title_is_english else '其他商品',
                 }.get(x_item_title_slug)"/>
-                <t t-set="title" t-value="(main_object and 'website_meta_title' in main_object and main_object.website_meta_title) or (x_item_browser_title + ' | ' + website.name)"/>
+                <t t-set="title" t-value="x_item_browser_title + ' | ' + website.name"/>
             </t>
         </xpath>
         <xpath expr="//div[@id='wrapwrap']/main/t[@t-out='0']" position="after">
@@ -415,9 +415,9 @@
             <t t-if="x_item_page_family">
                 <t t-set="x_item_page_is_english" t-value="bool(request.lang and (request.lang.code or '').lower().startswith('en'))"/>
                 <t t-set="x_item_page_title" t-value="{
-                    'ski-items': 'Ski Products' if x_item_page_is_english else '双板商品(SKI PRODUCTS)',
-                    'snowboard-items': 'Snowboard Products' if x_item_page_is_english else '单板商品(SNOWBOARD PRODUCTS)',
-                    'other-items': 'Other Products' if x_item_page_is_english else '其他商品(OTHER PRODUCTS)',
+                    'ski-items': 'Ski Products' if x_item_page_is_english else '双板商品',
+                    'snowboard-items': 'Snowboard Products' if x_item_page_is_english else '单板商品',
+                    'other-items': 'Other Products' if x_item_page_is_english else '其他商品',
                 }.get(x_item_page_slug)"/>
                 <t t-set="x_item_page_subtitle" t-value="{
                     'ski-items': 'Skis, ski boots, poles, and alpine gear.' if x_item_page_is_english else '双板、雪鞋、雪杖与滑雪装备。',
@@ -1374,9 +1374,9 @@
             <t t-set="x_shop_family_is_english" t-value="bool(request.lang and (request.lang.code or '').lower().startswith('en'))"/>
             <t t-set="x_shop_family_url" t-value="{'ski': '/ski-items', 'snowboard': '/snowboard-items', 'other': '/other-items'}.get(x_shop_product_family, '/other-items')"/>
             <t t-set="x_shop_family_title" t-value="{
-                'ski': 'Ski Products' if x_shop_family_is_english else '双板商品(SKI PRODUCTS)',
-                'snowboard': 'Snowboard Products' if x_shop_family_is_english else '单板商品(SNOWBOARD PRODUCTS)',
-                'other': 'Other Products' if x_shop_family_is_english else '其他商品(OTHER PRODUCTS)',
+                'ski': 'Ski Products' if x_shop_family_is_english else '双板商品',
+                'snowboard': 'Snowboard Products' if x_shop_family_is_english else '单板商品',
+                'other': 'Other Products' if x_shop_family_is_english else '其他商品',
             }.get(x_shop_product_family)"/>
             <p class="x_shop_product_family_heading">
                 <a

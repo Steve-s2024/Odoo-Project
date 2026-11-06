@@ -1,5 +1,4 @@
 from odoo import _, api, models
-from odoo.addons.base_import.models.base_import import ImportValidationError
 
 
 class BaseImport(models.TransientModel):
@@ -12,7 +11,7 @@ class BaseImport(models.TransientModel):
         fields_tree = super().get_fields_tree(model, depth=depth)
         # mrp.production.name is readonly because normal manufacturing orders
         # receive a sequence automatically.  The ORM still accepts an explicit
-        # name during import. An omitted column uses the normal MO sequence.
+        # name during import, and our duplicate guard requires that identifier.
         # Expose only this one readonly field on the root manufacturing import
         # so both `name` and `制造单号` headers are suggested automatically.
         if (
@@ -24,23 +23,15 @@ class BaseImport(models.TransientModel):
                 "id": "name",
                 "name": "name",
                 "string": _("制造单号"),
-                "required": False,
+                "required": True,
                 "fields": [],
                 "type": "char",
                 "model_name": model,
             })
-        if self.res_model == model == "mrp.production":
-            for field in fields_tree:
-                if field.get("name") == "name":
-                    field["required"] = False
         return fields_tree
 
     def execute_import(self, fields, columns, options, dryrun=False):
         self.ensure_one()
-        # Inspect the entire remaining file before importing the first batch.
-        # The normal importer only handles a window at a time.
-        if self.res_model == "mrp.production" and not self.env.context.get("mrp_destinations_prepared"):
-            return self._execute_mrp_destination_import(fields, columns, options, dryrun)
         business_batch = self.env["stock.subwarehouse.business.import.result.batch"]
         if self.res_model in self._business_duplicate_models:
             if not dryrun:
@@ -113,46 +104,6 @@ class BaseImport(models.TransientModel):
             has_more_rows = bool(result.get("nextrow"))
             result["x_product_import_result_action"]["x_open_when_complete"] = not has_more_rows
         return result
-
-    def _execute_mrp_destination_import(self, fields, columns, options, dryrun):
-        try:
-            data, import_fields = self._convert_import_data(fields, options)
-        except ImportValidationError as error:
-            return {"ids": [], "messages": [error.__dict__], "nextrow": 0}
-        model = self.env["mrp.production"]
-        plan = model._inspect_mrp_import_destinations(import_fields, data)
-        decision = options.get("mrp_destination_decision")
-        approved = set(options.get("mrp_destination_keys") or [])
-        if plan["missing"] and (
-            decision not in {"create", "skip"}
-            or (decision == "create" and any(item["key"] not in approved for item in plan["missing"]))
-        ):
-            offset = options.get("skip", 0) + (2 if options.get("has_headers") else 1)
-            return {
-                "ids": [], "messages": [], "nextrow": 0,
-                "x_mrp_missing_destinations": [{
-                    **{key: item[key] for key in ("key", "name", "company", "parent")},
-                    "rows": [offset + index for index in item["source_indexes"]],
-                } for item in plan["missing"]],
-            }
-        # This savepoint includes warehouse creation, which precedes Odoo's
-        # own import savepoint. Test imports and failed batches leave neither
-        # locations nor result rows behind.
-        savepoint = self.env.cr.savepoint()
-        try:
-            if decision == "create" and plan["missing"]:
-                model._create_mrp_import_destinations(plan["missing"])
-            result = self.with_context(mrp_destinations_prepared=True).execute_import(
-                fields, columns, dict(options), dryrun=dryrun,
-            )
-            failed = any(message.get("type") in {"error", "danger"} for message in result.get("messages", []))
-            savepoint.close(rollback=dryrun or failed)
-            if failed:
-                result.pop("x_business_import_result_action", None)
-            return result
-        except Exception:
-            savepoint.close(rollback=True)
-            raise
 
     def _complete_business_import_action(self, result, batch, dryrun):
         if batch and not dryrun:

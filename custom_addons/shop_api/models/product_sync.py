@@ -66,24 +66,15 @@ class ShopApiProductSyncPending(models.Model):
         self.invalidate_model()
         return self.sudo().search([("product_tmpl_id", "in", products.ids)])
 
-    _FLUSH_BATCH_SIZE = 25
-
     @api.model
-    def _flush_pending_products(self, dispatch=False, commit=False):
-        """Drain the set in batches so memory stays bounded for large changes.
-
-        Each batch's payloads are written and dropped from the ORM cache before
-        the next one is built.  ``commit`` (cron only) commits after every
-        batch, so product edits are not blocked behind a long flush and an
-        interruption keeps the batches already sent.
-        """
+    def _flush_pending_products(self, dispatch=False):
         # Only one cron or manual force action may drain the set at a time.
         self.env.cr.execute(
             "SELECT pg_advisory_xact_lock(hashtext(%s))",
             ["shop_api.product.sync.pending.flush"],
         )
-        pending_ids = self.sudo().search([], order="first_queued_at, id").ids
-        if not pending_ids:
+        pending = self.sudo().search([], order="first_queued_at, id")
+        if not pending:
             return {"products": 0, "events": self.env["shop.api.event"]}
 
         inventory_snapshot = self.env["product.template"]._shop_api_inventory_snapshot()
@@ -99,59 +90,41 @@ class ShopApiProductSyncPending(models.Model):
             if variant.get("id")
         }
 
-        event_ids = []
-        size = self._FLUSH_BATCH_SIZE
-        for start in range(0, len(pending_ids), size):
-            if commit and start:
-                # The advisory lock is per transaction; take it again after a commit.
-                self.env.cr.execute(
-                    "SELECT pg_advisory_xact_lock(hashtext(%s))",
-                    ["shop_api.product.sync.pending.flush"],
+        events = self.env["shop.api.event"]
+        for row in pending:
+            product = row.product_tmpl_id.sudo().with_context(active_test=False)
+            if not product.exists():
+                continue
+            product._shop_api_ensure_uuid()
+            snapshots = {
+                language: product._shop_api_payload(language=language, detail=True)
+                for language in ("zh_CN", "en_US")
+            }
+            for snapshot in snapshots.values():
+                self._merge_inventory_snapshot(
+                    snapshot,
+                    inventory_by_product,
+                    inventory_by_variant,
+                    inventory_snapshot.get("generated_at"),
                 )
-            pending = self.sudo().browse(pending_ids[start:start + size]).exists()
-            events = self.env["shop.api.event"]
-            for row in pending:
-                product = row.product_tmpl_id.sudo().with_context(active_test=False)
-                if not product.exists():
-                    continue
-                product._shop_api_ensure_uuid()
-                snapshots = {
-                    language: product._shop_api_payload(language=language, detail=True)
-                    for language in ("zh_CN", "en_US")
-                }
-                for snapshot in snapshots.values():
-                    self._merge_inventory_snapshot(
-                        snapshot,
-                        inventory_by_product,
-                        inventory_by_variant,
-                        inventory_snapshot.get("generated_at"),
-                    )
-                event_type = "product.archived" if not product.active else "product.updated"
-                events |= self.env["shop.api.event"].enqueue(
-                    event_type,
-                    product,
-                    {
-                        "product_id": product.shop_api_uuid,
-                        "authoritative": True,
-                        "replace": True,
-                        "snapshots": snapshots,
-                    },
-                )
+            event_type = "product.archived" if not product.active else "product.updated"
+            events |= self.env["shop.api.event"].enqueue(
+                event_type,
+                product,
+                {
+                    "product_id": product.shop_api_uuid,
+                    "authoritative": True,
+                    "replace": True,
+                    "snapshots": snapshots,
+                },
+            )
 
-            # The durable outbox owns retries from this point onward, so clearing
-            # the set cannot lose an update even if the storefront is unavailable.
-            pending.unlink()
-            # Dispatch before committing: once committed, the webhook cron could
-            # pick up the same events and race this loop for their deliveries.
-            if dispatch:
-                for event in events:
-                    event._dispatch()
-            if commit:
-                self.env.cr.commit()
-            event_ids += events.ids
-            self.env.flush_all()
-            self.env.invalidate_all()
-        events = self.env["shop.api.event"].browse(event_ids)
+        # The durable outbox owns retries from this point onward, so clearing
+        # the set cannot lose an update even if the storefront is unavailable.
+        pending.unlink()
+        if dispatch:
+            for event in events:
+                event._dispatch()
         return {"products": len(events), "events": events}
 
     @api.model
@@ -192,10 +165,7 @@ class ShopApiProductSyncPending(models.Model):
 
     @api.model
     def _cron_flush_pending_products(self):
-        # Only write the outbox; the webhook cron sends it.  Sending here keeps
-        # each batch's transaction open across HTTP calls that update the same
-        # webhook rows as that cron, and the commit then fails to serialize.
-        return self._flush_pending_products(commit=True)
+        return self._flush_pending_products(dispatch=True)
 
 
 class ProductTemplate(models.Model):
