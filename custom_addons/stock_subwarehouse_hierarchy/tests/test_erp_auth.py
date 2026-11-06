@@ -51,11 +51,14 @@ class TestErpAuthentication(HttpCase):
         response = self.url_open("/web/login")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("思安奇ERP系统", response.text)
+        self.assertIn("登录ERP系统", response.text)
+        self.assertIn("请使用已授权的员工账户登录", response.text)
+        self.assertIn("请输入账号或邮箱", response.text)
+        self.assertIn("请输入密码", response.text)
         self.assertIn("sun_erp_login_logo", response.text)
         self.assertIn('font-family: Arial, "Microsoft YaHei", sans-serif', response.text)
-        self.assertNotIn('<header id="top"', response.text)
-        self.assertNotIn('<footer id="bottom"', response.text)
+        self.assertIn("#wrapwrap > header", response.text)
+        self.assertIn("#wrapwrap > footer", response.text)
         self.assertNotIn('href="/web/signup', response.text)
 
     def test_internal_user_login_redirects_to_discuss(self):

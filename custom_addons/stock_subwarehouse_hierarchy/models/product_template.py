@@ -708,7 +708,6 @@ class ProductTemplate(models.Model):
                 return "No flex"
             if normalized in {"\u672a\u8bc6\u522b", "\u9ed8\u8ba4"}:
                 return "Not specified"
-            # The option group is already headed "Flex", so the value is the bare number.
             return normalized
         if key == "audience":
             return {

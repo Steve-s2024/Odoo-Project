@@ -4,56 +4,14 @@ import { BaseImportModel } from "@base_import/import_model";
 import { ImportAction } from "@base_import/import_action/import_action";
 import { _t } from "@web/core/l10n/translation";
 import { patch } from "@web/core/utils/patch";
-import { MrpImportDestinationDialog } from "./mrp_import_destination_dialog";
 
 patch(BaseImportModel.prototype, {
-    async executeImport() {
-        this.mrpDestinationChoice = null;
-        this.productImportResultAction = null;
-        this.businessImportResultAction = null;
-        return super.executeImport(...arguments);
-    },
-
     async _callImport(dryrun, args) {
         if (dryrun) {
             this.productImportResultAction = null;
             this.businessImportResultAction = null;
         }
-        let importArgs = args;
-        if (this.resModel === "mrp.production" && this.mrpDestinationChoice) {
-            importArgs = [...args.slice(0, 3), { ...args[3], ...this.mrpDestinationChoice }];
-        }
-        let result = await super._callImport(dryrun, importArgs);
-        while (this.resModel === "mrp.production" && result?.x_mrp_missing_destinations) {
-            const destinations = result.x_mrp_missing_destinations;
-            this.unblock();
-            let decision;
-            try {
-                decision = await new Promise((resolve) => {
-                    this.env.services.dialog.add(MrpImportDestinationDialog, {
-                        title: "制造单导入：发现不存在的成品库位",
-                        destinations,
-                        dryrun,
-                        confirmLabel: "创建全部并继续",
-                        cancelLabel: "跳过这些行",
-                        confirm: () => resolve("create"),
-                        cancel: () => resolve("skip"),
-                        dismiss: () => resolve(null),
-                    }, { onClose: () => resolve(null) });
-                });
-            } finally {
-                this.block(dryrun ? "测试导入" : "正在导入");
-            }
-            if (!decision) {
-                return { ids: [], messages: [], nextrow: 0 };
-            }
-            this.mrpDestinationChoice = {
-                mrp_destination_decision: decision,
-                mrp_destination_keys: destinations.map((destination) => destination.key),
-            };
-            importArgs = [...args.slice(0, 3), { ...args[3], ...this.mrpDestinationChoice }];
-            result = await super._callImport(dryrun, importArgs);
-        }
+        const result = await super._callImport(...arguments);
         if (this.resModel === "sale.order" && result) {
             const skippedRows = result.x_sale_import_skipped_rows || [];
             if (skippedRows.length) {
@@ -76,7 +34,7 @@ patch(BaseImportModel.prototype, {
             const duplicateFailures = result.x_business_import_failures || [];
             if (duplicateFailures.length) {
                 this._addMessage("warning", [
-                    "以下资料行未通过校验，其余有效资料仍会继续导入：",
+                    "以下资料行因记录 ID 不唯一或为空而未导入，其余有效资料仍会继续导入：",
                     ...duplicateFailures.map((failure) =>
                         `第 ${failure.source_row} 行（${failure.identifier || "空"}）：${failure.reason}`
                     ),

@@ -24,3 +24,15 @@ class TestStorefrontVideoUploadAccess(TransactionCase):
         ])
         self.assertTrue(access)
         self.assertTrue(all(access.mapped("perm_create")))
+
+        # The backend must send the leaf action to the web client.  A small
+        # Website navbar patch then keeps this specific action from being
+        # discarded with other top-level Website leaves.
+        loaded_menus = self.env["ir.ui.menu"].load_menus(debug=False)
+        loaded_menu = loaded_menus.get(str(menu.id)) or loaded_menus.get(menu.id)
+        self.assertTrue(loaded_menu)
+        self.assertEqual(
+            loaded_menu["xmlid"],
+            "stock_subwarehouse_hierarchy.menu_website_video_upload",
+        )
+        self.assertFalse(loaded_menu["children"])

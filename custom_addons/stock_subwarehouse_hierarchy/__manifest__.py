@@ -1,7 +1,7 @@
 {
     "name": "库存子仓库层级",
     "summary": "使用库存库位树跟踪仓库和子仓库。",
-    "version": "19.0.1.0.52",
+    "version": "19.0.1.0.41",
     "category": "库存/库存",
     "author": "Local",
     "license": "LGPL-3",
@@ -22,7 +22,6 @@
         "account_payment",
         "payment_wechatpay",
         "payment_alipay",
-        "payment_lianlian",
     ],
     "data": [
         "security/ir.model.access.csv",
@@ -42,8 +41,6 @@
         "views/product_attribute_apply_views.xml",
         "views/product_import_result_views.xml",
         "views/business_import_result_views.xml",
-        "data/import_template_data.xml",
-        "views/mrp_import_gateway_views.xml",
         "views/product_quick_encoder_views.xml",
         "views/product_bulk_update_views.xml",
         "views/product_international_mapping_views.xml",
@@ -54,7 +51,6 @@
         "views/stock_location_views.xml",
         "views/stock_warehouse_views.xml",
         "views/warehouse_history_views.xml",
-        "views/sale_product_selection_views.xml",
         "views/sale_order_views.xml",
         "views/external_sale_report_views.xml",
         "views/website_video_views.xml",
@@ -74,14 +70,11 @@
         "web.assets_backend": [
             "stock_subwarehouse_hierarchy/static/src/js/advanced_search_boolean.js",
             "stock_subwarehouse_hierarchy/static/src/js/business_import_start_row.js",
-            "stock_subwarehouse_hierarchy/static/src/js/mrp_import_gateway.js",
-            "stock_subwarehouse_hierarchy/static/src/js/mrp_import_destination_dialog.js",
             "stock_subwarehouse_hierarchy/static/src/js/product_import_result.js",
             "stock_subwarehouse_hierarchy/static/src/js/source_location_many2one.js",
             "stock_subwarehouse_hierarchy/static/src/js/template_format_export_menu.js",
             "stock_subwarehouse_hierarchy/static/src/xml/template_format_export_menu.xml",
             "stock_subwarehouse_hierarchy/static/src/xml/business_import_start_row.xml",
-            "stock_subwarehouse_hierarchy/static/src/xml/mrp_import_destination_dialog.xml",
             "stock_subwarehouse_hierarchy/static/src/xml/advanced_search_boolean.xml",
         ],
         "web.assets_frontend": [
