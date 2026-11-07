@@ -1,0 +1,107 @@
+.sun_terms_page {
+    color: #171717;
+    line-height: 1.75;
+}
+
+.sun_terms_document {
+    max-width: 920px;
+    padding: 0 1.25rem 3rem;
+}
+
+.sun_terms_header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.16);
+    margin-bottom: 1.75rem;
+    padding-bottom: 1.5rem;
+}
+
+.sun_terms_eyebrow {
+    font-size: 0.78rem;
+    letter-spacing: 0.16em;
+    margin-bottom: 0.4rem;
+}
+
+.sun_terms_header h1 {
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    font-weight: 500;
+    letter-spacing: -0.025em;
+    margin-bottom: 0.35rem;
+}
+
+.sun_terms_date {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.sun_terms_intro {
+    font-size: 1.05rem;
+    margin: 1.35rem 0 0;
+    max-width: 780px;
+}
+
+.sun_terms_notice {
+    background: #f1f1ee;
+    border-left: 4px solid #171717;
+    margin: 0 0 1.75rem;
+    padding: 1rem 1.2rem;
+}
+
+.sun_terms_index {
+    display: grid;
+    gap: 0.45rem 1.5rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 2.25rem;
+    padding: 1.25rem 0;
+}
+
+.sun_terms_index a,
+.sun_terms_document section a {
+    color: inherit;
+    text-decoration-color: rgba(0, 0, 0, 0.35);
+    text-underline-offset: 0.2em;
+    transition: opacity 180ms ease, text-decoration-color 180ms ease;
+}
+
+.sun_terms_index a:hover,
+.sun_terms_index a:focus-visible,
+.sun_terms_document section a:hover,
+.sun_terms_document section a:focus-visible {
+    opacity: 0.62;
+    text-decoration-color: currentColor;
+}
+
+.sun_terms_document section {
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 1.45rem 0 0.65rem;
+    scroll-margin-top: 6rem;
+}
+
+.sun_terms_document section h2 {
+    font-size: 1.22rem;
+    font-weight: 600;
+    margin-bottom: 0.65rem;
+}
+
+.sun_terms_document section p {
+    margin-bottom: 0.85rem;
+}
+
+@media (max-width: 767.98px) {
+    .sun_terms_page {
+        line-height: 1.68;
+    }
+
+    .sun_terms_document {
+        padding-inline: 0.25rem;
+    }
+
+    .sun_terms_index {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sun_terms_index a,
+    .sun_terms_document section a {
+        transition: none;
+    }
+}
