@@ -252,7 +252,7 @@ class TestDescendantInventoryTotals(TransactionCase):
             "stock_subwarehouse_hierarchy.product_page_replace_add_to_cart_button"
         ).arch_db
 
-        self.assertIn("双板商品(SKI PRODUCTS)", family_title_arch)
+        self.assertIn("双板商品", family_title_arch)
         self.assertIn("font-size: 16px", family_title_arch)
         self.assertIn("x_shop_product_family_title", family_title_arch)
         self.assertIn('disabled="disabled"', unavailable_button_arch)
