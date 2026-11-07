@@ -87,7 +87,7 @@
                 <div t-if="website.x_contact_order_wechat and (website.x_contact_order_wechat_english or not x_contact_is_english)" class="x_contact_order_channel">
                     <i class="fa fa-weixin" aria-hidden="true"/>
                     <span class="x_contact_order_label" t-out="'WeChat' if x_contact_is_english else '微信'"/>
-                    <span t-out="website.x_contact_order_wechat"/>
+                    <span class="x_wechat_qr" tabindex="0" role="button"><t t-out="'SUN WeChat' if x_contact_is_english else '思安奇企业微信'"/><span class="x_wechat_qr_pop"><img src="/storefront_contact_order/static/src/img/sun_wechat_qr.jpg" width="180" height="180" loading="lazy" t-att-alt="'SUN WeChat QR code' if x_contact_is_english else '思安奇企业微信二维码'"/><t t-out="'Scan to add us on WeChat' if x_contact_is_english else '微信扫码添加'"/></span></span>
                 </div>
             </div>
             <p t-if="product and product.default_code" class="x_contact_order_code">
