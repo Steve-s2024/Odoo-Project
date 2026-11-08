@@ -226,6 +226,24 @@
                     height: auto;
                     margin: 0 0 6px;
                 }
+                html.x_img_fade main img:not(.x_ready) {
+                    opacity: 0;
+                }
+                html.x_img_fade main img {
+                    transition: opacity 400ms ease;
+                }
+                html.x_img_fade main .x_item_product_image img {
+                    transition: transform 0.22s ease, opacity 400ms ease;
+                }
+                html.x_bg_wait main [style*="background-image"]:not(.x_ready) {
+                    background-image: none !important;
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    html.x_img_fade main img,
+                    html.x_img_fade main .x_item_product_image img {
+                        transition: none;
+                    }
+                }
                 @keyframes x_page_in {
                     from {
                         opacity: 0;
@@ -240,6 +258,69 @@
                     }
                 }
             </style>
+            <script>
+                (function () {
+                    // Show each photo only once it has fully loaded (fade in), instead of painting it strip by strip.
+                    // Off inside the website editor (an iframe), so editing and saving pages never see these classes.
+                    if (window.self !== window.top) {
+                        return;
+                    }
+                    var root = document.documentElement;
+                    root.classList.add("x_img_fade", "x_bg_wait");
+                    var ready = function (el) { el.classList.add("x_ready"); };
+                    var onImg = function (event) {
+                        if (event.target.tagName === "IMG") {
+                            ready(event.target);
+                        }
+                    };
+                    document.addEventListener("load", onImg, true);
+                    document.addEventListener("error", onImg, true);
+                    var bgDone = function () { root.classList.remove("x_bg_wait"); };
+                    setTimeout(bgDone, 8000);
+                    document.addEventListener("DOMContentLoaded", function () {
+                        var blocks = document.querySelectorAll("main [style*='background-image']");
+                        var left = blocks.length;
+                        if (left === 0) {
+                            bgDone();
+                            return;
+                        }
+                        blocks.forEach(function (el) {
+                            var match = /url\(["']?([^"')]+)/.exec(el.style.backgroundImage);
+                            var done = function () {
+                                ready(el);
+                                left -= 1;
+                                if (left === 0) {
+                                    bgDone();
+                                }
+                            };
+                            if (!match) {
+                                done();
+                                return;
+                            }
+                            var probe = new Image();
+                            probe.onload = done;
+                            probe.onerror = done;
+                            probe.src = match[1];
+                        });
+                    });
+                    // Never keep a photo hidden for long: one still downloading after about 6 s is shown as it loads.
+                    var seen = new WeakMap();
+                    setInterval(function () {
+                        var now = Date.now();
+                        document.querySelectorAll("main img:not(.x_ready)").forEach(function (img) {
+                            if (img.complete) {
+                                ready(img);
+                            } else if (img.naturalWidth) {
+                                if (!seen.has(img)) {
+                                    seen.set(img, now);
+                                } else if (now - seen.get(img) > 6000) {
+                                    ready(img);
+                                }
+                            }
+                        });
+                    }, 2000);
+                })();
+            </script>
         </xpath>
         <xpath expr="//body" position="inside">
             <script>
