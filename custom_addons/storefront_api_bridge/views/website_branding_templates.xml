@@ -2,9 +2,25 @@
 <odoo>
     <template id="website_search_branding" inherit_id="website.layout" name="SUN Winter Sports search branding" priority="90">
         <xpath expr="//link[@rel='shortcut icon']" position="replace">
-            <link rel="icon" type="image/png" sizes="192x192" href="/storefront_api_bridge/static/src/img/sun-favicon-192.png"/>
-            <link rel="icon" type="image/svg+xml" sizes="any" href="/storefront_api_bridge/static/src/img/sun-favicon.svg"/>
-            <link rel="shortcut icon" type="image/x-icon" href="/storefront_api_bridge/static/src/img/sun-favicon.ico"/>
+            <!-- Square white-on-black SUN icon (Google shows it in a circle); new file names beat the CDN cache. -->
+            <link rel="icon" type="image/png" sizes="48x48" href="/storefront_api_bridge/static/src/img/sun-icon-dark-48.png"/>
+            <link rel="icon" type="image/png" sizes="192x192" href="/storefront_api_bridge/static/src/img/sun-icon-dark-192.png"/>
+            <link rel="apple-touch-icon" sizes="180x180" href="/storefront_api_bridge/static/src/img/sun-icon-dark-180.png"/>
+            <link rel="shortcut icon" type="image/x-icon" href="/storefront_api_bridge/static/src/img/sun-icon-dark.ico"/>
+        </xpath>
+        <!-- Company markup: same name as the site name (Google uses both), square logo. -->
+        <xpath expr="//script[@type='application/ld+json'][@t-if='res_company and website']" position="replace">
+            <t t-set="x_org_name" t-value="'思安奇 SUN' if request.httprequest.host.endswith('.cn') else 'SUN Winter Sports'"/>
+            <script t-if="res_company and website" type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "<t t-out="x_org_name"/>",
+    "alternateName": ["SUN", "思安奇"],
+    "logo": "<t t-out="base_url"/>/storefront_api_bridge/static/src/img/sun-icon-dark-512.png",
+    "url": "<t t-out="base_url"/>/"
+}
+            </script>
         </xpath>
         <xpath expr="//head" position="inside">
             <!-- og:site_name is set in models/website_seo.py; same per-domain name here. -->
