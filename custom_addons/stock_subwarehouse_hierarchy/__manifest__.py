@@ -28,7 +28,6 @@
         "security/ir.model.access.csv",
         "data/currency_data.xml",
         "data/branding_data.xml",
-        "data/language_data.xml",
         "data/distributor_data.xml",
         "data/sale_nature_data.xml",
         "data/external_sales_dashboard.xml",
