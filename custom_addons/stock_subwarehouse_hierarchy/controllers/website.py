@@ -17,11 +17,17 @@ class StockSubwarehouseWebsite(http.Controller):
     @route("/collections", type="http", auth="public", website=True, sitemap=True)
     def collections(self, **kwargs):
         is_english = request.lang and request.lang.code == "en_US"
+        # The /collections page record holds the search description (per language).
+        page = request.env["website.page"].sudo().search(
+            [("url", "=", "/collections"), ("website_id", "in", [False, request.website.id])],
+            order="website_id", limit=1,
+        )
         return request.render(
             "stock_subwarehouse_hierarchy.collections_page",
             {
                 "is_english": is_english,
                 "additional_title": "Collections" if is_english else "产品系列",
+                "seo_object": page or None,
             },
         )
 

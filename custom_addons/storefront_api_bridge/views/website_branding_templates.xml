@@ -25,6 +25,9 @@
         <xpath expr="//head" position="inside">
             <!-- og:site_name is set in models/website_seo.py; same per-domain name here. -->
             <meta name="application-name" t-att-content="'思安奇 SUN' if request.httprequest.host.endswith('.cn') else 'SUN Winter Sports'"/>
+            <!-- Keep login, sign-up, cart, checkout and account pages out of search results (links still followed). -->
+            <t t-set="x_path" t-value="request.httprequest.path"/>
+            <meta t-if="'/web/login' in x_path or '/web/signup' in x_path or '/web/reset_password' in x_path or '/shop/cart' in x_path or '/shop/checkout' in x_path or '/shop/address' in x_path or '/shop/payment' in x_path or '/shop/confirmation' in x_path or x_path.endswith('/my') or '/my/' in x_path" name="robots" content="noindex, follow"/>
         </xpath>
     </template>
 </odoo>
