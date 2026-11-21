@@ -264,38 +264,67 @@
                 .x_page_loader_card {
                     display: flex;
                     flex-direction: column;
-                    align-items: center;
-                    gap: .7rem;
-                    min-width: 9.5rem;
-                    padding: 1.15rem 1.4rem 1rem;
-                    color: #111;
-                    background: rgba(255, 255, 255, .96);
-                    border: 1px solid rgba(17, 17, 17, .08);
-                    border-radius: 1.25rem;
-                    box-shadow: 0 18px 55px rgba(0, 0, 0, .16);
+                    align-items: stretch;
+                    gap: 1rem;
+                    width: 11rem;
+                    padding: 1.35rem 1.25rem 1rem;
+                    color: #fff;
+                    background: #0b0d10;
+                    border-radius: 14px;
+                    box-shadow: 0 22px 60px rgba(0, 0, 0, .38), inset 0 0 0 1px rgba(255, 255, 255, .06);
                     font-family: Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-                    font-size: .78rem;
-                    font-weight: 700;
-                    letter-spacing: .04em;
                     transform: translateY(6px) scale(.98);
                     transition: transform .22s ease;
                 }
                 html.x_page_loading .x_page_loader_card {
                     transform: none;
                 }
-                .x_page_loader_dots {
+                .x_page_loader_logo {
+                    display: block;
+                    width: 7.25rem;
+                    height: auto;
+                    margin: 0 auto .15rem;
+                }
+                .x_page_loader_track {
+                    position: relative;
+                    display: block;
+                    height: 2px;
+                    overflow: hidden;
+                    border-radius: 2px;
+                    background: rgba(255, 255, 255, .14);
+                }
+                .x_page_loader_track::after {
+                    content: "";
+                    position: absolute;
+                    top: 0;
+                    bottom: 0;
+                    left: 0;
+                    width: 38%;
+                    border-radius: 2px;
+                    background: #fff;
+                    animation: x_page_loader_run 1.15s cubic-bezier(.65, 0, .35, 1) infinite;
+                }
+                .x_page_loader_row {
                     display: flex;
                     align-items: center;
-                    justify-content: center;
-                    gap: .38rem;
-                    width: 4.5rem;
-                    height: 2.25rem;
+                    justify-content: space-between;
+                }
+                .x_page_loader_label {
+                    color: rgba(255, 255, 255, .62);
+                    font-size: .66rem;
+                    font-weight: 700;
+                    letter-spacing: .16em;
+                    text-transform: uppercase;
+                }
+                .x_page_loader_dots {
+                    display: flex;
+                    gap: .28rem;
                 }
                 .x_page_loader_dots span {
-                    width: .72rem;
-                    height: .72rem;
+                    width: .36rem;
+                    height: .36rem;
                     border-radius: 50%;
-                    background: #111;
+                    background: #fff;
                     animation: x_page_loader_pulse .9s ease-in-out infinite both;
                 }
                 .x_page_loader_dots span:nth-child(2) {
@@ -304,15 +333,20 @@
                 .x_page_loader_dots span:nth-child(3) {
                     animation-delay: .24s;
                 }
+                @keyframes x_page_loader_run {
+                    0% { transform: translateX(-100%); }
+                    100% { transform: translateX(265%); }
+                }
                 @keyframes x_page_loader_pulse {
-                    0%, 80%, 100% { opacity: .25; transform: translateY(0) scale(.8); }
-                    40% { opacity: 1; transform: translateY(-.38rem) scale(1); }
+                    0%, 80%, 100% { opacity: .25; transform: scale(.75); }
+                    40% { opacity: 1; transform: scale(1); }
                 }
                 @media (prefers-reduced-motion: reduce) {
                     .x_page_loader,
                     .x_page_loader_card {
                         transition: none;
                     }
+                    .x_page_loader_track::after,
                     .x_page_loader_dots span {
                         animation: none;
                         opacity: .65;
@@ -417,15 +451,27 @@
                             var card = document.createElement("div");
                             card.className = "x_page_loader_card";
                             card.setAttribute("role", "status");
+                            var logo = document.createElement("img");
+                            logo.className = "x_page_loader_logo";
+                            logo.alt = "";
+                            logo.src = "/stock_subwarehouse_hierarchy/static/img/sun-your-sport-white.svg";
+                            var track = document.createElement("span");
+                            track.className = "x_page_loader_track";
+                            var row = document.createElement("span");
+                            row.className = "x_page_loader_row";
+                            var text = document.createElement("span");
+                            text.className = "x_page_loader_label";
+                            text.textContent = label;
                             var dots = document.createElement("span");
                             dots.className = "x_page_loader_dots";
                             for (var i = 0; i !== 3; i += 1) {
                                 dots.appendChild(document.createElement("span"));
                             }
-                            var text = document.createElement("span");
-                            text.textContent = label;
-                            card.appendChild(dots);
-                            card.appendChild(text);
+                            row.appendChild(text);
+                            row.appendChild(dots);
+                            card.appendChild(logo);
+                            card.appendChild(track);
+                            card.appendChild(row);
                             box.appendChild(card);
                             document.body.appendChild(box);
                         };
@@ -448,7 +494,20 @@
                             },
                             hide: hide,
                         };
-                        window.addEventListener("pageshow", hide);
+                        // Hide again when the page comes back from the Back/Forward cache.
+                        window.addEventListener("pageshow", function (event) {
+                            if (event.persisted) {
+                                hide();
+                            }
+                        });
+                        // Prepare the (hidden) card after the page has loaded, so the logo is ready in time.
+                        window.addEventListener("load", function () {
+                            setTimeout(function () {
+                                if (!box) {
+                                    build();
+                                }
+                            }, 1500);
+                        });
                     })();
                     // Dim the page while the next one loads; never leave it hidden.
                     const root = document.documentElement;
