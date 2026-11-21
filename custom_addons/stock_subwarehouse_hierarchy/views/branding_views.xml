@@ -244,6 +244,80 @@
                         transition: none;
                     }
                 }
+                .x_page_loader {
+                    position: fixed;
+                    inset: 0;
+                    z-index: 2147483000;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    pointer-events: none;
+                    opacity: 0;
+                    visibility: hidden;
+                    transition: opacity .22s ease, visibility 0s linear .22s;
+                }
+                html.x_page_loading .x_page_loader {
+                    opacity: 1;
+                    visibility: visible;
+                    transition-delay: 0s;
+                }
+                .x_page_loader_card {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: .7rem;
+                    min-width: 9.5rem;
+                    padding: 1.15rem 1.4rem 1rem;
+                    color: #111;
+                    background: rgba(255, 255, 255, .96);
+                    border: 1px solid rgba(17, 17, 17, .08);
+                    border-radius: 1.25rem;
+                    box-shadow: 0 18px 55px rgba(0, 0, 0, .16);
+                    font-family: Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+                    font-size: .78rem;
+                    font-weight: 700;
+                    letter-spacing: .04em;
+                    transform: translateY(6px) scale(.98);
+                    transition: transform .22s ease;
+                }
+                html.x_page_loading .x_page_loader_card {
+                    transform: none;
+                }
+                .x_page_loader_dots {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: .38rem;
+                    width: 4.5rem;
+                    height: 2.25rem;
+                }
+                .x_page_loader_dots span {
+                    width: .72rem;
+                    height: .72rem;
+                    border-radius: 50%;
+                    background: #111;
+                    animation: x_page_loader_pulse .9s ease-in-out infinite both;
+                }
+                .x_page_loader_dots span:nth-child(2) {
+                    animation-delay: .12s;
+                }
+                .x_page_loader_dots span:nth-child(3) {
+                    animation-delay: .24s;
+                }
+                @keyframes x_page_loader_pulse {
+                    0%, 80%, 100% { opacity: .25; transform: translateY(0) scale(.8); }
+                    40% { opacity: 1; transform: translateY(-.38rem) scale(1); }
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .x_page_loader,
+                    .x_page_loader_card {
+                        transition: none;
+                    }
+                    .x_page_loader_dots span {
+                        animation: none;
+                        opacity: .65;
+                    }
+                }
                 @keyframes x_page_in {
                     from {
                         opacity: 0;
@@ -325,6 +399,57 @@
         <xpath expr="//body" position="inside">
             <script>
                 (function () {
+                    // Page loader: a small centred card ("Loading" / "正在加载") when the next page takes a moment.
+                    // Shown after 250 ms (no flash on fast pages), gone on arrival or after 12 s; clicks pass through.
+                    (function () {
+                        if (window.self !== window.top) {
+                            return;
+                        }
+                        var html = document.documentElement;
+                        var label = (html.lang || "").toLowerCase().indexOf("zh") === 0 ? "正在加载" : "Loading";
+                        var box = null;
+                        var showTimer = 0;
+                        var safety = 0;
+                        var build = function () {
+                            box = document.createElement("div");
+                            box.className = "x_page_loader";
+                            box.setAttribute("aria-hidden", "true");
+                            var card = document.createElement("div");
+                            card.className = "x_page_loader_card";
+                            card.setAttribute("role", "status");
+                            var dots = document.createElement("span");
+                            dots.className = "x_page_loader_dots";
+                            for (var i = 0; i !== 3; i += 1) {
+                                dots.appendChild(document.createElement("span"));
+                            }
+                            var text = document.createElement("span");
+                            text.textContent = label;
+                            card.appendChild(dots);
+                            card.appendChild(text);
+                            box.appendChild(card);
+                            document.body.appendChild(box);
+                        };
+                        var hide = function () {
+                            clearTimeout(showTimer);
+                            clearTimeout(safety);
+                            html.classList.remove("x_page_loading");
+                        };
+                        window.xPageLoader = {
+                            show: function () {
+                                if (!box) {
+                                    build();
+                                }
+                                clearTimeout(showTimer);
+                                clearTimeout(safety);
+                                showTimer = setTimeout(function () {
+                                    html.classList.add("x_page_loading");
+                                }, 250);
+                                safety = setTimeout(hide, 12000);
+                            },
+                            hide: hide,
+                        };
+                        window.addEventListener("pageshow", hide);
+                    })();
                     // Dim the page while the next one loads; never leave it hidden.
                     const root = document.documentElement;
                     const reset = () => root.classList.remove("x_page_leaving");
@@ -346,6 +471,9 @@
                             if (!event.defaultPrevented) {
                                 root.classList.add("x_page_leaving");
                                 setTimeout(reset, 2500);
+                                if (window.xPageLoader) {
+                                    window.xPageLoader.show();
+                                }
                             }
                         });
                     });
