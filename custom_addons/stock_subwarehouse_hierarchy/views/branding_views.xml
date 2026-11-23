@@ -266,11 +266,11 @@
                     flex-direction: column;
                     align-items: stretch;
                     gap: 1rem;
-                    width: 11rem;
+                    width: 9.5rem;
                     padding: 1.35rem 1.25rem 1rem;
                     color: #111;
                     background: rgba(255, 255, 255, .97);
-                    border-radius: 14px;
+                    border-radius: 8px;
                     box-shadow: 0 22px 60px rgba(0, 0, 0, .16), inset 0 0 0 1px rgba(17, 17, 17, .07);
                     font-family: Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
                     transform: translateY(6px) scale(.98);
@@ -281,14 +281,16 @@
                 }
                 .x_page_loader_logo {
                     display: block;
-                    width: 7.25rem;
+                    width: 6.5rem;
                     height: auto;
                     margin: 0 auto .15rem;
                 }
                 .x_page_loader_track {
                     position: relative;
                     display: block;
+                    width: 4.5rem;
                     height: 2px;
+                    margin: 0 auto;
                     overflow: hidden;
                     border-radius: 2px;
                     background: rgba(17, 17, 17, .1);
