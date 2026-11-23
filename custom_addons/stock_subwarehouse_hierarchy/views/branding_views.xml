@@ -268,10 +268,10 @@
                     gap: 1rem;
                     width: 11rem;
                     padding: 1.35rem 1.25rem 1rem;
-                    color: #fff;
-                    background: #0b0d10;
+                    color: #111;
+                    background: rgba(255, 255, 255, .97);
                     border-radius: 14px;
-                    box-shadow: 0 22px 60px rgba(0, 0, 0, .38), inset 0 0 0 1px rgba(255, 255, 255, .06);
+                    box-shadow: 0 22px 60px rgba(0, 0, 0, .16), inset 0 0 0 1px rgba(17, 17, 17, .07);
                     font-family: Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
                     transform: translateY(6px) scale(.98);
                     transition: transform .22s ease;
@@ -291,7 +291,7 @@
                     height: 2px;
                     overflow: hidden;
                     border-radius: 2px;
-                    background: rgba(255, 255, 255, .14);
+                    background: rgba(17, 17, 17, .1);
                 }
                 .x_page_loader_track::after {
                     content: "";
@@ -301,53 +301,28 @@
                     left: 0;
                     width: 38%;
                     border-radius: 2px;
-                    background: #fff;
+                    background: #111;
                     animation: x_page_loader_run 1.15s cubic-bezier(.65, 0, .35, 1) infinite;
                 }
-                .x_page_loader_row {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                }
                 .x_page_loader_label {
-                    color: rgba(255, 255, 255, .62);
+                    display: block;
+                    text-align: center;
+                    color: rgba(17, 17, 17, .55);
                     font-size: .66rem;
                     font-weight: 700;
                     letter-spacing: .16em;
                     text-transform: uppercase;
                 }
-                .x_page_loader_dots {
-                    display: flex;
-                    gap: .28rem;
-                }
-                .x_page_loader_dots span {
-                    width: .36rem;
-                    height: .36rem;
-                    border-radius: 50%;
-                    background: #fff;
-                    animation: x_page_loader_pulse .9s ease-in-out infinite both;
-                }
-                .x_page_loader_dots span:nth-child(2) {
-                    animation-delay: .12s;
-                }
-                .x_page_loader_dots span:nth-child(3) {
-                    animation-delay: .24s;
-                }
                 @keyframes x_page_loader_run {
                     0% { transform: translateX(-100%); }
                     100% { transform: translateX(265%); }
-                }
-                @keyframes x_page_loader_pulse {
-                    0%, 80%, 100% { opacity: .25; transform: scale(.75); }
-                    40% { opacity: 1; transform: scale(1); }
                 }
                 @media (prefers-reduced-motion: reduce) {
                     .x_page_loader,
                     .x_page_loader_card {
                         transition: none;
                     }
-                    .x_page_loader_track::after,
-                    .x_page_loader_dots span {
+                    .x_page_loader_track::after {
                         animation: none;
                         opacity: .65;
                     }
@@ -454,24 +429,15 @@
                             var logo = document.createElement("img");
                             logo.className = "x_page_loader_logo";
                             logo.alt = "";
-                            logo.src = "/stock_subwarehouse_hierarchy/static/img/sun-your-sport-white.svg";
+                            logo.src = "/stock_subwarehouse_hierarchy/static/img/sun-your-sport-black.svg";
                             var track = document.createElement("span");
                             track.className = "x_page_loader_track";
-                            var row = document.createElement("span");
-                            row.className = "x_page_loader_row";
                             var text = document.createElement("span");
                             text.className = "x_page_loader_label";
                             text.textContent = label;
-                            var dots = document.createElement("span");
-                            dots.className = "x_page_loader_dots";
-                            for (var i = 0; i !== 3; i += 1) {
-                                dots.appendChild(document.createElement("span"));
-                            }
-                            row.appendChild(text);
-                            row.appendChild(dots);
                             card.appendChild(logo);
                             card.appendChild(track);
-                            card.appendChild(row);
+                            card.appendChild(text);
                             box.appendChild(card);
                             document.body.appendChild(box);
                         };
