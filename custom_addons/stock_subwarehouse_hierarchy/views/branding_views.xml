@@ -266,8 +266,8 @@
                     flex-direction: column;
                     align-items: stretch;
                     gap: 1rem;
-                    width: auto;
-                    padding: 1rem;
+                    width: 11rem;
+                    padding: 1.35rem 1.25rem 1rem;
                     color: #111;
                     background: rgba(255, 255, 255, .97);
                     border-radius: 8px;
@@ -288,9 +288,7 @@
                 .x_page_loader_track {
                     position: relative;
                     display: block;
-                    width: 4.5rem;
                     height: 2px;
-                    margin: 0 auto;
                     overflow: hidden;
                     border-radius: 2px;
                     background: rgba(17, 17, 17, .1);
