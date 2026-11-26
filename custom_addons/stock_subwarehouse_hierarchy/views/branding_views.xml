@@ -338,6 +338,10 @@ file updated
                 .x_about {
                     font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
                 }
+                .x_contact &gt; .container,
+                .x_about &gt; .container {
+                    max-width: 1080px;
+                }
                 .x_contact_eyebrow {
                     margin: 0 0 .8rem;
                     color: rgba(17, 17, 17, .5);
@@ -350,7 +354,7 @@ file updated
                     margin: 0 0 1rem;
                     color: #111;
                     font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
-                    font-size: clamp(2rem, 3.2vw, 2.75rem);
+                    font-size: clamp(1.6rem, 2.4vw, 2rem);
                     font-weight: 600;
                     line-height: 1.08;
                     letter-spacing: -.01em;
@@ -359,7 +363,7 @@ file updated
                     max-width: 27rem;
                     margin: 0 0 2.25rem;
                     color: #5b5f66;
-                    font-size: 1rem;
+                    font-size: .9375rem;
                     line-height: 1.7;
                 }
                 .x_contact_list {
@@ -373,6 +377,7 @@ file updated
                     gap: 1rem;
                     padding: 1rem 0;
                     border-bottom: 1px solid rgba(17, 17, 17, .1);
+                    font-size: .9375rem;
                     line-height: 1.5;
                 }
                 .x_contact_key {
@@ -435,7 +440,7 @@ file updated
                     border: 1px solid rgba(17, 17, 17, .1);
                     border-radius: 6px;
                     color: #111;
-                    font-size: .95rem;
+                    font-size: .9rem;
                     transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
                 }
                 .x_contact_card .form-control:focus {
@@ -593,7 +598,7 @@ file updated
                     max-width: 34rem;
                     margin: 0 0 1.1rem;
                     color: #5b5f66;
-                    font-size: 1rem;
+                    font-size: .9375rem;
                     line-height: 1.75;
                 }
                 .x_about_text .btn {
