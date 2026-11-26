@@ -329,6 +329,233 @@
                         opacity: .65;
                     }
                 }
+                /* Contact page (x_contact), blue outline buttons, Discover slider - 2026-11-26 */
+                .x_contact {
+                    padding: 64px 0 80px;
+                }
+                .x_contact_eyebrow {
+                    margin: 0 0 .8rem;
+                    color: rgba(17, 17, 17, .5);
+                    font-size: .7rem;
+                    font-weight: 700;
+                    letter-spacing: .18em;
+                    text-transform: uppercase;
+                }
+                .x_contact_title {
+                    margin: 0 0 1rem;
+                    color: #111;
+                    font-family: "Inter Tight", Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+                    font-size: clamp(2rem, 3.2vw, 2.75rem);
+                    font-weight: 600;
+                    line-height: 1.08;
+                    letter-spacing: -.01em;
+                }
+                .x_contact_lead {
+                    max-width: 27rem;
+                    margin: 0 0 2.25rem;
+                    color: #5b5f66;
+                    font-size: 1rem;
+                    line-height: 1.7;
+                }
+                .x_contact_list {
+                    margin: 0;
+                    padding: 0;
+                    list-style: none;
+                    border-top: 1px solid rgba(17, 17, 17, .1);
+                }
+                .x_contact_list li {
+                    display: flex;
+                    gap: 1rem;
+                    padding: 1rem 0;
+                    border-bottom: 1px solid rgba(17, 17, 17, .1);
+                    line-height: 1.5;
+                }
+                .x_contact_key {
+                    flex: none;
+                    width: 5.5rem;
+                    padding-top: .2rem;
+                    color: rgba(17, 17, 17, .45);
+                    font-size: .68rem;
+                    font-weight: 700;
+                    letter-spacing: .16em;
+                    text-transform: uppercase;
+                }
+                .x_contact_val,
+                .x_contact_val a {
+                    color: #111 !important;
+                    font-weight: 500;
+                    text-decoration: none;
+                }
+                .x_contact_val a:hover {
+                    color: #0260eb !important;
+                }
+                .x_contact_card {
+                    padding: 2.25rem;
+                    background: #fff;
+                    border: 1px solid rgba(17, 17, 17, .08);
+                    border-radius: 8px;
+                    box-shadow: 0 20px 55px rgba(0, 0, 0, .07);
+                }
+                .x_contact_card .s_website_form_label {
+                    width: auto !important;
+                    margin-bottom: .45rem;
+                    color: rgba(17, 17, 17, .62);
+                    font-size: .68rem;
+                    font-weight: 700;
+                    letter-spacing: .14em;
+                    text-transform: uppercase;
+                }
+                .x_contact_card .s_website_form_mark {
+                    margin-left: .2em;
+                    color: #e5484d;
+                    opacity: .8;
+                }
+                .x_contact_card .form-control {
+                    padding: .72rem .9rem;
+                    background: #f7f7f8;
+                    border: 1px solid rgba(17, 17, 17, .1);
+                    border-radius: 6px;
+                    color: #111;
+                    font-size: .95rem;
+                    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+                }
+                .x_contact_card .form-control:focus {
+                    background: #fff;
+                    border-color: #0260eb;
+                    box-shadow: 0 0 0 3px rgba(2, 96, 235, .12);
+                }
+                .x_contact_card textarea.form-control {
+                    min-height: 9.5rem;
+                    resize: vertical;
+                }
+                .x_contact_card .s_website_form_submit {
+                    margin-top: .5rem;
+                }
+                .x_contact_card .s_website_form_send,
+                .s_carousel_wrapper .carousel-item .btn {
+                    padding: .62rem 1.6rem;
+                    background: transparent !important;
+                    border: 1px solid #0260eb !important;
+                    border-radius: 6.4px;
+                    color: #0260eb !important;
+                    font-weight: 500;
+                    transition: background .18s ease, color .18s ease;
+                }
+                .s_carousel_wrapper .carousel-item .btn {
+                    color: #fff !important;
+                }
+                .x_contact_card .s_website_form_send:hover,
+                .x_contact_card .s_website_form_send:focus-visible,
+                .s_carousel_wrapper .carousel-item .btn:hover,
+                .s_carousel_wrapper .carousel-item .btn:focus-visible {
+                    background: #0260eb !important;
+                    color: #fff !important;
+                }
+                @media (max-width: 991.98px) {
+                    .x_contact {
+                        padding: 40px 0 56px;
+                    }
+                    .x_contact_card {
+                        margin-top: 2.5rem;
+                        padding: 1.5rem;
+                    }
+                }
+                .s_carousel_wrapper .carousel-item {
+                    padding-top: 0 !important;
+                    padding-bottom: 0 !important;
+                    min-height: 36rem !important;
+                }
+                .s_carousel_wrapper .carousel-item.active,
+                .s_carousel_wrapper .carousel-item-next,
+                .s_carousel_wrapper .carousel-item-prev {
+                    display: flex !important;
+                    align-items: center;
+                }
+                .s_carousel_wrapper .carousel-item::before {
+                    content: "";
+                    position: absolute;
+                    inset: 0;
+                    z-index: 0;
+                    background: linear-gradient(90deg, rgba(0, 0, 0, .62) 0%, rgba(0, 0, 0, .34) 45%, rgba(0, 0, 0, 0) 75%);
+                    pointer-events: none;
+                }
+                .s_carousel_wrapper .carousel-item &gt; .container {
+                    position: relative;
+                    z-index: 1;
+                    width: 100%;
+                    padding-left: 5.25rem;
+                    padding-right: 7rem;
+                }
+                .s_carousel_wrapper .carousel-item .row.o_grid_mode {
+                    display: block !important;
+                }
+                .s_carousel_wrapper .carousel-item .o_grid_item {
+                    max-width: 31rem;
+                    padding: 0 !important;
+                }
+                .s_carousel_wrapper .carousel-item h2 {
+                    margin: 0 !important;
+                    color: #fff !important;
+                    font-family: "Inter Tight", Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+                    font-size: clamp(2.2rem, 4vw, 3.4rem) !important;
+                    font-weight: 600 !important;
+                    line-height: 1.08 !important;
+                    letter-spacing: -.01em;
+                    text-align: left !important;
+                }
+                .s_carousel_wrapper .carousel-item .o_grid_item h2 + :not(h2) {
+                    margin-top: 1.25rem !important;
+                }
+                .s_carousel_wrapper .carousel-item h2 br {
+                    display: none;
+                }
+                .s_carousel_wrapper .carousel-item h2 font,
+                .s_carousel_wrapper .carousel-item p font,
+                .s_carousel_wrapper .carousel-item div font {
+                    color: inherit !important;
+                }
+                .s_carousel_wrapper .carousel-item .o_grid_item p,
+                .s_carousel_wrapper .carousel-item .o_grid_item &gt; div,
+                .s_carousel_wrapper .carousel-item .o_grid_item span {
+                    color: rgba(255, 255, 255, .88) !important;
+                    font-size: 1.05rem !important;
+                    line-height: 1.75 !important;
+                    text-align: left !important;
+                }
+                .s_carousel_wrapper .carousel-item .o_grid_item p,
+                .s_carousel_wrapper .carousel-item .o_grid_item &gt; div {
+                    margin: 0 0 1rem !important;
+                }
+                .s_carousel_wrapper .carousel-item .o_grid_item p:last-child {
+                    margin-bottom: 0 !important;
+                }
+                .s_carousel_wrapper .carousel-item .o_grid_item p:has(&gt; .btn) {
+                    margin-top: 1.75rem !important;
+                }
+                @media (max-width: 991.98px) {
+                    .s_carousel_wrapper .carousel-item {
+                        min-height: 30rem !important;
+                    }
+                    .s_carousel_wrapper .carousel-item &gt; .container {
+                        padding: 4rem 1.5rem 5rem;
+                    }
+                    .s_carousel_wrapper .carousel-item::before {
+                        background: rgba(0, 0, 0, .5);
+                    }
+                }
+                .s_carousel_wrapper .carousel-item h2 *,
+                .s_carousel_wrapper .carousel-item .o_grid_item h2 span {
+                    font-size: inherit !important;
+                    line-height: inherit !important;
+                    color: inherit !important;
+                }
+                .s_carousel_wrapper .carousel-item h2 + h2 {
+                    margin-top: 0 !important;
+                }
+                .s_carousel_wrapper .carousel-item .o_grid_item .btn,
+                .s_carousel_wrapper .carousel-item .o_grid_item .btn * {
+                    color: #fff !important;
+                }
                 @keyframes x_page_in {
                     from {
                         opacity: 0;
