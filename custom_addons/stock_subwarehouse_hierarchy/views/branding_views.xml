@@ -499,7 +499,7 @@ file updated
                 }
                 .s_carousel_wrapper .carousel-item &gt; .container {
                     position: relative;
-                    z-index: 1;
+                    z-index: auto;
                     width: 100%;
                     padding-left: 5.25rem;
                     padding-right: 7rem;
@@ -571,7 +571,11 @@ file updated
                     margin-top: 0 !important;
                 }
                 /* Buttons on photos (slider, Collections tiles): light outline like "View All";
-                   on hover a light fill with the text cut out so the photo shows through. */
+                   on hover a light fill with the text cut out so the photo shows through.
+                   The tile row must not form its own layer, or the cut-out text blends with nothing and shows black. */
+                .s_ecomm_categories_showcase_row {
+                    z-index: auto !important;
+                }
                 .s_carousel_wrapper .carousel-item .o_grid_item .btn {
                     padding: 6px 16px;
                     background: transparent !important;
