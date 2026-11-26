@@ -620,6 +620,46 @@ file updated
                         padding: 48px 0;
                     }
                 }
+                /* Text consistency on Home (page 4) and Discover (page 16), 2026-11-26:
+                   section titles and body text like Contact / About Us. Heroes, slider,
+                   photo-tile labels, layouts and colours are left as they are. */
+                html[data-main-object="website.page(4,)"] .x_feature h2,
+                html[data-main-object="website.page(4,)"] .s_picture h2,
+                html[data-main-object="website.page(16,)"] .s_picture h2,
+                html[data-main-object="website.page(16,)"] .s_image_text_box h2,
+                html[data-main-object="website.page(16,)"] .s_faq_collapse h2 {
+                    font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif !important;
+                    font-size: 2rem !important;
+                    font-weight: 600 !important;
+                    line-height: 1.15 !important;
+                    letter-spacing: -.01em;
+                }
+                html[data-main-object="website.page(4,)"] .x_feature h2 *,
+                html[data-main-object="website.page(4,)"] .s_picture h2 *,
+                html[data-main-object="website.page(16,)"] .s_picture h2 *,
+                html[data-main-object="website.page(16,)"] .s_image_text_box h2 *,
+                html[data-main-object="website.page(16,)"] .s_faq_collapse h2 * {
+                    font-size: inherit !important;
+                    font-family: inherit !important;
+                }
+                html[data-main-object="website.page(4,)"] .x_feature p,
+                html[data-main-object="website.page(4,)"] .s_picture p,
+                html[data-main-object="website.page(16,)"] .s_picture p,
+                html[data-main-object="website.page(16,)"] .s_image_text_box p,
+                html[data-main-object="website.page(16,)"] .s_faq_collapse p,
+                html[data-main-object="website.page(16,)"] .s_faq_collapse .accordion-body,
+                html[data-main-object="website.page(16,)"] .s_faq_collapse .accordion-button {
+                    font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif !important;
+                    font-size: .9375rem !important;
+                    line-height: 1.75 !important;
+                }
+                html[data-main-object="website.page(4,)"] .x_feature p span,
+                html[data-main-object="website.page(4,)"] .s_picture p span,
+                html[data-main-object="website.page(16,)"] .s_picture p span,
+                html[data-main-object="website.page(16,)"] .s_image_text_box p span,
+                html[data-main-object="website.page(16,)"] .s_faq_collapse p span {
+                    font-size: inherit !important;
+                }
                 @keyframes x_page_in {
                     from {
                         opacity: 0;
