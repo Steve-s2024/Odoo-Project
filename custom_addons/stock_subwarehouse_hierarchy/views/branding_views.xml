@@ -1,3 +1,4 @@
+file updated
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <template id="sun_web_layout_branding" inherit_id="web.layout" name="SUN Web Layout Branding">
@@ -333,6 +334,10 @@
                 .x_contact {
                     padding: 64px 0 80px;
                 }
+                .x_contact,
+                .x_about {
+                    font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+                }
                 .x_contact_eyebrow {
                     margin: 0 0 .8rem;
                     color: rgba(17, 17, 17, .5);
@@ -344,7 +349,7 @@
                 .x_contact_title {
                     margin: 0 0 1rem;
                     color: #111;
-                    font-family: "Inter Tight", Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+                    font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
                     font-size: clamp(2rem, 3.2vw, 2.75rem);
                     font-weight: 600;
                     line-height: 1.08;
@@ -380,14 +385,28 @@
                     letter-spacing: .16em;
                     text-transform: uppercase;
                 }
+                .x_contact_val {
+                    display: flex;
+                    align-items: baseline;
+                    gap: .55rem;
+                }
                 .x_contact_val,
-                .x_contact_val a {
-                    color: #111 !important;
+                .x_contact_val a,
+                .x_contact_val .x_wechat_qr {
+                    color: #0260eb !important;
                     font-weight: 500;
                     text-decoration: none;
                 }
-                .x_contact_val a:hover {
-                    color: #0260eb !important;
+                .x_contact_val a:hover,
+                .x_contact_val .x_wechat_qr:hover {
+                    color: #014bb8 !important;
+                    text-decoration: underline;
+                }
+                .x_contact_icon {
+                    flex: none;
+                    width: 1.1em;
+                    color: #0260eb;
+                    text-align: center;
                 }
                 .x_contact_card {
                     padding: 2.25rem;
