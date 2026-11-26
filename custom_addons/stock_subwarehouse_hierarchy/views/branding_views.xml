@@ -431,8 +431,7 @@
                 .x_contact_card .s_website_form_submit {
                     margin-top: .5rem;
                 }
-                .x_contact_card .s_website_form_send,
-                .s_carousel_wrapper .carousel-item .btn {
+                .x_contact_card .s_website_form_send {
                     padding: .62rem 1.6rem;
                     background: transparent !important;
                     border: 1px solid #0260eb !important;
@@ -441,13 +440,8 @@
                     font-weight: 500;
                     transition: background .18s ease, color .18s ease;
                 }
-                .s_carousel_wrapper .carousel-item .btn {
-                    color: #fff !important;
-                }
                 .x_contact_card .s_website_form_send:hover,
-                .x_contact_card .s_website_form_send:focus-visible,
-                .s_carousel_wrapper .carousel-item .btn:hover,
-                .s_carousel_wrapper .carousel-item .btn:focus-visible {
+                .x_contact_card .s_website_form_send:focus-visible {
                     background: #0260eb !important;
                     color: #fff !important;
                 }
@@ -552,9 +546,55 @@
                 .s_carousel_wrapper .carousel-item h2 + h2 {
                     margin-top: 0 !important;
                 }
-                .s_carousel_wrapper .carousel-item .o_grid_item .btn,
-                .s_carousel_wrapper .carousel-item .o_grid_item .btn * {
-                    color: #fff !important;
+                /* Buttons on photos (slider, Collections tiles): light outline like "View All";
+                   on hover a light fill with the text cut out so the photo shows through. */
+                .s_carousel_wrapper .carousel-item .o_grid_item .btn {
+                    padding: 6px 16px;
+                    background: transparent !important;
+                    border: 1px solid #e9ecef !important;
+                    border-radius: 6.4px;
+                    color: #e9ecef !important;
+                    font-weight: 400;
+                    transition: color .15s ease-in-out, background-color .15s ease-in-out;
+                }
+                .s_carousel_wrapper .carousel-item .o_grid_item .btn:hover,
+                .s_carousel_wrapper .carousel-item .o_grid_item .btn:focus-visible,
+                .s_ecomm_categories_showcase_block a.btn:hover,
+                .s_ecomm_categories_showcase_block a.btn:focus-visible {
+                    background: #e9ecef !important;
+                    border-color: #e9ecef !important;
+                    color: #000 !important;
+                    mix-blend-mode: screen;
+                }
+                /* About Us (x_about) */
+                .x_about {
+                    padding: 72px 0;
+                }
+                .x_about_text &gt; p:not(.x_contact_eyebrow) {
+                    max-width: 34rem;
+                    margin: 0 0 1.1rem;
+                    color: #5b5f66;
+                    font-size: 1rem;
+                    line-height: 1.75;
+                }
+                .x_about_text .btn {
+                    margin-top: .9rem;
+                    padding: .62rem 1.6rem;
+                }
+                .x_about_text .x_contact_list {
+                    max-width: 34rem;
+                    margin-top: 1.75rem;
+                }
+                .x_about_media img {
+                    display: block;
+                    width: 100%;
+                    height: auto;
+                    border-radius: 8px;
+                }
+                @media (max-width: 991.98px) {
+                    .x_about {
+                        padding: 48px 0;
+                    }
                 }
                 @keyframes x_page_in {
                     from {
